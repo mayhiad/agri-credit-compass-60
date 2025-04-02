@@ -45,9 +45,19 @@ const Dashboard = () => {
 
           if (farmError) {
             console.error("Hiba a farm adatok lekérésekor:", farmError);
-            setError("Nem sikerült betölteni a gazdaság adatait");
-            setLoading(false);
-            return;
+            if (farmError.code === 'PGRST116') {
+              // Ez a hiba kód azt jelenti hogy nincs találat - tehát nincs még farm adat
+              // Itt nem dobunk hibát, mert ez egy normális eset is lehet
+              setFarmData(null);
+              setError(null);
+              setLoading(false);
+              return;
+            } else {
+              // Egyéb hiba esetén hibaüzenetet jelenítünk meg
+              setError("Adatbázis hiba történt. Kérjük próbálja újra később.");
+              setLoading(false);
+              return;
+            }
           }
 
           // Ha nincs farm adat, térjünk vissza
@@ -64,7 +74,7 @@ const Dashboard = () => {
             .eq('farm_id', farms.id)
             .single();
 
-          if (marketPricesError) {
+          if (marketPricesError && marketPricesError.code !== 'PGRST116') {
             console.error("Hiba a piaci árak lekérésekor:", marketPricesError);
           }
 
@@ -109,7 +119,7 @@ const Dashboard = () => {
         }
       } catch (error) {
         console.error("Hiba az adatok betöltése során:", error);
-        setError("Nem sikerült betölteni az adatokat");
+        setError("Váratlan hiba történt az adatok betöltése során. Kérjük próbálja újra később.");
       } finally {
         setLoading(false);
       }
@@ -121,7 +131,20 @@ const Dashboard = () => {
   const handleSapsUploadComplete = (data: FarmData) => {
     setFarmData(data);
     setShowUploadForm(false);
+    setError(null); // Hiba törlése sikeres feltöltés esetén
     toast.success("SAPS dokumentum sikeresen feldolgozva");
+  };
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError(null);
+    // Újratöltjük az oldalt a friss adatokért
+    window.location.reload();
+  };
+
+  const handleAddFarmData = () => {
+    setShowUploadForm(true);
+    setError(null);
   };
   
   if (loading || authLoading) {
@@ -141,7 +164,13 @@ const Dashboard = () => {
         </div>
         
         {error ? (
-          <DashboardError message={error} />
+          <div className="space-y-4">
+            <DashboardError message={error} />
+            <div className="flex justify-center gap-4 mt-4">
+              <Button onClick={handleRetry} variant="outline">Újrapróbálkozás</Button>
+              <Button onClick={handleAddFarmData}>SAPS dokumentum feltöltése</Button>
+            </div>
+          </div>
         ) : farmData ? (
           <DashboardContent farmData={farmData} onFarmDataUpdate={setFarmData} />
         ) : showUploadForm ? (
