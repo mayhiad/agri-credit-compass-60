@@ -5,13 +5,16 @@ import { Leaf, Coins, TrendingUp, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { LoanApplication } from "@/components/LoanApplication";
 import { useAuth } from "@/App";
-import Footer from "@/components/Footer";
+import Header from "@/components/Header";
 
 const Index = () => {
   const { user, loading } = useAuth();
   
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Show header when user is logged in */}
+      {user && !loading && <Header />}
+      
       <div className="container max-w-7xl mx-auto py-10 flex-grow">
         <div className="text-center mb-10 space-y-2">
           <h1 className="text-4xl md:text-5xl font-bold">Agrár-hitelezés egyszerűen</h1>
@@ -75,9 +78,6 @@ const Index = () => {
           </Card>
         </div>
       </div>
-      
-      {/* Only show footer when user is logged in */}
-      {user && !loading && <Footer />}
     </div>
   );
 };

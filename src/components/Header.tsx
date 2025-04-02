@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 
-const Footer = () => {
+const Header = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -25,7 +25,7 @@ const Footer = () => {
   if (!user) return null;
   
   return (
-    <div className="bg-white border-t shadow-sm py-2 sticky bottom-0">
+    <div className="bg-white border-b shadow-sm py-2 sticky top-0 z-10">
       <div className="container max-w-6xl mx-auto">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-1 md:space-x-4">
@@ -69,4 +69,4 @@ const Footer = () => {
   );
 };
 
-export default Footer;
+export default Header;

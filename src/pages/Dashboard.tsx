@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +13,7 @@ import { AlertCircle, LayoutDashboard, Loader2, LogOut, Map, Tractor } from "luc
 import { toast } from "sonner";
 import NavBar from "@/components/NavBar";
 import FarmLocation from "@/components/FarmLocation";
-import Footer from "@/components/Footer";
+import Header from "@/components/Header";
 import { useAuth } from "@/App";
 
 const Dashboard = () => {
@@ -80,6 +79,7 @@ const Dashboard = () => {
   
   return (
     <div className="min-h-screen flex flex-col">
+      <Header />
       <NavBar onSignOut={handleSignOut} />
       
       <div className="container max-w-6xl mx-auto py-10 flex-grow">
