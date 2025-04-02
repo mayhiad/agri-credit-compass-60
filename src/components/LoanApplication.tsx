@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ export type FarmData = {
   totalRevenue: number;
   region: string;
   documentId: string;
+  applicantName?: string; // Added applicant name from SAPS document
 };
 
 export type UserData = {
@@ -117,7 +119,13 @@ export const LoanApplication = () => {
       case "loan-terms":
         return <LoanTerms approvedAmount={creditLimit} onSubmit={handleLoanTermsComplete} />;
       case "identification":
-        return <PersonalIdentification onComplete={handleIdentificationComplete} />;
+        return <PersonalIdentification 
+                onComplete={handleIdentificationComplete}
+                farmData={farmData ? {
+                  documentId: farmData.documentId,
+                  applicantName: farmData.applicantName
+                } : undefined}
+              />;
       case "contract":
         return (
           userData && farmData && loanTerms && (

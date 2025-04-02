@@ -8,45 +8,73 @@ import { UserData } from "@/components/LoanApplication";
 import { ArrowRight, UserCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 interface PersonalIdentificationProps {
   onComplete: (userData: UserData) => void;
+  farmData?: {
+    documentId: string;
+    applicantName?: string;
+  };
 }
 
-export const PersonalIdentification = ({ onComplete }: PersonalIdentificationProps) => {
+// Form validation schema
+const formSchema = z.object({
+  firstName: z.string().min(1, "A keresztnév kötelező"),
+  lastName: z.string().min(1, "A vezetéknév kötelező"),
+  idNumber: z.string().min(1, "A személyi igazolvány szám kötelező"),
+  taxId: z.string().min(1, "Az adóazonosító jel kötelező"),
+  address: z.string().min(1, "A lakcím kötelező"),
+  email: z.string().email("Érvénytelen email cím").optional(),
+  phone: z.string().min(1, "A telefonszám kötelező")
+});
+
+export const PersonalIdentification = ({ onComplete, farmData }: PersonalIdentificationProps) => {
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    idNumber: "",
-    taxId: "",
-    address: "",
-    email: "",
-    phone: ""
+  const [verificationStatus, setVerificationStatus] = useState<{
+    status: "pending" | "success" | "error";
+    message?: string;
+  }>({ status: "pending" });
+  
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      idNumber: "",
+      taxId: "",
+      address: "",
+      email: "",
+      phone: ""
+    }
   });
   
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-  
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validate form
-    const requiredFields = ["firstName", "lastName", "idNumber", "taxId", "address", "phone"];
-    const missingFields = requiredFields.filter(field => !formData[field as keyof typeof formData]);
-    
-    if (missingFields.length > 0) {
-      toast.error("Kérjük, töltsön ki minden kötelező mezőt");
-      return;
-    }
-    
+  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     
     try {
-      // In real app, we would validate via API or similar
+      // Simulate API call for document verification
       await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Cross-check with SAPS document data if available
+      if (farmData?.applicantName) {
+        const fullName = `${values.lastName} ${values.firstName}`.toLowerCase();
+        const sapsName = farmData.applicantName.toLowerCase();
+        
+        // Check if names match
+        if (!sapsName.includes(fullName) && !fullName.includes(sapsName)) {
+          setVerificationStatus({
+            status: "error",
+            message: "A megadott név nem egyezik a SAPS dokumentumon szereplő névvel"
+          });
+          toast.error("Az azonosítás sikertelen: a nevek nem egyeznek");
+          setLoading(false);
+          return;
+        }
+      }
       
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
@@ -55,11 +83,11 @@ export const PersonalIdentification = ({ onComplete }: PersonalIdentificationPro
         // Update user profile - commented out due to type issues
         // We'd need proper database schema setup to make this work
         console.log("Would update profile for user:", user.id, {
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          tax_id: formData.taxId,
-          address: formData.address,
-          phone: formData.phone
+          first_name: values.firstName,
+          last_name: values.lastName,
+          tax_id: values.taxId,
+          address: values.address,
+          phone: values.phone
         });
         
         // For now, we'll just mock this functionality
@@ -67,15 +95,26 @@ export const PersonalIdentification = ({ onComplete }: PersonalIdentificationPro
         // what you're expecting in the code
       }
       
+      // Verification successful
+      setVerificationStatus({
+        status: "success",
+        message: "Személyazonosítás sikeres"
+      });
+      
       // Create userData object to pass to parent component
       const userData: UserData = {
-        ...formData,
+        ...values,
         verified: true
       };
       
+      toast.success("Személyazonosítás sikeres");
       onComplete(userData);
     } catch (error) {
       console.error("Azonosítási hiba:", error);
+      setVerificationStatus({
+        status: "error",
+        message: "Hiba történt az adatok ellenőrzése során"
+      });
       toast.error("Hiba történt az adatok ellenőrzése során");
     } finally {
       setLoading(false);
@@ -94,96 +133,136 @@ export const PersonalIdentification = ({ onComplete }: PersonalIdentificationPro
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Vezetéknév</Label>
-              <Input
-                id="lastName"
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
                 name="lastName"
-                value={formData.lastName}
-                onChange={handleChange}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Vezetéknév</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="firstName">Keresztnév</Label>
-              <Input
-                id="firstName"
+              <FormField
+                control={form.control}
                 name="firstName"
-                value={formData.firstName}
-                onChange={handleChange}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Keresztnév</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="idNumber">Személyi igazolvány szám</Label>
-              <Input
-                id="idNumber"
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
                 name="idNumber"
-                value={formData.idNumber}
-                onChange={handleChange}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Személyi igazolvány szám</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="taxId">Adóazonosító jel</Label>
-              <Input
-                id="taxId"
+              <FormField
+                control={form.control}
                 name="taxId"
-                value={formData.taxId}
-                onChange={handleChange}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Adóazonosító jel</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="address">Lakcím</Label>
-            <Input
-              id="address"
+            
+            <FormField
+              control={form.control}
               name="address"
-              value={formData.address}
-              onChange={handleChange}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Lakcím</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email cím</Label>
-              <Input
-                id="email"
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
                 name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email cím</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="email" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Telefonszám</Label>
-              <Input
-                id="phone"
+              <FormField
+                control={form.control}
                 name="phone"
-                value={formData.phone}
-                onChange={handleChange}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefonszám</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-          </div>
-        </form>
+            
+            {verificationStatus.status !== "pending" && (
+              <div className={`p-3 rounded-md ${
+                verificationStatus.status === "success" 
+                  ? "bg-green-50 text-green-700 border border-green-200" 
+                  : "bg-red-50 text-red-700 border border-red-200"
+              }`}>
+                {verificationStatus.message}
+              </div>
+            )}
+            
+            <div className="pt-2">
+              <Button 
+                type="submit"
+                disabled={loading}
+                className="w-full"
+              >
+                {loading ? "Ellenőrzés..." : (
+                  <>
+                    Adatok ellenőrzése
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </Form>
       </CardContent>
-      <CardFooter>
-        <Button 
-          onClick={handleSubmit}
-          disabled={loading}
-          className="w-full"
-        >
-          {loading ? "Ellenőrzés..." : (
-            <>
-              Adatok ellenőrzése
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </>
-          )}
-        </Button>
-      </CardFooter>
     </Card>
   );
 };

@@ -45,7 +45,8 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         ],
         totalRevenue: 100000000, // 100 millió Ft
         region: "Dél-Alföld",
-        documentId: "SAPS-2023-568742"
+        documentId: "SAPS-2023-568742",
+        applicantName: "Kovács János" // Mock applicant name from SAPS document
       };
       
       onComplete(mockFarmData);
