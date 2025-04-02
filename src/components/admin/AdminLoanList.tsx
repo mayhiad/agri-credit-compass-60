@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { 
   Table, TableHeader, TableRow, TableHead, 
@@ -15,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Search, Eye, FileText } from "lucide-react";
+import { Loader2, Search, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { formatCurrency } from "@/lib/utils";
 
@@ -32,7 +33,7 @@ interface LoanWithDetails {
     first_name: string | null;
     last_name: string | null;
     customer_id: string | null;
-  } | null;
+  } | null | { error: true };
 }
 
 interface AdminLoanListProps {
@@ -64,7 +65,8 @@ const AdminLoanList = ({ isAdmin, isFinanceOfficer }: AdminLoanListProps) => {
 
         if (error) throw error;
         if (data) {
-          setLoans(data as LoanWithDetails[]);
+          // Cast the data to the expected type since we know our interface accommodates the possible response formats
+          setLoans(data as unknown as LoanWithDetails[]);
         } else {
           setLoans([]);
         }
@@ -96,6 +98,14 @@ const AdminLoanList = ({ isAdmin, isFinanceOfficer }: AdminLoanListProps) => {
 
   const filteredLoans = loans.filter(loan => {
     const searchLower = searchTerm.toLowerCase();
+    
+    // Handle possible error in profiles or null profiles
+    if (!loan.profiles || 'error' in loan.profiles) {
+      // If there's no profiles data or it's an error, only match by contract number
+      const contractMatch = loan.contract_number?.toLowerCase().includes(searchLower) || false;
+      return contractMatch && (!statusFilter || loan.status === statusFilter);
+    }
+
     const matchesSearch = 
       (loan.contract_number?.toLowerCase().includes(searchLower)) ||
       (loan.profiles?.customer_id?.toLowerCase().includes(searchLower)) ||
@@ -173,7 +183,7 @@ const AdminLoanList = ({ isAdmin, isFinanceOfficer }: AdminLoanListProps) => {
                   <TableRow key={loan.id}>
                     <TableCell className="font-medium">{loan.contract_number || '-'}</TableCell>
                     <TableCell>
-                      {loan.profiles ? (
+                      {loan.profiles && !('error' in loan.profiles) ? (
                         <div>
                           <div>
                             {loan.profiles.last_name || ''} {loan.profiles.first_name || ''}
