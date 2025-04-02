@@ -23,59 +23,82 @@ const Dashboard = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // If not authenticated and not loading, redirect to auth page
+        // Ha nem vagyunk hitelesítve és nem folyik a betöltés, irányítsuk át a bejelentkezési oldalra
         if (!authLoading && !user) {
           navigate("/auth");
           return;
         }
         
-        // Only proceed if we have a valid user
+        // Csak akkor folytassuk, ha érvényes felhasználónk van
         if (user) {
-          console.log("Fetching data for user:", user.id);
+          console.log("Adatok lekérése a felhasználó részére:", user.id);
           
-          // In a real app, this would fetch from the database based on user ID
-          // For now, we're using dynamic mock data based on user email
-          const mockFarmData: FarmData = {
-            hectares: 450,
-            cultures: [
-              { name: "Búza", hectares: 200, estimatedRevenue: 40000000 },
-              { name: "Kukorica", hectares: 150, estimatedRevenue: 32000000 },
-              { name: "Napraforgó", hectares: 100, estimatedRevenue: 28000000 }
-            ],
-            totalRevenue: 100000000, // 100 millió Ft
-            region: "Dél-Alföld",
-            documentId: `SAPS-2023-${user.id.substring(0, 6)}`, // Make unique per user
+          // Lekérjük a felhasználó specifikus farm adatait a Supabase-ből
+          const { data: farms, error: farmError } = await supabase
+            .from('farms')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+
+          if (farmError) {
+            console.error("Hiba a farm adatok lekérésekor:", farmError);
+            setError("Nem sikerült betölteni a gazdaság adatait");
+            return;
+          }
+
+          // Ha nincs farm adat, térjünk vissza
+          if (!farms) {
+            setFarmData(null);
+            return;
+          }
+
+          // Részletes piaci árak lekérése
+          const { data: marketPrices, error: marketPricesError } = await supabase
+            .from('farm_details')
+            .select('market_prices')
+            .eq('farm_id', farms.id)
+            .single();
+
+          if (marketPricesError) {
+            console.error("Hiba a piaci árak lekérésekor:", marketPricesError);
+          }
+
+          // Kultúrák lekérése
+          const { data: cultures, error: culturesError } = await supabase
+            .from('cultures')
+            .select('*')
+            .eq('farm_id', farms.id);
+
+          if (culturesError) {
+            console.error("Hiba a kultúrák lekérésekor:", culturesError);
+          }
+
+          // Farm adatok összeállítása
+          const farmData: FarmData = {
+            hectares: farms.hectares,
+            cultures: cultures?.map(culture => ({
+              name: culture.name,
+              hectares: culture.hectares,
+              estimatedRevenue: culture.estimated_revenue
+            })) || [],
+            totalRevenue: farms.total_revenue,
+            region: farms.region || "Ismeretlen régió",
+            documentId: farms.document_id || `SAPS-2023-${user.id.substring(0, 6)}`,
             applicantName: user.email?.split('@')[0] || "Ismeretlen felhasználó",
             blockIds: [`K-${user.id.substring(0, 4)}`, `L-${user.id.substring(4, 8)}`],
-            marketPrices: [
-              { 
-                culture: "Búza", 
-                averageYield: 5.8, 
-                price: 85000, 
-                trend: 2.5, 
-                lastUpdated: new Date() 
-              },
-              { 
-                culture: "Kukorica", 
-                averageYield: 7.2, 
-                price: 78000, 
-                trend: -1.3, 
-                lastUpdated: new Date() 
-              },
-              { 
-                culture: "Napraforgó", 
-                averageYield: 3.1, 
-                price: 210000, 
-                trend: 4.2, 
-                lastUpdated: new Date() 
-              }
-            ]
+            marketPrices: (marketPrices?.market_prices || []).map(price => ({
+              culture: price.culture,
+              averageYield: price.averageYield,
+              price: price.price,
+              trend: price.trend,
+              lastUpdated: new Date(price.lastUpdated)
+            }))
           };
           
-          setFarmData(mockFarmData);
+          setFarmData(farmData);
         }
       } catch (error) {
-        console.error("Error checking auth:", error);
+        console.error("Hiba az adatok betöltése során:", error);
         setError("Nem sikerült betölteni az adatokat");
       } finally {
         setLoading(false);
@@ -91,7 +114,7 @@ const Dashboard = () => {
       toast.success("Sikeres kijelentkezés");
       navigate("/");
     } catch (error) {
-      console.error("Sign out error:", error);
+      console.error("Kijelentkezési hiba:", error);
       toast.error("Hiba történt a kijelentkezés során");
     }
   };
@@ -123,7 +146,7 @@ const Dashboard = () => {
         ) : (
           <Alert>
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>Nincs hozzáférhető gazdasági adat.</AlertDescription>
+            <AlertDescription>Nincs hozzáférhető gazdasági adat. Kérjük, töltse fel SAPS dokumentumát.</AlertDescription>
           </Alert>
         )}
       </div>
