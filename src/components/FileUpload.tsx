@@ -3,9 +3,10 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { UploadCloud } from "lucide-react";
+import { UploadCloud, Clock, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { FarmData } from "@/components/LoanApplication";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface FileUploadProps {
   onComplete: (farmData: FarmData) => void;
@@ -67,6 +68,15 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <Alert className="mb-4 bg-blue-50 border-blue-200">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-blue-500" />
+            <AlertDescription className="text-blue-700">
+              A teljes folyamat mindössze <span className="font-bold">10 percet</span> vesz igénybe, és a szerződéskötéstől számított <span className="font-bold">48 órán belül</span> folyósítunk!
+            </AlertDescription>
+          </div>
+        </Alert>
+
         <form onSubmit={handleSubmit}>
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center space-y-4">
             <UploadCloud className="h-12 w-12 mx-auto text-gray-400" />

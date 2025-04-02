@@ -47,6 +47,44 @@ export type Database = {
           },
         ]
       }
+      farm_details: {
+        Row: {
+          created_at: string
+          crop_type: string | null
+          farm_id: string
+          id: string
+          location_data: Json | null
+          market_prices: Json | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          crop_type?: string | null
+          farm_id: string
+          id?: string
+          location_data?: Json | null
+          market_prices?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          crop_type?: string | null
+          farm_id?: string
+          id?: string
+          location_data?: Json | null
+          market_prices?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "farm_details_farm_id_fkey"
+            columns: ["farm_id"]
+            isOneToOne: false
+            referencedRelation: "farms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       farms: {
         Row: {
           created_at: string
