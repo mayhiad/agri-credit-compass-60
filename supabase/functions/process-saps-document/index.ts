@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -16,23 +15,19 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function extractTextFromPdf(pdfBuffer: ArrayBuffer): Promise<string> {
-  // In a real implementation, we would use a PDF parsing library like pdf.js
-  // But since we can't easily import that in Deno, we'll simulate the extraction
   console.log("Extracting text from PDF...");
   
-  // For demo purposes, we're assuming text has been extracted
-  return "Sample extracted text from SAPS document";
+  // For production, use a proper PDF parsing library
+  // Here we'll simulate text extraction
+  return "Sample SAPS document text with agricultural details";
 }
 
 async function processDocument(fileBuffer: ArrayBuffer, fileName: string, userId: string): Promise<any> {
   try {
-    console.log("Processing document:", fileName);
-    
-    // Extract text from PDF
     const extractedText = await extractTextFromPdf(fileBuffer);
     console.log("Text extracted successfully");
     
-    // Use OpenAI to analyze the extracted text
+    // Enhanced OpenAI prompt for more precise SAPS document parsing
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -45,23 +40,23 @@ async function processDocument(fileBuffer: ArrayBuffer, fileName: string, userId
           {
             role: "system",
             content: `You are an expert in analyzing Hungarian SAPS (Single Area Payment Scheme) agricultural documents. 
-            Extract the following information in a structured way:
-            - Applicant name
-            - Total hectares
-            - List of cultures (crops) with their respective areas in hectares
-            - Block IDs
-            - Parcel details (including block ID, parcel ID, culture, hectares, and location)
-            - Region
+            Extract the following structured information with high precision:
+            1. Exact applicant name
+            2. Total agricultural area in hectares
+            3. Detailed breakdown of crop types and their specific areas
+            4. Complete list of block IDs
+            5. Parcel details including exact location, block ID, parcel ID, crop type, and area
+            6. Agricultural region
             
-            Return the data in a clean JSON format with the keys: applicantName, hectares, cultures (array of objects with name and hectares), 
-            blockIds (array of strings), parcels (array of objects), and region.`
+            Return data in a strict, clean JSON format with validated and cross-referenced information.`
           },
           {
             role: "user",
             content: extractedText
           }
         ],
-        temperature: 0.2
+        temperature: 0.1, // Lower temperature for more consistent results
+        response_format: { type: "json_object" } // Ensure structured JSON response
       })
     });
 
@@ -72,9 +67,9 @@ async function processDocument(fileBuffer: ArrayBuffer, fileName: string, userId
 
     const aiResult = await response.json();
     const extractedData = JSON.parse(aiResult.choices[0].message.content);
-    console.log("AI analysis completed");
+    console.log("Detailed AI analysis completed");
 
-    // Fetch current market prices data (this could be from another API or database)
+    // Enhanced data processing and revenue calculation
     const marketPrices = [
       {
         culture: "Búza",
@@ -113,17 +108,11 @@ async function processDocument(fileBuffer: ArrayBuffer, fileName: string, userId
       }
     ];
 
-    // Calculate estimated revenue based on extracted cultures and market prices
     const culturesWithRevenue = extractedData.cultures.map(culture => {
       const marketPrice = marketPrices.find(mp => mp.culture === culture.name);
-      let estimatedRevenue = 0;
-      
-      if (marketPrice) {
-        estimatedRevenue = culture.hectares * marketPrice.averageYield * marketPrice.price;
-      } else {
-        // Default estimation if market price not found
-        estimatedRevenue = culture.hectares * 500000;
-      }
+      const estimatedRevenue = marketPrice 
+        ? culture.hectares * marketPrice.averageYield * marketPrice.price
+        : culture.hectares * 500000;
       
       return {
         ...culture,
@@ -131,13 +120,11 @@ async function processDocument(fileBuffer: ArrayBuffer, fileName: string, userId
       };
     });
 
-    // Calculate total revenue
     const totalRevenue = culturesWithRevenue.reduce(
       (sum, culture) => sum + culture.estimatedRevenue, 
       0
     );
 
-    // Prepare final farm data
     const farmData = {
       hectares: extractedData.hectares,
       cultures: culturesWithRevenue,
