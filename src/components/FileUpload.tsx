@@ -3,10 +3,11 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { UploadCloud, Clock, ArrowRight } from "lucide-react";
+import { UploadCloud, Clock, ArrowRight, FileWarning } from "lucide-react";
 import { toast } from "sonner";
 import { FarmData } from "@/components/LoanApplication";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { processSapsDocument } from "@/services/sapsProcessor";
 
 interface FileUploadProps {
   onComplete: (farmData: FarmData) => void;
@@ -15,10 +16,12 @@ interface FileUploadProps {
 export const FileUpload = ({ onComplete }: FileUploadProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
+      setError(null);
     }
   };
   
@@ -31,29 +34,21 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
     }
     
     setUploading(true);
+    setError(null);
     
     try {
-      // Mock file processing - in real app, we would send to a backend
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Valódi dokumentum feldolgozás
+      const farmData = await processSapsDocument(file);
       
-      // Mock farm data - in real app, this would come from backend
-      const mockFarmData: FarmData = {
-        hectares: 450,
-        cultures: [
-          { name: "Búza", hectares: 200, estimatedRevenue: 40000000 },
-          { name: "Kukorica", hectares: 150, estimatedRevenue: 32000000 },
-          { name: "Napraforgó", hectares: 100, estimatedRevenue: 28000000 }
-        ],
-        totalRevenue: 100000000, // 100 millió Ft
-        region: "Dél-Alföld",
-        documentId: "SAPS-2023-568742",
-        applicantName: "Kovács János" // Mock applicant name from SAPS document
-      };
+      // Sikeres feldolgozás után továbblépés
+      onComplete(farmData);
       
-      onComplete(mockFarmData);
+      // Mentsük el a farmData-t localStorage-ba is az egyszerűbb folytatás érdekében
+      localStorage.setItem("farmData", JSON.stringify(farmData));
     } catch (error) {
+      console.error("SAPS feldolgozási hiba:", error);
+      setError(error instanceof Error ? error.message : "Ismeretlen hiba történt a feldolgozás során");
       toast.error("Hiba történt a dokumentum feldolgozása során");
-      console.error("Upload error:", error);
     } finally {
       setUploading(false);
     }
@@ -103,6 +98,13 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
               </div>
             )}
           </div>
+
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-600 flex items-start">
+              <FileWarning className="h-5 w-5 mr-2 flex-shrink-0" />
+              <p className="text-sm">{error}</p>
+            </div>
+          )}
         </form>
       </CardContent>
       <CardFooter>

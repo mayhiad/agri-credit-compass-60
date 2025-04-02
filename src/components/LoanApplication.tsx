@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,15 @@ import { ContractSigning } from "@/components/ContractSigning";
 import { LoanComplete } from "@/components/LoanComplete";
 import { useToast } from "@/components/ui/use-toast";
 import { useSearchParams } from "react-router-dom";
+import { ParcelData } from "@/services/sapsProcessor";
+
+export interface MarketPrice {
+  culture: string;
+  averageYield: number;
+  price: number;
+  trend: number;
+  lastUpdated: Date;
+}
 
 export type FarmData = {
   hectares: number;
@@ -18,7 +28,11 @@ export type FarmData = {
   totalRevenue: number;
   region: string;
   documentId: string;
-  applicantName?: string; // Added applicant name from SAPS document
+  applicantName?: string;
+  // Új, részletes adatok
+  blockIds?: string[];
+  parcels?: ParcelData[];
+  marketPrices?: MarketPrice[];
 };
 
 export type UserData = {
