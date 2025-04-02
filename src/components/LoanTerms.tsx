@@ -1,14 +1,15 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, Calendar, CalendarClock } from "lucide-react";
+import { ArrowRight, Calendar, CalendarClock, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 
 interface LoanTermsProps {
   approvedAmount: number;
@@ -26,6 +27,36 @@ export const LoanTerms = ({ approvedAmount, onSubmit }: LoanTermsProps) => {
   const [amount, setAmount] = useState(approvedAmount);
   const [duration, setDuration] = useState(12); // default 12 months (1 year)
   const [paymentFrequency, setPaymentFrequency] = useState<"quarterly" | "biannual" | "annual">("annual");
+  
+  // Set up min, max, and step values for the slider
+  const minAmount = 200000; // Minimum loan amount
+  const maxAmount = approvedAmount; // Maximum is the approved amount
+  const step = 200000; // 200,000 Ft increments
+
+  // Adjust amount to fit step increments on component mount
+  useEffect(() => {
+    // Round to nearest step
+    const roundedAmount = Math.round(approvedAmount / step) * step;
+    setAmount(roundedAmount);
+  }, [approvedAmount, step]);
+  
+  // Handle slider value change
+  const handleSliderChange = (value: number[]) => {
+    setAmount(value[0]);
+  };
+
+  // Manual amount adjustment with buttons
+  const decreaseAmount = () => {
+    if (amount - step >= minAmount) {
+      setAmount(amount - step);
+    }
+  };
+
+  const increaseAmount = () => {
+    if (amount + step <= approvedAmount) {
+      setAmount(amount + step);
+    }
+  };
   
   // APR calculation based on payment frequency
   const getAPR = (frequency: string): number => {
@@ -80,16 +111,43 @@ export const LoanTerms = ({ approvedAmount, onSubmit }: LoanTermsProps) => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="loan-amount">Kölcsön összege</Label>
-          <Input 
-            id="loan-amount"
-            type="number"
-            min={100000}
-            max={approvedAmount}
-            value={amount}
-            onChange={(e) => setAmount(Number(e.target.value))}
-          />
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <Label htmlFor="loan-amount">Kölcsön összege</Label>
+            <span className="text-xl font-semibold">{formatCurrency(amount)}</span>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={decreaseAmount} 
+              disabled={amount <= minAmount}
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+            
+            <div className="flex-1">
+              <Slider 
+                value={[amount]}
+                min={minAmount}
+                max={maxAmount}
+                step={step}
+                onValueChange={handleSliderChange}
+                className="my-2"
+              />
+            </div>
+            
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={increaseAmount} 
+              disabled={amount >= approvedAmount}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+          
           <p className="text-sm text-muted-foreground">
             Jóváhagyott hitelkeret: {formatCurrency(approvedAmount)}
           </p>
