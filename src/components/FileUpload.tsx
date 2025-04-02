@@ -5,16 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UploadCloud, Clock, ArrowRight, FileWarning, FileCheck, FileScan } from "lucide-react";
 import { toast } from "sonner";
-import { FarmData, MarketPrice } from "@/components/LoanApplication";
+import { FarmData } from "@/components/LoanApplication";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { processSapsDocument } from "@/services/sapsProcessor";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/App";
 
 interface FileUploadProps {
   onComplete: (farmData: FarmData) => void;
 }
 
 export const FileUpload = ({ onComplete }: FileUploadProps) => {
+  const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,11 +42,16 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       return;
     }
     
+    if (!user) {
+      toast.error("A dokumentum feldolgozásához be kell jelentkeznie");
+      return;
+    }
+    
     setUploading(true);
     setError(null);
     
     try {
-      // Processing steps simulation with status updates
+      // Update status for UI feedback
       setProcessingStatus({
         step: "Dokumentum ellenőrzése",
         progress: 10,
@@ -57,17 +64,45 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       });
       await new Promise(resolve => setTimeout(resolve, 700));
       
-      setProcessingStatus({
-        step: "Növénykultúrák adatainak elemzése",
-        progress: 50,
-      });
-      await new Promise(resolve => setTimeout(resolve, 700));
+      // Prepare form data for the request
+      const formData = new FormData();
+      formData.append('file', file);
       
       setProcessingStatus({
-        step: "Piaci adatok lekérése",
+        step: "Dokumentum feldolgozása",
+        progress: 50,
+      });
+      
+      // Get user token for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("Nincs érvényes felhasználói munkamenet");
+      }
+      
+      // Call the Supabase Edge function
+      const response = await fetch(
+        `https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-saps-document`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: formData,
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Hiba a dokumentum feldolgozása közben");
+      }
+      
+      setProcessingStatus({
+        step: "Adatok elemzése",
         progress: 70,
       });
-      await new Promise(resolve => setTimeout(resolve, 600));
+      
+      // Get the response data
+      const farmData = await response.json();
       
       setProcessingStatus({
         step: "Bevétel becslés készítése",
@@ -75,22 +110,20 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       });
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Valódi dokumentum feldolgozás
-      const farmData = await processSapsDocument(file);
-      
+      // Successfully processed
       setProcessingStatus({
         step: "Feldolgozás befejezve",
         progress: 100,
         details: `${farmData.blockIds?.length || 0} blokkazonosító, ${farmData.parcels?.length || 0} parcella, ${farmData.cultures.length} növénykultúra feldolgozva`
       });
       
-      // Sikeres feldolgozás után továbblépés
+      // Save to localStorage for persistence
       localStorage.setItem("farmData", JSON.stringify(farmData));
       
-      // Rövid várakozás a sikeres állapot megjelenítésére
+      // Short delay to show success state
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Továbblépés a következő szakaszra
+      // Move to next step
       onComplete(farmData);
       toast.success("SAPS dokumentum sikeresen feldolgozva");
       
