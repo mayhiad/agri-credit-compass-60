@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -103,7 +102,13 @@ export const PersonalIdentification = ({ onComplete, farmData }: PersonalIdentif
       
       // Create userData object to pass to parent component
       const userData: UserData = {
-        ...values,
+        firstName: values.firstName,
+        lastName: values.lastName,
+        idNumber: values.idNumber,
+        taxId: values.taxId,
+        address: values.address,
+        email: values.email || "",
+        phone: values.phone,
         verified: true
       };
       
