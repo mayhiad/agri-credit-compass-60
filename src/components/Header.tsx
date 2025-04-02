@@ -26,9 +26,9 @@ const Header = () => {
   
   return (
     <div className="bg-white border-b shadow-sm py-2 sticky top-0 z-10">
-      <div className="container max-w-6xl mx-auto">
+      <div className="container mx-auto px-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-1 md:space-x-4">
+          <div className="flex items-center space-x-1 md:space-x-4 overflow-x-auto">
             <Link to="/" className="mr-6">
               <span className="font-bold text-primary text-lg">Agrár-Hitel</span>
             </Link>

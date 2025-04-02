@@ -15,7 +15,19 @@ const Index = () => {
       {/* Show header when user is logged in */}
       {user && !loading && <Header />}
       
-      <div className="container max-w-7xl mx-auto py-10 flex-grow">
+      {/* Login button in top right corner for non-logged in users */}
+      {!user && !loading && (
+        <div className="container mx-auto px-4 py-4 flex justify-end">
+          <Link to="/auth">
+            <Button className="gap-2">
+              <LogIn className="h-4 w-4" />
+              Bejelentkezés
+            </Button>
+          </Link>
+        </div>
+      )}
+      
+      <div className="container mx-auto px-4 py-10 flex-grow">
         <div className="text-center mb-10 space-y-2">
           <h1 className="text-4xl md:text-5xl font-bold">Agrár-hitelezés egyszerűen</h1>
           <p className="text-xl text-muted-foreground">
@@ -28,14 +40,8 @@ const Index = () => {
               </p>
             </div>
           ) : !loading && (
-            <div className="mt-6">
-              <Link to="/auth">
-                <Button className="gap-2">
-                  <LogIn className="h-4 w-4" />
-                  Bejelentkezés
-                </Button>
-              </Link>
-              <p className="text-sm text-muted-foreground mt-2">
+            <div className="mt-2">
+              <p className="text-sm text-muted-foreground">
                 Már van fiókja? Jelentkezzen be a folytatáshoz.
               </p>
             </div>
