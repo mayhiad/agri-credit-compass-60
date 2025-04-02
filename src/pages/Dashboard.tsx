@@ -11,6 +11,7 @@ import { useAuth } from "@/App";
 import DashboardLoading from "@/components/dashboard/DashboardLoading";
 import DashboardError from "@/components/dashboard/DashboardError";
 import DashboardContent from "@/components/dashboard/DashboardContent";
+import DebuggingInfo from "@/components/dashboard/DebuggingInfo";
 import { Button } from "@/components/ui/button";
 
 const Dashboard = () => {
@@ -43,17 +44,19 @@ const Dashboard = () => {
           if (farmError) {
             console.error("Hiba a farm adatok lekérésekor:", farmError);
             setError("Nem sikerült betölteni a gazdaság adatait");
+            setLoading(false);
             return;
           }
 
           // Ha nincs farm adat, térjünk vissza
           if (!farms) {
             setFarmData(null);
+            setLoading(false);
             return;
           }
 
           // Részletes piaci árak lekérése
-          const { data: marketPrices, error: marketPricesError } = await supabase
+          const { data: farmDetails, error: marketPricesError } = await supabase
             .from('farm_details')
             .select('market_prices')
             .eq('farm_id', farms.id)
@@ -74,6 +77,17 @@ const Dashboard = () => {
           }
 
           // Farm adatok összeállítása
+          const marketPriceData = farmDetails?.market_prices && 
+            Array.isArray(farmDetails.market_prices) ? 
+            farmDetails.market_prices.map((price: any) => ({
+              culture: price.culture,
+              averageYield: price.averageYield,
+              price: price.price,
+              trend: price.trend,
+              lastUpdated: new Date(price.lastUpdated || new Date().toISOString())
+            })) : [];
+          
+          // Farm adatok összeállítása
           const farmData: FarmData = {
             hectares: farms.hectares,
             cultures: cultures?.map(culture => ({
@@ -86,13 +100,7 @@ const Dashboard = () => {
             documentId: farms.document_id || `SAPS-2023-${user.id.substring(0, 6)}`,
             applicantName: user.email?.split('@')[0] || "Ismeretlen felhasználó",
             blockIds: [`K-${user.id.substring(0, 4)}`, `L-${user.id.substring(4, 8)}`],
-            marketPrices: (marketPrices?.market_prices || []).map(price => ({
-              culture: price.culture,
-              averageYield: price.averageYield,
-              price: price.price,
-              trend: price.trend,
-              lastUpdated: new Date(price.lastUpdated)
-            }))
+            marketPrices: marketPriceData
           };
           
           setFarmData(farmData);
@@ -149,6 +157,8 @@ const Dashboard = () => {
             <AlertDescription>Nincs hozzáférhető gazdasági adat. Kérjük, töltse fel SAPS dokumentumát.</AlertDescription>
           </Alert>
         )}
+        
+        {user && <DebuggingInfo userId={user.id} />}
       </div>
     </div>
   );
