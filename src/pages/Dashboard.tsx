@@ -143,7 +143,7 @@ const Dashboard = () => {
         {error ? (
           <DashboardError message={error} />
         ) : farmData ? (
-          <DashboardContent farmData={farmData} />
+          <DashboardContent farmData={farmData} onFarmDataUpdate={setFarmData} />
         ) : showUploadForm ? (
           <FileUpload onComplete={handleSapsUploadComplete} />
         ) : (
