@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { FarmData } from "@/components/LoanApplication";
-import { AlertCircle, LogOut } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import Header from "@/components/Header";
 import { useAuth } from "@/App";
@@ -13,6 +13,7 @@ import DashboardError from "@/components/dashboard/DashboardError";
 import DashboardContent from "@/components/dashboard/DashboardContent";
 import DebuggingInfo from "@/components/dashboard/DebuggingInfo";
 import { Button } from "@/components/ui/button";
+import FileUpload from "@/components/FileUpload";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [farmData, setFarmData] = useState<FarmData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showUploadForm, setShowUploadForm] = useState(false);
   
   useEffect(() => {
     const checkAuth = async () => {
@@ -116,15 +118,10 @@ const Dashboard = () => {
     checkAuth();
   }, [navigate, user, authLoading]);
   
-  const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast.success("Sikeres kijelentkezés");
-      navigate("/");
-    } catch (error) {
-      console.error("Kijelentkezési hiba:", error);
-      toast.error("Hiba történt a kijelentkezés során");
-    }
+  const handleSapsUploadComplete = (data: FarmData) => {
+    setFarmData(data);
+    setShowUploadForm(false);
+    toast.success("SAPS dokumentum sikeresen feldolgozva");
   };
   
   if (loading || authLoading) {
@@ -141,21 +138,33 @@ const Dashboard = () => {
             <h1 className="text-3xl font-bold">Gazdaságom</h1>
             <p className="text-muted-foreground">Üdvözöljük a gazdasági irányítópultján</p>
           </div>
-          <Button variant="outline" onClick={handleSignOut}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Kijelentkezés
-          </Button>
         </div>
         
         {error ? (
           <DashboardError message={error} />
         ) : farmData ? (
           <DashboardContent farmData={farmData} />
+        ) : showUploadForm ? (
+          <FileUpload onComplete={handleSapsUploadComplete} />
         ) : (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>Nincs hozzáférhető gazdasági adat. Kérjük, töltse fel SAPS dokumentumát.</AlertDescription>
-          </Alert>
+          <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6 text-center">
+            <div className="mb-6">
+              <img 
+                src="/placeholder.svg" 
+                alt="SAPS dokumentum" 
+                className="mx-auto w-32 h-32 opacity-70"
+              />
+            </div>
+            
+            <h2 className="text-2xl font-semibold mb-2">Nincsenek még gazdasági adatok</h2>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              Adja hozzá gazdaságának adatait egyszerűen, töltse fel SAPS dokumentumát a hiteligénylési folyamat megkezdéséhez.
+            </p>
+            
+            <Button onClick={() => setShowUploadForm(true)} size="lg" className="mt-2">
+              SAPS dokumentum feltöltése
+            </Button>
+          </div>
         )}
         
         {user && <DebuggingInfo userId={user.id} />}
