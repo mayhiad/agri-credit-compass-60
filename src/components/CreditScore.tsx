@@ -7,6 +7,7 @@ import { formatCurrency } from "@/lib/utils";
 import { CheckCircle, ArrowRight, Clock } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/App";
 
 interface CreditScoreProps {
   farmData: FarmData;
@@ -16,6 +17,7 @@ interface CreditScoreProps {
 
 export const CreditScore = ({ farmData, creditLimit, onComplete }: CreditScoreProps) => {
   const [calculating, setCalculating] = useState(true);
+  const { user } = useAuth();
   
   useEffect(() => {
     // Simulate calculation time
@@ -70,15 +72,24 @@ export const CreditScore = ({ farmData, creditLimit, onComplete }: CreditScorePr
       <CardFooter className="flex flex-col gap-3">
         {!calculating && (
           <>
-            <Link to="/auth" className="w-full">
-              <Button className="w-full" variant="default">
-                Regisztrálok és igénylem a hitelt
+            {user ? (
+              <Button className="w-full" variant="default" onClick={() => onComplete()}>
+                Folytatom a hiteligénylést
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
-            </Link>
-            <Button onClick={onComplete} variant="outline" className="w-full">
-              Folytatás regisztráció nélkül
-            </Button>
+            ) : (
+              <>
+                <Link to="/auth" className="w-full">
+                  <Button className="w-full" variant="default">
+                    Regisztrálok és igénylem a hitelt
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+                <Button onClick={onComplete} variant="outline" className="w-full">
+                  Folytatás regisztráció nélkül
+                </Button>
+              </>
+            )}
           </>
         )}
       </CardFooter>

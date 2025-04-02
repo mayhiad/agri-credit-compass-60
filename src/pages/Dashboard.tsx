@@ -14,9 +14,12 @@ import { AlertCircle, LayoutDashboard, Loader2, LogOut, Map, Tractor } from "luc
 import { toast } from "sonner";
 import NavBar from "@/components/NavBar";
 import FarmLocation from "@/components/FarmLocation";
+import Footer from "@/components/Footer";
+import { useAuth } from "@/App";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [farmData, setFarmData] = useState<FarmData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,9 +27,8 @@ const Dashboard = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        
-        if (!data.session) {
+        // If not authenticated and not loading, redirect to auth page
+        if (!authLoading && !user) {
           navigate("/auth");
           return;
         }
@@ -55,7 +57,7 @@ const Dashboard = () => {
     };
     
     checkAuth();
-  }, [navigate]);
+  }, [navigate, user, authLoading]);
   
   const handleSignOut = async () => {
     try {
@@ -68,7 +70,7 @@ const Dashboard = () => {
     }
   };
   
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -77,10 +79,10 @@ const Dashboard = () => {
   }
   
   return (
-    <>
+    <div className="min-h-screen flex flex-col">
       <NavBar onSignOut={handleSignOut} />
       
-      <div className="container max-w-6xl mx-auto py-10">
+      <div className="container max-w-6xl mx-auto py-10 flex-grow">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold">Gazdaságom</h1>
@@ -252,7 +254,10 @@ const Dashboard = () => {
           </Alert>
         )}
       </div>
-    </>
+      
+      {/* Add Footer component */}
+      <Footer />
+    </div>
   );
 };
 
