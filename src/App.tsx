@@ -8,6 +8,10 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import Admin from "./pages/Admin";
+import AdminAuth from "./pages/AdminAuth";
+import AdminCustomerDetail from "./pages/AdminCustomerDetail";
+import AdminLoanDetail from "./pages/AdminLoanDetail";
 import { supabase } from "@/integrations/supabase/client";
 
 const queryClient = new QueryClient();
@@ -64,6 +68,13 @@ const App = () => {
               user ? <Navigate to="/dashboard" /> : <Auth />
             } />
             <Route path="/dashboard" element={<Dashboard />} />
+            
+            {/* Admin Routes */}
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin/auth" element={<AdminAuth />} />
+            <Route path="/admin/customer/:customerId" element={<AdminCustomerDetail />} />
+            <Route path="/admin/loan/:loanId" element={<AdminLoanDetail />} />
+            
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

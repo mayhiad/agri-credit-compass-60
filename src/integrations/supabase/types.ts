@@ -118,9 +118,51 @@ export type Database = {
         }
         Relationships: []
       }
+      loan_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          document_url: string | null
+          id: string
+          loan_id: string
+          payment_date: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by: string
+          document_url?: string | null
+          id?: string
+          loan_id: string
+          payment_date?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          document_url?: string | null
+          id?: string
+          loan_id?: string
+          payment_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_payments_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "loans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loans: {
         Row: {
           amount: number
+          contract_number: string | null
           contract_signed: boolean
           created_at: string
           farm_id: string
@@ -134,6 +176,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          contract_number?: string | null
           contract_signed?: boolean
           created_at?: string
           farm_id: string
@@ -147,6 +190,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          contract_number?: string | null
           contract_signed?: boolean
           created_at?: string
           farm_id?: string
@@ -171,7 +215,9 @@ export type Database = {
       profiles: {
         Row: {
           address: string | null
+          bank_account: string | null
           created_at: string
+          customer_id: string | null
           first_name: string | null
           id: string
           last_name: string | null
@@ -181,7 +227,9 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          bank_account?: string | null
           created_at?: string
+          customer_id?: string | null
           first_name?: string | null
           id: string
           last_name?: string | null
@@ -191,7 +239,9 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          bank_account?: string | null
           created_at?: string
+          customer_id?: string | null
           first_name?: string | null
           id?: string
           last_name?: string | null
@@ -201,12 +251,43 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_finance_officer: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
