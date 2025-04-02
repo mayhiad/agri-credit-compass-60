@@ -25,34 +25,34 @@ const Header = () => {
   if (!user) return null;
   
   return (
-    <div className="bg-white border-b shadow-sm py-2 sticky top-0 z-10">
+    <div className="bg-white border-b shadow-sm py-2 sticky top-0 z-10 w-full">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-1 md:space-x-4 overflow-x-auto">
-            <Link to="/" className="mr-6">
+          <div className="flex items-center space-x-1 md:space-x-4 overflow-x-auto pb-1">
+            <Link to="/" className="mr-6 shrink-0">
               <span className="font-bold text-primary text-lg">Agrár-Hitel</span>
             </Link>
             
-            <Link to="/">
+            <Link to="/" className="shrink-0">
               <Button variant="ghost" size="sm" className="flex flex-col items-center md:flex-row">
                 <Home className="h-4 w-4 md:mr-2" />
                 <span className="text-xs md:text-sm">Főoldal</span>
               </Button>
             </Link>
             
-            <Link to="/dashboard">
+            <Link to="/dashboard" className="shrink-0">
               <Button variant="ghost" size="sm" className="flex flex-col items-center md:flex-row">
                 <LayoutDashboard className="h-4 w-4 md:mr-2" />
                 <span className="text-xs md:text-sm">Irányítópult</span>
               </Button>
             </Link>
             
-            <Button variant="ghost" size="sm" className="flex flex-col items-center md:flex-row">
+            <Button variant="ghost" size="sm" className="flex flex-col items-center md:flex-row shrink-0">
               <FileText className="h-4 w-4 md:mr-2" />
               <span className="text-xs md:text-sm">Szerződések</span>
             </Button>
             
-            <Button variant="ghost" size="sm" className="flex flex-col items-center md:flex-row">
+            <Button variant="ghost" size="sm" className="flex flex-col items-center md:flex-row shrink-0">
               <Settings className="h-4 w-4 md:mr-2" />
               <span className="text-xs md:text-sm">Beállítások</span>
             </Button>
@@ -61,7 +61,7 @@ const Header = () => {
           <Button 
             variant="ghost" 
             size="sm" 
-            className="flex flex-col items-center md:flex-row" 
+            className="flex flex-col items-center md:flex-row shrink-0" 
             onClick={handleSignOut}
           >
             <LogOut className="h-4 w-4 md:mr-2" />

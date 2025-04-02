@@ -11,7 +11,7 @@ const Index = () => {
   const { user, loading } = useAuth();
   
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col w-full overflow-x-hidden">
       {/* Show header when user is logged in */}
       {user && !loading && <Header />}
       
@@ -48,7 +48,7 @@ const Index = () => {
           )}
         </div>
 
-        <div className="mt-12">
+        <div className="mt-12 max-w-full">
           <LoanApplication />
         </div>
         
