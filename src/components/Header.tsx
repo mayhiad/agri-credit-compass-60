@@ -1,7 +1,7 @@
 
 import { Link } from "react-router-dom";
 import { useAuth } from "@/App";
-import { Home, FileText, LayoutDashboard, Settings, LogOut } from "lucide-react";
+import { FileText, LayoutDashboard, Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,13 +31,6 @@ const Header = () => {
           <div className="flex items-center space-x-1 md:space-x-4 overflow-x-auto pb-1">
             <Link to="/" className="mr-6 shrink-0">
               <span className="font-bold text-primary text-lg">Agrár-Hitel</span>
-            </Link>
-            
-            <Link to="/" className="shrink-0">
-              <Button variant="ghost" size="sm" className="flex flex-col items-center md:flex-row">
-                <Home className="h-4 w-4 md:mr-2" />
-                <span className="text-xs md:text-sm">Főoldal</span>
-              </Button>
             </Link>
             
             <Link to="/dashboard" className="shrink-0">
