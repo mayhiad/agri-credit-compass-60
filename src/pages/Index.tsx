@@ -1,7 +1,6 @@
-
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Leaf, Coins, TrendingUp, ChevronRight, LogIn } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Leaf, Coins, TrendingUp, LogIn } from "lucide-react";
 import { Link } from "react-router-dom";
 import { LoanApplication } from "@/components/LoanApplication";
 import { useAuth } from "@/App";
@@ -17,7 +16,10 @@ const Index = () => {
       
       {/* Login button in top right corner for non-logged in users */}
       {!user && !loading && (
-        <div className="container mx-auto px-4 py-4 flex justify-end">
+        <div className="container mx-auto px-4 py-4 flex flex-col items-end">
+          <p className="text-sm text-muted-foreground mb-2">
+            Már van fiókja? Jelentkezzen be a folytatáshoz.
+          </p>
           <Link to="/auth">
             <Button className="gap-2">
               <LogIn className="h-4 w-4" />
@@ -29,9 +31,9 @@ const Index = () => {
       
       <div className="container mx-auto px-4 py-10 flex-grow">
         <div className="text-center mb-10 space-y-2">
-          <h1 className="text-4xl md:text-5xl font-bold">Agrár-hitelezés egyszerűen</h1>
+          <h1 className="text-4xl md:text-5xl font-bold">AGRIFIX</h1>
           <p className="text-xl text-muted-foreground">
-            Egyszerű és gyors mezőgazdasági hitelkérelem a SAPS adatok alapján
+            Agrárhitel kihelyezés egy nap alatt, valós termelési adatok alapján!
           </p>
           {user && !loading ? (
             <div className="mt-4">
@@ -39,13 +41,7 @@ const Index = () => {
                 Üdvözöljük újra! Folytathatja a hiteligénylési folyamatot.
               </p>
             </div>
-          ) : !loading && (
-            <div className="mt-2">
-              <p className="text-sm text-muted-foreground">
-                Már van fiókja? Jelentkezzen be a folytatáshoz.
-              </p>
-            </div>
-          )}
+          ) : null}
         </div>
 
         <div className="mt-12 max-w-full">
