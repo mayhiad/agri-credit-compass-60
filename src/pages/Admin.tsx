@@ -24,28 +24,20 @@ const Admin = () => {
       }
 
       try {
-        // Check if user has admin role
-        const { data: adminData, error: adminError } = await supabase
-          .from('user_roles')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('role', 'admin');
+        // Check if user has admin role using the custom function
+        const { data: adminRoleData, error: adminError } = await supabase.rpc('is_admin');
         
         if (adminError) throw adminError;
-        setIsAdmin(adminData && adminData.length > 0);
+        setIsAdmin(!!adminRoleData);
 
-        // Check if user has finance officer role
-        const { data: financeData, error: financeError } = await supabase
-          .from('user_roles')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('role', 'finance_officer');
+        // Check if user has finance officer role using the custom function
+        const { data: financeRoleData, error: financeError } = await supabase.rpc('is_finance_officer');
         
         if (financeError) throw financeError;
-        setIsFinanceOfficer(financeData && financeData.length > 0);
+        setIsFinanceOfficer(!!financeRoleData);
 
         // If not admin or finance officer, redirect to home
-        if (!adminData?.length && !financeData?.length) {
+        if (!adminRoleData && !financeRoleData) {
           navigate('/');
         }
       } catch (error) {

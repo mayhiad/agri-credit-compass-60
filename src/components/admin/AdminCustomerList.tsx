@@ -13,13 +13,14 @@ import { useNavigate } from "react-router-dom";
 
 interface ProfileWithDetails {
   id: string;
-  first_name: string;
-  last_name: string;
-  customer_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  customer_id: string | null;
   tax_id: string | null;
   phone: string | null;
   bank_account: string | null;
   created_at: string;
+  address?: string | null;
 }
 
 interface AdminCustomerListProps {
@@ -42,7 +43,7 @@ const AdminCustomerList = ({ isAdmin, isFinanceOfficer }: AdminCustomerListProps
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        setCustomers(data || []);
+        setCustomers(data as ProfileWithDetails[] || []);
       } catch (error) {
         console.error('Error fetching customers:', error);
       } finally {

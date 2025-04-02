@@ -22,14 +22,14 @@ import { formatCurrency } from "@/lib/utils";
 
 interface LoanWithDetails {
   id: string;
-  contract_number: string;
+  contract_number: string | null;
   amount: number;
   interest_rate: number;
   payment_frequency: string;
   term_months: number;
   status: string;
   created_at: string;
-  profiles: {
+  profiles?: {
     first_name: string | null;
     last_name: string | null;
     customer_id: string | null;
@@ -64,7 +64,7 @@ const AdminLoanList = ({ isAdmin, isFinanceOfficer }: AdminLoanListProps) => {
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        setLoans(data || []);
+        setLoans(data as LoanWithDetails[] || []);
       } catch (error) {
         console.error('Error fetching loans:', error);
       } finally {
