@@ -67,8 +67,16 @@ async function processDocument(fileBuffer: ArrayBuffer, fileName: string, userId
     }
 
     const aiResult = await response.json();
-    const extractedData = JSON.parse(aiResult.choices[0].message.content);
-    console.log("Detailed AI analysis completed");
+    let extractedData;
+    
+    try {
+      // Safely parse the JSON response from OpenAI
+      extractedData = JSON.parse(aiResult.choices[0]?.message?.content || "{}");
+      console.log("Detailed AI analysis completed");
+    } catch (parseError) {
+      console.error("Error parsing AI response:", parseError);
+      extractedData = {}; // Fallback to empty object if parsing fails
+    }
 
     // Default values for required fields to prevent undefined errors
     const defaultData = {
@@ -125,14 +133,19 @@ async function processDocument(fileBuffer: ArrayBuffer, fileName: string, userId
     // Ensure cultures is an array before mapping
     const cultures = Array.isArray(safeExtractedData.cultures) ? safeExtractedData.cultures : [];
     
+    // Add fallback for each culture object to ensure it has required properties
     const culturesWithRevenue = cultures.map(culture => {
-      const marketPrice = marketPrices.find(mp => mp.culture === culture.name);
+      const cultureName = typeof culture.name === 'string' ? culture.name : 'Ismeretlen';
+      const cultureHectares = typeof culture.hectares === 'number' && !isNaN(culture.hectares) ? culture.hectares : 0;
+      
+      const marketPrice = marketPrices.find(mp => mp.culture === cultureName);
       const estimatedRevenue = marketPrice 
-        ? culture.hectares * marketPrice.averageYield * marketPrice.price
-        : culture.hectares * 500000;
+        ? cultureHectares * marketPrice.averageYield * marketPrice.price
+        : cultureHectares * 500000;
       
       return {
-        ...culture,
+        name: cultureName,
+        hectares: cultureHectares,
         estimatedRevenue
       };
     });
@@ -146,15 +159,31 @@ async function processDocument(fileBuffer: ArrayBuffer, fileName: string, userId
     const blockIds = Array.isArray(safeExtractedData.blockIds) ? safeExtractedData.blockIds : [];
     const parcels = Array.isArray(safeExtractedData.parcels) ? safeExtractedData.parcels : [];
 
+    // Create safe parcels with validated properties
+    const safeParcels = parcels.map(parcel => {
+      return {
+        blockId: typeof parcel.blockId === 'string' ? parcel.blockId : 'UNKNOWN',
+        parcelId: typeof parcel.parcelId === 'string' ? parcel.parcelId : 'UNKNOWN',
+        culture: typeof parcel.culture === 'string' ? parcel.culture : 'UNKNOWN',
+        hectares: typeof parcel.hectares === 'number' && !isNaN(parcel.hectares) ? parcel.hectares : 0,
+        location: typeof parcel.location === 'object' && parcel.location !== null ? parcel.location : {
+          county: 'Ismeretlen',
+          settlement: 'Ismeretlen',
+          topographicNumber: 'Ismeretlen'
+        }
+      };
+    });
+
     const farmData = {
-      hectares: safeExtractedData.hectares,
+      hectares: typeof safeExtractedData.hectares === 'number' && !isNaN(safeExtractedData.hectares) 
+        ? safeExtractedData.hectares : 0,
       cultures: culturesWithRevenue,
       totalRevenue,
-      region: safeExtractedData.region,
+      region: typeof safeExtractedData.region === 'string' ? safeExtractedData.region : "Ismeretlen régió",
       documentId: fileName,
-      applicantName: safeExtractedData.applicantName,
+      applicantName: typeof safeExtractedData.applicantName === 'string' ? safeExtractedData.applicantName : "Felhasználó",
       blockIds,
-      parcels,
+      parcels: safeParcels,
       marketPrices
     };
 
@@ -193,8 +222,8 @@ async function processDocument(fileBuffer: ArrayBuffer, fileName: string, userId
     }
 
     // Store additional farm details with safe location data
-    const locationData = Array.isArray(parcels) && parcels.length > 0 
-      ? parcels.map(p => p.location || {})
+    const locationData = Array.isArray(safeParcels) && safeParcels.length > 0 
+      ? safeParcels.map(p => p.location || {})
       : [];
 
     const { error: detailsError } = await supabase
