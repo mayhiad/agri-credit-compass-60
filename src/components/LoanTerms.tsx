@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowRight, Calendar, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface LoanTermsProps {
   approvedAmount: number;
@@ -17,21 +18,38 @@ interface LoanTermsProps {
 export interface LoanSettings {
   amount: number;
   duration: number; // months
-  paymentFrequency: "quarterly" | "biannual";
+  paymentFrequency: "quarterly" | "biannual" | "annual";
   apr: number;
 }
 
 export const LoanTerms = ({ approvedAmount, onSubmit }: LoanTermsProps) => {
   const [amount, setAmount] = useState(approvedAmount);
-  const [duration, setDuration] = useState(12); // max 12 months (1 year)
-  const [paymentFrequency, setPaymentFrequency] = useState<"quarterly" | "biannual">("biannual");
+  const [duration, setDuration] = useState(12); // default 12 months (1 year)
+  const [paymentFrequency, setPaymentFrequency] = useState<"quarterly" | "biannual" | "annual">("annual");
   
-  // APR calculation - slightly lower for quarterly payments
-  const baseAPR = 8.9;
-  const apr = paymentFrequency === "quarterly" ? baseAPR - 0.5 : baseAPR;
+  // APR calculation based on payment frequency
+  const getAPR = (frequency: string): number => {
+    switch (frequency) {
+      case "quarterly": return 16;
+      case "biannual": return 17;
+      case "annual": return 18;
+      default: return 18;
+    }
+  };
+  
+  const apr = getAPR(paymentFrequency);
   
   // Calculate payment info
-  const numberOfPayments = paymentFrequency === "quarterly" ? 4 : 2;
+  const getNumberOfPayments = (): number => {
+    switch (paymentFrequency) {
+      case "quarterly": return duration / 3;
+      case "biannual": return duration / 6;
+      case "annual": return duration / 12;
+      default: return 1;
+    }
+  };
+  
+  const numberOfPayments = getNumberOfPayments();
   const paymentAmount = calculatePayment(amount, apr, numberOfPayments);
   
   const handleSubmit = () => {
@@ -43,13 +61,22 @@ export const LoanTerms = ({ approvedAmount, onSubmit }: LoanTermsProps) => {
     });
     toast.success("Kölcsön feltételek kiválasztva");
   };
+
+  const getPaymentFrequencyText = () => {
+    switch (paymentFrequency) {
+      case "quarterly": return "negyedév";
+      case "biannual": return "félév";
+      case "annual": return "év";
+      default: return "";
+    }
+  };
   
   return (
     <Card className="w-full max-w-xl mx-auto">
       <CardHeader>
         <CardTitle>Kölcsön feltételek</CardTitle>
         <CardDescription>
-          Válassza ki a kölcsön összegét és törlesztési feltételeit
+          Válassza ki a kölcsön összegét, futamidejét és törlesztési feltételeit
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -68,19 +95,36 @@ export const LoanTerms = ({ approvedAmount, onSubmit }: LoanTermsProps) => {
           </p>
         </div>
         
+        <div className="space-y-2">
+          <Label htmlFor="duration">Futamidő</Label>
+          <Select 
+            value={String(duration)} 
+            onValueChange={(value) => setDuration(Number(value))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Válasszon futamidőt" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="3">3 hónap</SelectItem>
+              <SelectItem value="6">6 hónap</SelectItem>
+              <SelectItem value="12">1 év</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
         <div className="space-y-3">
           <Label>Törlesztési gyakoriság</Label>
           <RadioGroup 
             value={paymentFrequency} 
-            onValueChange={(value: "quarterly" | "biannual") => setPaymentFrequency(value)}
-            className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+            onValueChange={(value: "quarterly" | "biannual" | "annual") => setPaymentFrequency(value)}
+            className="grid grid-cols-1 gap-4"
           >
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="quarterly" id="quarterly" />
               <Label htmlFor="quarterly" className="flex items-center gap-1.5 cursor-pointer">
                 <Calendar className="h-4 w-4" />
                 <span>Negyedéves törlesztés</span>
-                <span className="text-xs text-green-600 font-semibold ml-1">(-0.5% THM)</span>
+                <span className="text-xs text-green-600 font-semibold ml-1">(16% THM)</span>
               </Label>
             </div>
             <div className="flex items-center space-x-2">
@@ -88,6 +132,15 @@ export const LoanTerms = ({ approvedAmount, onSubmit }: LoanTermsProps) => {
               <Label htmlFor="biannual" className="flex items-center gap-1.5 cursor-pointer">
                 <CalendarClock className="h-4 w-4" />
                 <span>Féléves törlesztés</span>
+                <span className="text-xs text-amber-600 font-semibold ml-1">(17% THM)</span>
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="annual" id="annual" />
+              <Label htmlFor="annual" className="flex items-center gap-1.5 cursor-pointer">
+                <CalendarClock className="h-4 w-4" />
+                <span>Éves törlesztés</span>
+                <span className="text-xs text-red-600 font-semibold ml-1">(18% THM)</span>
               </Label>
             </div>
           </RadioGroup>
@@ -97,15 +150,15 @@ export const LoanTerms = ({ approvedAmount, onSubmit }: LoanTermsProps) => {
           <div className="space-y-2">
             <div className="flex justify-between">
               <span>THM:</span>
-              <span className="font-medium">{apr.toFixed(1)}%</span>
+              <span className="font-medium">{apr}%</span>
             </div>
             <div className="flex justify-between">
               <span>Futamidő:</span>
-              <span className="font-medium">1 év</span>
+              <span className="font-medium">{duration === 12 ? '1 év' : `${duration} hónap`}</span>
             </div>
             <div className="flex justify-between">
               <span>Törlesztőrészlet:</span>
-              <span className="font-medium">{formatCurrency(paymentAmount)}/{paymentFrequency === "quarterly" ? "negyedév" : "félév"}</span>
+              <span className="font-medium">{formatCurrency(paymentAmount)}/{getPaymentFrequencyText()}</span>
             </div>
             <div className="flex justify-between">
               <span>Törlesztések száma:</span>

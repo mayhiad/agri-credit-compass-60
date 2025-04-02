@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,9 +57,7 @@ export const LoanApplication = () => {
   };
 
   const handleFarmInfoComplete = () => {
-    // Calculate credit limit based on farm data
     if (farmData) {
-      // Simple calculation for demonstration - 40% of annual revenue
       const calculatedCreditLimit = Math.round(farmData.totalRevenue * 0.4);
       setCreditLimit(calculatedCreditLimit);
       setStep("credit-score");
