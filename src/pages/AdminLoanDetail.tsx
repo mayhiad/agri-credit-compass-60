@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -71,27 +70,26 @@ const AdminLoanDetail = () => {
       }
 
       try {
-        // Check if user has admin role
-        const { data: adminData } = await supabase
-          .from('user_roles')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('role', 'admin');
+        // Check if user has admin role using the custom function
+        const { data: adminRoleData, error: adminError } = await supabase.rpc('is_admin');
         
-        setIsAdmin(adminData && adminData.length > 0);
+        if (adminError) throw adminError;
+        setIsAdmin(!!adminRoleData);
         
-        // Check if user has finance officer role
-        const { data: financeData } = await supabase
-          .from('user_roles')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('role', 'finance_officer');
+        // Check if user has finance officer role using the custom function
+        const { data: financeRoleData, error: financeError } = await supabase.rpc('is_finance_officer');
         
-        setIsFinanceOfficer(financeData && financeData.length > 0);
+        if (financeError) throw financeError;
+        setIsFinanceOfficer(!!financeRoleData);
         
-        if (!adminData?.length && !financeData?.length) {
+        if (!adminRoleData && !financeRoleData) {
           // User doesn't have permission
           navigate('/');
+          return;
+        }
+        
+        if (!loanId) {
+          navigate('/admin');
           return;
         }
         
@@ -109,9 +107,14 @@ const AdminLoanDetail = () => {
         
         if (loanError) throw loanError;
         
-        setLoan(loanData);
-        setNewStatus(loanData.status);
-        setCustomer(loanData.profiles);
+        if (loanData) {
+          setLoan(loanData as Loan);
+          setNewStatus(loanData.status);
+          
+          if (loanData.profiles) {
+            setCustomer(loanData.profiles as unknown as Customer);
+          }
+        }
         
         // Fetch loan payments
         const { data: paymentData, error: paymentError } = await supabase
@@ -121,7 +124,9 @@ const AdminLoanDetail = () => {
           .order('payment_date', { ascending: true });
         
         if (paymentError) throw paymentError;
-        setPayments(paymentData || []);
+        if (paymentData) {
+          setPayments(paymentData as Payment[]);
+        }
         
       } catch (error) {
         console.error('Error fetching loan data:', error);
@@ -211,7 +216,9 @@ const AdminLoanDetail = () => {
       if (error) throw error;
       
       // Update payments list
-      setPayments([...payments, data[0]]);
+      if (data) {
+        setPayments([...payments, data[0] as Payment]);
+      }
       setPaymentAmount(0);
       setFile(null);
       
@@ -417,39 +424,39 @@ const AdminLoanDetail = () => {
             </CardContent>
             
             {isFinanceOfficer && loan.status === 'kihelyezett hitelösszeg' && (
-              <CardFooter className="flex flex-col">
-                <div className="w-full border-t pt-4 mt-2">
-                  <h3 className="font-semibold mb-3">Új törlesztés rögzítése</h3>
-                  <form onSubmit={addPayment} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="payment-amount">Törlesztés összege (Ft)</Label>
-                        <Input
-                          id="payment-amount"
-                          type="number"
-                          placeholder="Törlesztés összege"
-                          value={paymentAmount || ''}
-                          onChange={(e) => setPaymentAmount(Number(e.target.value))}
-                        />
+                <CardFooter className="flex flex-col">
+                  <div className="w-full border-t pt-4 mt-2">
+                    <h3 className="font-semibold mb-3">Új törlesztés rögzítése</h3>
+                    <form onSubmit={addPayment} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="payment-amount">Törlesztés összege (Ft)</Label>
+                          <Input
+                            id="payment-amount"
+                            type="number"
+                            placeholder="Törlesztés összege"
+                            value={paymentAmount || ''}
+                            onChange={(e) => setPaymentAmount(Number(e.target.value))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="payment-document">Banki bizonylat (opcionális)</Label>
+                          <Input
+                            id="payment-document"
+                            type="file"
+                            accept="application/pdf,image/*"
+                            onChange={handleFileChange}
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="payment-document">Banki bizonylat (opcionális)</Label>
-                        <Input
-                          id="payment-document"
-                          type="file"
-                          accept="application/pdf,image/*"
-                          onChange={handleFileChange}
-                        />
-                      </div>
-                    </div>
-                    <Button type="submit" disabled={!paymentAmount || paymentAmount <= 0 || uploadLoading}>
-                      {uploadLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Törlesztés rögzítése
-                    </Button>
-                  </form>
-                </div>
-              </CardFooter>
-            )}
+                      <Button type="submit" disabled={!paymentAmount || paymentAmount <= 0 || uploadLoading}>
+                        {uploadLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Törlesztés rögzítése
+                      </Button>
+                    </form>
+                  </div>
+                </CardFooter>
+              )}
           </Card>
         </div>
         

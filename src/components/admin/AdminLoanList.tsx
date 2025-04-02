@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   Table, TableHeader, TableRow, TableHead, 
@@ -64,9 +63,14 @@ const AdminLoanList = ({ isAdmin, isFinanceOfficer }: AdminLoanListProps) => {
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        setLoans(data as LoanWithDetails[] || []);
+        if (data) {
+          setLoans(data as LoanWithDetails[]);
+        } else {
+          setLoans([]);
+        }
       } catch (error) {
         console.error('Error fetching loans:', error);
+        setLoans([]);
       } finally {
         setLoading(false);
       }
@@ -104,7 +108,6 @@ const AdminLoanList = ({ isAdmin, isFinanceOfficer }: AdminLoanListProps) => {
   });
 
   const viewLoanDetails = (loanId: string) => {
-    // Navigate to loan details page
     navigate(`/admin/loan/${loanId}`);
   };
 
