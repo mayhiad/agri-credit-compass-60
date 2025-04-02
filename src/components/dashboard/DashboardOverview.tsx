@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { FarmData } from "@/components/LoanApplication";
 import { useNavigate } from "react-router-dom";
-import { FileText, Map, BarChart3 } from "lucide-react";
+import { FileText, Map, BarChart3, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface DashboardOverviewProps {
   farmData: FarmData;
@@ -23,6 +24,11 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
     navigate("/?step=loan-terms");
   };
   
+  // Ellenőrizzük, hogy rendelkezünk-e érvényes árbevétel adatokkal
+  const hasValidRevenue = typeof farmData.totalRevenue === 'number' && farmData.totalRevenue > 0;
+  // Kiszámoljuk a hitelkeretet az árbevétel 40%-aként
+  const creditLimit = hasValidRevenue ? Math.round(farmData.totalRevenue * 0.4) : 0;
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <Card>
@@ -86,17 +92,26 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-            <div className="font-semibold text-lg mb-1">Elérhető hitelkeret:</div>
-            <div className="text-3xl font-bold text-green-700 mb-2">
-              {formatCurrency(Math.round(farmData.totalRevenue * 0.4))}
+          {hasValidRevenue ? (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+              <div className="font-semibold text-lg mb-1">Elérhető hitelkeret:</div>
+              <div className="text-3xl font-bold text-green-700 mb-2">
+                {formatCurrency(creditLimit)}
+              </div>
+              <div className="text-sm text-green-600">
+                A szerződéskötéstől számított 48 órán belül folyósítunk.
+              </div>
             </div>
-            <div className="text-sm text-green-600">
-              A szerződéskötéstől számított 48 órán belül folyósítunk.
-            </div>
-          </div>
+          ) : (
+            <Alert className="bg-amber-50 border-amber-200">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800">
+                A hitelkeret számításához érvényes árbevétel adatok szükségesek. Kérjük, ellenőrizze a feltöltött SAPS dokumentumot.
+              </AlertDescription>
+            </Alert>
+          )}
           
-          {farmData.marketPrices && (
+          {farmData.marketPrices && farmData.marketPrices.length > 0 ? (
             <div className="mt-4">
               <h4 className="text-sm font-medium mb-2">Aktuális piaci árak:</h4>
               <div className="overflow-x-auto">
@@ -129,11 +144,21 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
                 </Table>
               </div>
             </div>
+          ) : (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-700">
+                Az aktuális piaci árak megjelenítéséhez kérjük, töltsön fel naprakész SAPS dokumentumot.
+              </p>
+            </div>
           )}
           
           <div className="mt-4">
-            <Button className="w-full" onClick={handleStartLoanApplication}>
-              Hiteligénylés indítása
+            <Button 
+              className="w-full" 
+              onClick={handleStartLoanApplication}
+              disabled={!hasValidRevenue}
+            >
+              {hasValidRevenue ? "Hiteligénylés indítása" : "Árbevétel adat szükséges a hiteligényléshez"}
             </Button>
           </div>
         </CardContent>
