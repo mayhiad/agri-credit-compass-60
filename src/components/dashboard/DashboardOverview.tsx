@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { FarmData } from "@/components/LoanApplication";
 import { useNavigate } from "react-router-dom";
-import { FileText, Map, BarChart3, AlertTriangle } from "lucide-react";
+import { FileText, Map, BarChart3, AlertTriangle, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -33,13 +33,23 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
-            Gazdaságom adatai
-          </CardTitle>
-          <CardDescription>
-            SAPS dokumentum alapján
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                Gazdaságom adatai
+              </CardTitle>
+              <CardDescription>
+                SAPS dokumentum alapján
+              </CardDescription>
+            </div>
+            {farmData.year && (
+              <Badge variant="outline" className="flex items-center gap-1 bg-amber-50 text-amber-700">
+                <Calendar className="h-3.5 w-3.5" />
+                {farmData.year}. évi adatok
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -62,7 +72,7 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">Éves árbevétel</TableCell>
-                <TableCell>{formatCurrency(farmData.totalRevenue)}</TableCell>
+                <TableCell className="font-bold text-green-700">{formatCurrency(farmData.totalRevenue)}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">Blokkazonosítók</TableCell>
@@ -113,7 +123,7 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
           
           {farmData.marketPrices && farmData.marketPrices.length > 0 ? (
             <div className="mt-4">
-              <h4 className="text-sm font-medium mb-2">Aktuális piaci árak:</h4>
+              <h4 className="text-sm font-medium mb-2">Aktuális piaci árak és várható hozamok:</h4>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>

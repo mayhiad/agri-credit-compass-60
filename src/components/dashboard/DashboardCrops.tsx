@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FarmData } from "@/components/LoanApplication";
 import { formatCurrency } from "@/lib/utils";
-import { Info } from "lucide-react";
+import { Info, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface DashboardCropsProps {
@@ -15,18 +15,24 @@ const DashboardCrops = ({ farmData }: DashboardCropsProps) => {
   const marketPrices = farmData.marketPrices
     ? Object.fromEntries(farmData.marketPrices.map(price => [price.culture, price.price]))
     : {
-        "Búza": 85000,
-        "Kukorica": 75000,
-        "Napraforgó": 180000
+        "Őszi búza": 85000,
+        "Kukorica": 72000,
+        "Napraforgó": 170000,
+        "Őszi káposztarepce": 190000,
+        "Őszi árpa": 70000,
+        "Tavaszi árpa": 73000
       };
   
   // Átlagos hozam számítása kultúránként
   const averageYields = farmData.marketPrices
     ? Object.fromEntries(farmData.marketPrices.map(price => [price.culture, price.averageYield]))
     : {
-        "Búza": 5.2,
-        "Kukorica": 7.8,
-        "Napraforgó": 2.9
+        "Őszi búza": 5.5,
+        "Kukorica": 8.0,
+        "Napraforgó": 3.1,
+        "Őszi káposztarepce": 3.3,
+        "Őszi árpa": 5.2,
+        "Tavaszi árpa": 4.8
       };
   
   // Ellenőrizzük, hogy a cultures rendelkezik-e a megfelelő adatokkal
@@ -38,10 +44,20 @@ const DashboardCrops = ({ farmData }: DashboardCropsProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Növénykultúrák</CardTitle>
-        <CardDescription>
-          A SAPS dokumentum alapján rögzített növénykultúrák - {farmData.documentId || ""}
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Növénykultúrák</CardTitle>
+            <CardDescription>
+              A SAPS dokumentum alapján rögzített növénykultúrák - {farmData.documentId || ""}
+            </CardDescription>
+          </div>
+          {farmData.year && (
+            <Badge variant="outline" className="flex items-center gap-1 bg-amber-50 text-amber-700">
+              <Calendar className="h-3.5 w-3.5" />
+              {farmData.year}. évi adatok
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {isValidCultures ? (

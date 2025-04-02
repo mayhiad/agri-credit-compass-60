@@ -33,6 +33,7 @@ export type FarmData = {
   blockIds?: string[];
   parcels?: ParcelData[];
   marketPrices?: MarketPrice[];
+  year?: string; // Új mező az évszám tárolására
 };
 
 export type UserData = {
