@@ -1,20 +1,17 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FarmData } from "@/components/LoanApplication";
-import { formatCurrency } from "@/lib/utils";
-import { FarmInfoDisplay } from "@/components/FarmInfo";
-import { AlertCircle, LayoutDashboard, Loader2, LogOut, Map, Tractor } from "lucide-react";
+import { AlertCircle, Loader2, LogOut } from "lucide-react";
 import { toast } from "sonner";
-import NavBar from "@/components/NavBar";
-import FarmLocation from "@/components/FarmLocation";
 import Header from "@/components/Header";
 import { useAuth } from "@/App";
+import DashboardLoading from "@/components/dashboard/DashboardLoading";
+import DashboardError from "@/components/dashboard/DashboardError";
+import DashboardContent from "@/components/dashboard/DashboardContent";
+import { Button } from "@/components/ui/button";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -70,17 +67,12 @@ const Dashboard = () => {
   };
   
   if (loading || authLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <DashboardLoading />;
   }
   
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <NavBar onSignOut={handleSignOut} />
       
       <div className="container max-w-6xl mx-auto py-10 flex-grow">
         <div className="flex items-center justify-between mb-6">
@@ -95,158 +87,9 @@ const Dashboard = () => {
         </div>
         
         {error ? (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <DashboardError message={error} />
         ) : farmData ? (
-          <Tabs defaultValue="overview">
-            <TabsList className="mb-6">
-              <TabsTrigger value="overview">
-                <LayoutDashboard className="h-4 w-4 mr-2" />
-                Áttekintés
-              </TabsTrigger>
-              <TabsTrigger value="crops">
-                <Tractor className="h-4 w-4 mr-2" />
-                Növénykultúrák
-              </TabsTrigger>
-              <TabsTrigger value="map">
-                <Map className="h-4 w-4 mr-2" />
-                Földterületek
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="overview">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Gazdaságom adatai</CardTitle>
-                    <CardDescription>
-                      SAPS dokumentum alapján
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableBody>
-                        <TableRow>
-                          <TableCell className="font-medium">Dokumentum azonosító</TableCell>
-                          <TableCell>{farmData.documentId}</TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="font-medium">Régió</TableCell>
-                          <TableCell>{farmData.region}</TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="font-medium">Gazdálkodó</TableCell>
-                          <TableCell>{farmData.applicantName}</TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="font-medium">Összes terület</TableCell>
-                          <TableCell>{farmData.hectares} ha</TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="font-medium">Éves árbevétel</TableCell>
-                          <TableCell>{formatCurrency(farmData.totalRevenue)}</TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Hitelkeret információ</CardTitle>
-                    <CardDescription>
-                      A SAPS adatok alapján kalkulált hitelkeret
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                      <div className="font-semibold text-lg mb-1">Elérhető hitelkeret:</div>
-                      <div className="text-3xl font-bold text-green-700 mb-2">
-                        {formatCurrency(Math.round(farmData.totalRevenue * 0.4))}
-                      </div>
-                      <div className="text-sm text-green-600">
-                        A szerződéskötéstől számított 48 órán belül folyósítunk.
-                      </div>
-                    </div>
-                    
-                    <div className="mt-4">
-                      <Button className="w-full" onClick={() => navigate("/")}>
-                        Hiteligénylés indítása
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="crops">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Növénykultúrák</CardTitle>
-                  <CardDescription>
-                    A SAPS dokumentum alapján rögzített növénykultúrák
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Kultúra</TableHead>
-                        <TableHead className="text-right">Terület (ha)</TableHead>
-                        <TableHead className="text-right">Becsült bevétel</TableHead>
-                        <TableHead className="text-right">Piaci ár (Ft/tonna)</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {farmData.cultures.map((culture, idx) => {
-                        // Mock piaci árak
-                        const marketPrices = {
-                          "Búza": 85000,
-                          "Kukorica": 75000,
-                          "Napraforgó": 180000
-                        };
-                        
-                        const price = (marketPrices as any)[culture.name] || 100000;
-                        
-                        return (
-                          <TableRow key={idx}>
-                            <TableCell>{culture.name}</TableCell>
-                            <TableCell className="text-right">{culture.hectares}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(culture.estimatedRevenue)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(price)}</TableCell>
-                          </TableRow>
-                        );
-                      })}
-                      <TableRow>
-                        <TableCell className="font-medium">Összesen</TableCell>
-                        <TableCell className="text-right font-medium">{farmData.hectares} ha</TableCell>
-                        <TableCell className="text-right font-medium">{formatCurrency(farmData.totalRevenue)}</TableCell>
-                        <TableCell className="text-right"></TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="map">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Földterületek</CardTitle>
-                  <CardDescription>
-                    A SAPS dokumentum alapján azonosított földterületek térképe
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-96 rounded-md overflow-hidden border">
-                    <FarmLocation />
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+          <DashboardContent farmData={farmData} />
         ) : (
           <Alert>
             <AlertCircle className="h-4 w-4" />
@@ -254,9 +97,6 @@ const Dashboard = () => {
           </Alert>
         )}
       </div>
-      
-      {/* Add Footer component */}
-      <Footer />
     </div>
   );
 };
