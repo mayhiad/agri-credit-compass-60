@@ -9,11 +9,13 @@ import { Link } from "react-router-dom";
 interface LoanCompleteProps {
   userData: UserData;
   loanAmount: number;
-  paymentFrequency: "quarterly" | "biannual";
+  paymentFrequency: "quarterly" | "biannual" | "annual";
 }
 
 export const LoanComplete = ({ userData, loanAmount, paymentFrequency }: LoanCompleteProps) => {
-  const paymentFrequencyText = paymentFrequency === "quarterly" ? "negyedéves" : "féléves";
+  const paymentFrequencyText = 
+    paymentFrequency === "quarterly" ? "negyedéves" : 
+    paymentFrequency === "biannual" ? "féléves" : "éves";
   const nextPaymentDate = getNextPaymentDate(paymentFrequency);
   
   return (
@@ -68,14 +70,17 @@ export const LoanComplete = ({ userData, loanAmount, paymentFrequency }: LoanCom
 };
 
 // Helper function to get the next payment date based on frequency
-function getNextPaymentDate(frequency: "quarterly" | "biannual"): string {
+function getNextPaymentDate(frequency: "quarterly" | "biannual" | "annual"): string {
   const now = new Date();
   let nextDate = new Date(now);
   
   if (frequency === "quarterly") {
     nextDate.setMonth(now.getMonth() + 3);
-  } else {
+  } else if (frequency === "biannual") {
     nextDate.setMonth(now.getMonth() + 6);
+  } else {
+    // annual
+    nextDate.setMonth(now.getMonth() + 12);
   }
   
   return nextDate.toLocaleDateString("hu-HU", {
