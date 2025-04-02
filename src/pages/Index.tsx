@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Leaf, Coins, TrendingUp, ChevronRight } from "lucide-react";
+import { Leaf, Coins, TrendingUp, ChevronRight, LogIn } from "lucide-react";
 import { Link } from "react-router-dom";
 import { LoanApplication } from "@/components/LoanApplication";
 import { useAuth } from "@/App";
@@ -21,10 +21,22 @@ const Index = () => {
           <p className="text-xl text-muted-foreground">
             Egyszerű és gyors mezőgazdasági hitelkérelem a SAPS adatok alapján
           </p>
-          {user && !loading && (
+          {user && !loading ? (
             <div className="mt-4">
               <p className="text-primary font-medium">
                 Üdvözöljük újra! Folytathatja a hiteligénylési folyamatot.
+              </p>
+            </div>
+          ) : !loading && (
+            <div className="mt-6">
+              <Link to="/auth">
+                <Button className="gap-2">
+                  <LogIn className="h-4 w-4" />
+                  Bejelentkezés
+                </Button>
+              </Link>
+              <p className="text-sm text-muted-foreground mt-2">
+                Már van fiókja? Jelentkezzen be a folytatáshoz.
               </p>
             </div>
           )}

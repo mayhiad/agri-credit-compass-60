@@ -29,6 +29,10 @@ const Header = () => {
       <div className="container max-w-6xl mx-auto">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-1 md:space-x-4">
+            <Link to="/" className="mr-6">
+              <span className="font-bold text-primary text-lg">Agrár-Hitel</span>
+            </Link>
+            
             <Link to="/">
               <Button variant="ghost" size="sm" className="flex flex-col items-center md:flex-row">
                 <Home className="h-4 w-4 md:mr-2" />
