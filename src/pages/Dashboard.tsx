@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { FarmData } from "@/components/LoanApplication";
-import { AlertCircle, Loader2, LogOut } from "lucide-react";
+import { AlertCircle, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import Header from "@/components/Header";
 import { useAuth } from "@/App";
@@ -29,21 +29,33 @@ const Dashboard = () => {
           return;
         }
         
-        // Fetch user's farm data
-        // In a real app, this would fetch from the database
-        // For now, we're using mock data
-        setFarmData({
-          hectares: 450,
-          cultures: [
-            { name: "Búza", hectares: 200, estimatedRevenue: 40000000 },
-            { name: "Kukorica", hectares: 150, estimatedRevenue: 32000000 },
-            { name: "Napraforgó", hectares: 100, estimatedRevenue: 28000000 }
-          ],
-          totalRevenue: 100000000, // 100 millió Ft
-          region: "Dél-Alföld",
-          documentId: "SAPS-2023-568742",
-          applicantName: "Kovács János"
-        });
+        // Only proceed if we have a valid user
+        if (user) {
+          console.log("Fetching data for user:", user.id);
+          
+          // In a real app, this would fetch from the database based on user ID
+          // For now, we're using dynamic mock data based on user email
+          const mockFarmData: FarmData = {
+            hectares: 450,
+            cultures: [
+              { name: "Búza", hectares: 200, estimatedRevenue: 40000000 },
+              { name: "Kukorica", hectares: 150, estimatedRevenue: 32000000 },
+              { name: "Napraforgó", hectares: 100, estimatedRevenue: 28000000 }
+            ],
+            totalRevenue: 100000000, // 100 millió Ft
+            region: "Dél-Alföld",
+            documentId: `SAPS-2023-${user.id.substring(0, 6)}`, // Make unique per user
+            applicantName: user.email?.split('@')[0] || "Ismeretlen felhasználó",
+            blockIds: [`K-${user.id.substring(0, 4)}`, `L-${user.id.substring(4, 8)}`],
+            marketPrices: [
+              { culture: "Búza", averageYield: 5.8, price: 85000, trend: 2.5 },
+              { culture: "Kukorica", averageYield: 7.2, price: 78000, trend: -1.3 },
+              { culture: "Napraforgó", averageYield: 3.1, price: 210000, trend: 4.2 }
+            ]
+          };
+          
+          setFarmData(mockFarmData);
+        }
       } catch (error) {
         console.error("Error checking auth:", error);
         setError("Nem sikerült betölteni az adatokat");

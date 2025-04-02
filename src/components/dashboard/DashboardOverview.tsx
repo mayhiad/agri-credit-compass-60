@@ -116,7 +116,10 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
                         <TableCell className="text-right">{price.averageYield} t/ha</TableCell>
                         <TableCell className="text-right">{formatCurrency(price.price)}/t</TableCell>
                         <TableCell className="text-right">
-                          <Badge variant={price.trend > 0 ? "success" : price.trend < 0 ? "destructive" : "outline"}>
+                          <Badge 
+                            variant={price.trend > 0 ? "default" : price.trend < 0 ? "destructive" : "outline"}
+                            className={price.trend > 0 ? "bg-green-100 text-green-800 hover:bg-green-200" : undefined}
+                          >
                             {price.trend > 0 ? "+" : ""}{price.trend}%
                           </Badge>
                         </TableCell>

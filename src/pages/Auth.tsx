@@ -23,8 +23,15 @@ const Auth = () => {
   // Check if user is already logged in
   useEffect(() => {
     const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error("Session error:", error);
+      }
+      
+      // If session exists, redirect to dashboard
       if (data.session) {
+        console.log("User already authenticated, redirecting to dashboard");
         navigate("/dashboard");
       }
     };
@@ -48,6 +55,9 @@ const Auth = () => {
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: window.location.origin + "/dashboard"
+        }
       });
       
       if (signUpError) throw signUpError;
@@ -57,6 +67,8 @@ const Auth = () => {
       
       // If email confirmation is not enabled, redirect to dashboard
       if (data.session) {
+        // Clear any stored data before setting up the new session
+        localStorage.removeItem('farmData');
         navigate("/dashboard");
       }
     } catch (error: any) {
@@ -79,6 +91,9 @@ const Auth = () => {
     setLoading(true);
     
     try {
+      // Clear any stored data before attempting sign in
+      localStorage.removeItem('farmData');
+      
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
