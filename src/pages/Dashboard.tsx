@@ -48,9 +48,27 @@ const Dashboard = () => {
             applicantName: user.email?.split('@')[0] || "Ismeretlen felhasználó",
             blockIds: [`K-${user.id.substring(0, 4)}`, `L-${user.id.substring(4, 8)}`],
             marketPrices: [
-              { culture: "Búza", averageYield: 5.8, price: 85000, trend: 2.5 },
-              { culture: "Kukorica", averageYield: 7.2, price: 78000, trend: -1.3 },
-              { culture: "Napraforgó", averageYield: 3.1, price: 210000, trend: 4.2 }
+              { 
+                culture: "Búza", 
+                averageYield: 5.8, 
+                price: 85000, 
+                trend: 2.5, 
+                lastUpdated: new Date() 
+              },
+              { 
+                culture: "Kukorica", 
+                averageYield: 7.2, 
+                price: 78000, 
+                trend: -1.3, 
+                lastUpdated: new Date() 
+              },
+              { 
+                culture: "Napraforgó", 
+                averageYield: 3.1, 
+                price: 210000, 
+                trend: 4.2, 
+                lastUpdated: new Date() 
+              }
             ]
           };
           
