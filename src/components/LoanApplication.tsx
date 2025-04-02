@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Steps } from "@/components/Steps";
@@ -11,6 +10,7 @@ import { LoanTerms, LoanSettings } from "@/components/LoanTerms";
 import { ContractSigning } from "@/components/ContractSigning";
 import { LoanComplete } from "@/components/LoanComplete";
 import { useToast } from "@/components/ui/use-toast";
+import { useSearchParams } from "react-router-dom";
 
 export type FarmData = {
   hectares: number;
@@ -43,11 +43,40 @@ type ApplicationStep =
 
 export const LoanApplication = () => {
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState<ApplicationStep>("upload");
   const [farmData, setFarmData] = useState<FarmData | null>(null);
   const [creditLimit, setCreditLimit] = useState<number>(0);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loanTerms, setLoanTerms] = useState<LoanSettings | null>(null);
+
+  useEffect(() => {
+    // Check if there's a step query parameter and farm data in localStorage
+    const urlStep = searchParams.get("step");
+    const storedFarmData = localStorage.getItem("farmData");
+    
+    if (urlStep === "loan-terms" && storedFarmData) {
+      try {
+        // Parse stored farm data
+        const parsedFarmData = JSON.parse(storedFarmData);
+        setFarmData(parsedFarmData);
+        
+        // Calculate credit limit
+        const calculatedCreditLimit = Math.round(parsedFarmData.totalRevenue * 0.4);
+        setCreditLimit(calculatedCreditLimit);
+        
+        // Skip directly to loan terms
+        setStep("loan-terms");
+        
+        toast({
+          title: "Hiteligénylés folytatása",
+          description: "A gazdasági adatok betöltésre kerültek.",
+        });
+      } catch (error) {
+        console.error("Error parsing stored farm data:", error);
+      }
+    }
+  }, [searchParams, toast]);
 
   const handleFileUploadComplete = (data: FarmData) => {
     setFarmData(data);
@@ -94,6 +123,8 @@ export const LoanApplication = () => {
       title: "Szerződés aláírva",
       description: "A kölcsön folyósítása folyamatban van.",
     });
+    // Clear the stored farm data after completing the process
+    localStorage.removeItem("farmData");
   };
 
   const renderCurrentStep = () => {

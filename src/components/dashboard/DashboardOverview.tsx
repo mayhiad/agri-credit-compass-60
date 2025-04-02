@@ -13,6 +13,14 @@ interface DashboardOverviewProps {
 const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
   const navigate = useNavigate();
   
+  const handleStartLoanApplication = () => {
+    // Store farmData in localStorage to access it in the LoanApplication component
+    localStorage.setItem('farmData', JSON.stringify(farmData));
+    
+    // Navigate to the homepage with a query parameter to indicate we should skip to loan terms
+    navigate("/?step=loan-terms");
+  };
+  
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <Card>
@@ -69,7 +77,7 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
           </div>
           
           <div className="mt-4">
-            <Button className="w-full" onClick={() => navigate("/")}>
+            <Button className="w-full" onClick={handleStartLoanApplication}>
               Hiteligénylés indítása
             </Button>
           </div>
