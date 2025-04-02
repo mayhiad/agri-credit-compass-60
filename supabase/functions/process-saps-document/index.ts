@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -69,6 +70,19 @@ async function processDocument(fileBuffer: ArrayBuffer, fileName: string, userId
     const extractedData = JSON.parse(aiResult.choices[0].message.content);
     console.log("Detailed AI analysis completed");
 
+    // Default values for required fields to prevent undefined errors
+    const defaultData = {
+      applicantName: "Felhasználó",
+      hectares: 0,
+      cultures: [],
+      region: "Ismeretlen régió",
+      blockIds: [],
+      parcels: []
+    };
+
+    // Merge extracted data with defaults to ensure all required fields exist
+    const safeExtractedData = { ...defaultData, ...extractedData };
+
     // Enhanced data processing and revenue calculation
     const marketPrices = [
       {
@@ -108,7 +122,10 @@ async function processDocument(fileBuffer: ArrayBuffer, fileName: string, userId
       }
     ];
 
-    const culturesWithRevenue = extractedData.cultures.map(culture => {
+    // Ensure cultures is an array before mapping
+    const cultures = Array.isArray(safeExtractedData.cultures) ? safeExtractedData.cultures : [];
+    
+    const culturesWithRevenue = cultures.map(culture => {
       const marketPrice = marketPrices.find(mp => mp.culture === culture.name);
       const estimatedRevenue = marketPrice 
         ? culture.hectares * marketPrice.averageYield * marketPrice.price
@@ -125,15 +142,19 @@ async function processDocument(fileBuffer: ArrayBuffer, fileName: string, userId
       0
     );
 
+    // Ensure blockIds and parcels are arrays
+    const blockIds = Array.isArray(safeExtractedData.blockIds) ? safeExtractedData.blockIds : [];
+    const parcels = Array.isArray(safeExtractedData.parcels) ? safeExtractedData.parcels : [];
+
     const farmData = {
-      hectares: extractedData.hectares,
+      hectares: safeExtractedData.hectares,
       cultures: culturesWithRevenue,
       totalRevenue,
-      region: extractedData.region,
+      region: safeExtractedData.region,
       documentId: fileName,
-      applicantName: extractedData.applicantName,
-      blockIds: extractedData.blockIds,
-      parcels: extractedData.parcels,
+      applicantName: safeExtractedData.applicantName,
+      blockIds,
+      parcels,
       marketPrices
     };
 
@@ -171,13 +192,17 @@ async function processDocument(fileBuffer: ArrayBuffer, fileName: string, userId
       }
     }
 
-    // Store additional farm details
+    // Store additional farm details with safe location data
+    const locationData = Array.isArray(parcels) && parcels.length > 0 
+      ? parcels.map(p => p.location || {})
+      : [];
+
     const { error: detailsError } = await supabase
       .from('farm_details')
       .insert({
         farm_id: farmRecord.id,
         market_prices: marketPrices,
-        location_data: extractedData.parcels.map(p => p.location)
+        location_data: locationData
       });
 
     if (detailsError) {
