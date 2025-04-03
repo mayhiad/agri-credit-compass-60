@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,9 +27,17 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      setError(null);
-      setProcessingStatus(null);
+      const selectedFile = e.target.files[0];
+      const allowedTypes = ['application/pdf', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+      
+      if (allowedTypes.includes(selectedFile.type)) {
+        setFile(selectedFile);
+        setError(null);
+        setProcessingStatus(null);
+      } else {
+        toast.error("Kérjük, PDF vagy Excel formátumú dokumentumot töltsön fel");
+        setFile(null);
+      }
     }
   };
   
@@ -51,20 +58,11 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
     setError(null);
     
     try {
-      // Update status for UI feedback
       setProcessingStatus({
         step: "Dokumentum ellenőrzése",
         progress: 10,
       });
-      await new Promise(resolve => setTimeout(resolve, 500));
       
-      setProcessingStatus({
-        step: "Blokkazonosítók kiolvasása",
-        progress: 30,
-      });
-      await new Promise(resolve => setTimeout(resolve, 700));
-      
-      // Prepare form data for the request
       const formData = new FormData();
       formData.append('file', file);
       
@@ -73,13 +71,11 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         progress: 50,
       });
       
-      // Get user token for authorization
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error("Nincs érvényes felhasználói munkamenet");
       }
       
-      // Call the Supabase Edge function
       const response = await fetch(
         `https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-saps-document`,
         {
@@ -96,34 +92,23 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         throw new Error(errorData.error || "Hiba a dokumentum feldolgozása közben");
       }
       
-      setProcessingStatus({
-        step: "Adatok elemzése",
-        progress: 70,
-      });
-      
-      // Get the response data
       const farmData = await response.json();
       
+      // Alapvető validáció a válasz struktúrájára
+      if (!farmData.hectares || !farmData.cultures || farmData.cultures.length === 0) {
+        throw new Error("A feldolgozott adatok hiányosak");
+      }
+      
       setProcessingStatus({
-        step: "Bevétel becslés készítése",
+        step: "Adatok elemzése",
         progress: 90,
-      });
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Successfully processed
-      setProcessingStatus({
-        step: "Feldolgozás befejezve",
-        progress: 100,
-        details: `${farmData.blockIds?.length || 0} blokkazonosító, ${farmData.parcels?.length || 0} parcella, ${farmData.cultures.length} növénykultúra feldolgozva`
+        details: `${farmData.blockIds?.length || 0} blokkazonosító, ${farmData.cultures.length} növénykultúra feldolgozva`
       });
       
-      // Save to localStorage for persistence
       localStorage.setItem("farmData", JSON.stringify(farmData));
       
-      // Short delay to show success state
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Move to next step
       onComplete(farmData);
       toast.success("SAPS dokumentum sikeresen feldolgozva");
       

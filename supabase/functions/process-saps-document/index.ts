@@ -1,7 +1,8 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
-import { OpenAI } from "https://deno.land/x/openai@v4.24.0/mod.ts";
+import OpenAI from 'https://esm.sh/openai@4.38.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,450 +13,163 @@ const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
 const supabaseUrl = Deno.env.get('SUPABASE_URL');
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-// Create Supabase client
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-// Create OpenAI client configured for Assistants API v2
 const openai = new OpenAI({
   apiKey: openaiApiKey,
-  defaultHeaders: {
-    'OpenAI-Beta': 'assistants=v2'
-  }
+  defaultHeaders: { 'OpenAI-Beta': 'assistants=v2' }
 });
 
-// Upload file to OpenAI
-async function uploadFileToOpenAI(fileBuffer: ArrayBuffer, fileName: string): Promise<string> {
-  console.log("Uploading file to OpenAI:", fileName);
-  
-  const file = await openai.files.create({
-    file: new File([fileBuffer], fileName),
-    purpose: "assistants"
-  });
-  
-  console.log("File uploaded successfully. File ID:", file.id);
-  return file.id;
-}
+// Részletes diagnosztikai logging hozzáadása
+async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: string, userId: string) {
+  console.log(`🔍 Dokumentum feldolgozás megkezdése: ${fileName}`);
+  console.log(`📦 Dokumentum mérete: ${fileBuffer.byteLength} bájt`);
 
-// Create Assistant
-async function createAssistant(fileId: string): Promise<string> {
-  console.log("Creating OpenAI Assistant with file:", fileId);
-  
-  const assistant = await openai.beta.assistants.create({
-    name: "SAPS Dokumentum Elemző",
-    instructions: `Te egy magyar mezőgazdasági SAPS dokumentum elemző szakértő vagy.
-    A dokumentumból a következő adatokat kell precízen kinyerned JSON formátumban:
-    
-    {
-      "applicantName": "A kérelmező teljes neve",
-      "clientId": "Ügyfél-azonosító",
-      "documentId": "Dokumentum azonosító",
-      "year": "Gazdasági év",
-      "hectares": "Teljes igényelt terület (számformátumban)",
-      "cultures": [
+  try {
+    // Fájl feltöltés részletes logolása
+    const file = await openai.files.create({
+      file: new File([fileBuffer], fileName),
+      purpose: "assistants"
+    });
+    console.log(`📤 Fájl sikeresen feltöltve. File ID: ${file.id}`);
+
+    // Asszisztens létrehozás diagnosztikai adatokkal
+    const assistant = await openai.beta.assistants.create({
+      name: "SAPS Dokumentum Elemző Diagnosztika",
+      instructions: `
+        DIAGNOSZTIKAI MINTA:
+        Részletes JSON kibontás a dokumentumból:
         {
-          "name": "Növénykultúra neve magyarul",
-          "code": "Hasznosítási kód",
-          "hectares": "Igényelt terület (számformátumban)"
+          "debug": {
+            "fileSize": "${fileBuffer.byteLength}",
+            "fileName": "${fileName}"
+          },
+          "applicantName": "Kérelmező teljes neve",
+          "cultures": [
+            {
+              "name": "Kultúra neve",
+              "hectares": "Terület nagysága",
+              "detailedInfo": "Opcionális részletek"
+            }
+          ]
         }
-      ],
-      "blockIds": ["Blokkazonosítók listája"]
-    }`,
-    tools: [{ type: "retrieval" }],
-    file_ids: [fileId],
-    model: "gpt-4o"
-  });
-  
-  console.log("Assistant created successfully. Assistant ID:", assistant.id);
-  return assistant.id;
-}
+      `,
+      tools: [{ type: "retrieval" }],
+      model: "gpt-4o",
+      file_ids: [file.id]
+    });
+    console.log(`🤖 Asszisztens létrehozva. ID: ${assistant.id}`);
 
-// Create Thread
-async function createThread(): Promise<string> {
-  console.log("Creating thread");
-  
-  const thread = await openai.beta.threads.create();
-  
-  console.log("Thread created. Thread ID:", thread.id);
-  return thread.id;
-}
+    // Thread és üzenet létrehozás diagnosztikai céllal
+    const thread = await openai.beta.threads.create();
+    console.log(`📝 Thread létrehozva. ID: ${thread.id}`);
 
-// Add Message to Thread
-async function addMessageToThread(threadId: string, fileId: string): Promise<void> {
-  console.log("Adding message to thread", threadId);
-  
-  await openai.beta.threads.messages.create(threadId, {
-    role: "user",
-    content: `Elemezd ki részletesen a csatolt SAPS dokumentumot. 
-    Kérem JSON formátumban add meg a dokumentum részleteit, 
-    figyelve a magyar mezőgazdasági terminológiára és a pontos adatokra.`,
-    file_ids: [fileId]
-  });
-  
-  console.log("Message added to thread");
-}
+    await openai.beta.threads.messages.create(thread.id, {
+      role: "user",
+      content: `
+        DIAGNOSZTIKAI FELDOLGOZÁS:
+        1. Olvasd ki a dokumentum összes lehetséges adatát
+        2. Részletes JSON formátum
+        3. Debug információk feltüntetése
+      `,
+      file_ids: [file.id]
+    });
 
-// Run Assistant
-async function runAssistant(threadId: string, assistantId: string): Promise<string> {
-  console.log("Running assistant", assistantId, "on thread", threadId);
-  
-  const run = await openai.beta.threads.runs.create(threadId, {
-    assistant_id: assistantId
-  });
-  
-  console.log("Run created. Run ID:", run.id);
-  return run.id;
-}
+    // Futtatás és részletes állapotkövetés
+    const run = await openai.beta.threads.runs.create(thread.id, {
+      assistant_id: assistant.id
+    });
 
-// Check Run Status
-async function checkRunStatus(threadId: string, runId: string): Promise<string> {
-  const run = await openai.beta.threads.runs.retrieve(threadId, runId);
-  console.log("Run status:", run.status);
-  return run.status;
-}
+    console.log(`🏃 Feldolgozás elindítva. Run ID: ${run.id}`);
 
-// Wait for Run Completion
-async function waitForRunCompletion(threadId: string, runId: string, maxAttempts = 30): Promise<void> {
-  console.log("Waiting for run completion...");
-  
-  for (let i = 0; i < maxAttempts; i++) {
-    const status = await checkRunStatus(threadId, runId);
-    
-    if (status === 'completed') {
-      console.log("Run completed successfully");
-      return;
+    // Futtatás állapotának részletes nyomonkövetése
+    let runStatus: string;
+    const maxAttempts = 10;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const retrievedRun = await openai.beta.threads.runs.retrieve(thread.id, run.id);
+      runStatus = retrievedRun.status;
+      
+      console.log(`🕒 ${attempt}. próbálkozás - Státusz: ${runStatus}`);
+
+      if (runStatus === 'completed') break;
+      if (runStatus === 'failed') {
+        console.error("❌ Feldolgozás sikertelen", retrievedRun);
+        throw new Error(`Feldolgozás sikertelen: ${retrievedRun.last_error?.message}`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Hosszabb várakozási idő
     }
-    
-    if (['failed', 'cancelled', 'expired'].includes(status)) {
-      throw new Error(`Run ended with status: ${status}`);
-    }
-    
-    console.log(`Attempt ${i + 1}/${maxAttempts}: Status is ${status}, waiting 2 seconds...`);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-  }
-  
-  throw new Error(`Run did not complete after ${maxAttempts} checks`);
-}
 
-// Retrieve Thread Messages
-async function retrieveThreadMessages(threadId: string): Promise<any> {
-  console.log("Retrieving messages from thread", threadId);
-  
-  const messages = await openai.beta.threads.messages.list(threadId);
-  
-  // Find the last assistant message
-  const assistantMessages = messages.data.filter(msg => msg.role === 'assistant');
-  
-  if (assistantMessages.length === 0) {
-    throw new Error("No assistant messages found");
-  }
-  
-  const lastMessage = assistantMessages[0];
-  
-  if (!lastMessage.content || lastMessage.content.length === 0) {
-    throw new Error("Empty message content");
-  }
-  
-  const content = lastMessage.content[0];
-  
-  if (content.type !== 'text') {
-    throw new Error(`Unexpected content type: ${content.type}`);
-  }
-  
-  const textContent = content.text.value;
-  console.log("Retrieved message:", textContent);
-  
-  try {
-    // Try to parse the message as JSON
-    const jsonMatch = textContent.match(/```json\s*([\s\S]*?)\s*```/);
-    if (jsonMatch && jsonMatch[1]) {
-      return JSON.parse(jsonMatch[1]);
-    }
+    // Üzenetek lekérése részletes logolással
+    const messages = await openai.beta.threads.messages.list(thread.id);
+    const assistantMessages = messages.data.filter(msg => msg.role === 'assistant');
     
-    return JSON.parse(textContent);
+    console.log(`📬 Érkezett asszisztensi üzenetek: ${assistantMessages.length}`);
+
+    const extractedContent = assistantMessages
+      .map(msg => msg.content[0].type === 'text' ? msg.content[0].text.value : null)
+      .filter(Boolean);
+
+    console.log("📋 Nyers kivont tartalom:", extractedContent);
+
+    // Robusztus JSON kibontás
+    const jsonData = extractedContent.reduce((acc, content) => {
+      try {
+        const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
+        const parsedJson = jsonMatch 
+          ? JSON.parse(jsonMatch[1]) 
+          : JSON.parse(content);
+        return { ...acc, ...parsedJson };
+      } catch (parseError) {
+        console.warn("❗ JSON parsing hiba:", parseError);
+        return acc;
+      }
+    }, {});
+
+    console.log("🔍 Feldolgozott JSON:", jsonData);
+
+    // Diagnosztikai adatok mentése Supabase-be
+    await supabase.from('diagnostic_logs').insert({
+      user_id: userId,
+      file_name: fileName,
+      file_size: fileBuffer.byteLength,
+      extraction_data: jsonData,
+      created_at: new Date().toISOString()
+    });
+
+    console.log("✅ Diagnosztikai adatok sikeresen mentve");
+
+    return jsonData;
+
   } catch (error) {
-    console.warn("Failed to parse message as JSON:", error);
-    return { rawMessage: textContent };
-  }
-}
-
-// Main document processing function
-async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: string, userId: string): Promise<any> {
-  try {
-    console.log("Starting OpenAI document processing flow...");
-    
-    // 1. Upload file to OpenAI
-    const fileId = await uploadFileToOpenAI(fileBuffer, fileName);
-    
-    // 2. Create Assistant
-    const assistantId = await createAssistant(fileId);
-    
-    // 3. Create Thread
-    const threadId = await createThread();
-    
-    // 4. Add Message to Thread
-    await addMessageToThread(threadId, fileId);
-    
-    // 5. Run Assistant
-    const runId = await runAssistant(threadId, assistantId);
-    
-    // 6. Wait for Run Completion
-    await waitForRunCompletion(threadId, runId);
-    
-    // 7. Retrieve Thread Messages
-    const extractedData = await retrieveThreadMessages(threadId);
-    console.log("Extracted data:", extractedData);
-    
-    // 8. Calculate Revenue and Market Prices
-    const processedData = await calculateRevenueAndMarketPrices(extractedData);
-    
-    // 9. Store Data in Supabase
-    await storeProcessedData(userId, processedData);
-    
-    return processedData;
-  } catch (error) {
-    console.error("Error processing document with OpenAI:", error);
-    throw error;
-  }
-}
-
-// Calculate Revenue and Market Prices (similar to previous implementation)
-async function calculateRevenueAndMarketPrices(extractedData: any): Promise<any> {
-  console.log("Calculating revenue and market prices");
-  
-  // Alapértelmezett piaci árak és hozamok
-  const defaultMarketPrices = [
-    {
-      culture: "Őszi búza",
-      averageYield: 5.5,
-      price: 85000,
-      trend: 0,
-      lastUpdated: new Date()
-    },
-    {
-      culture: "Kukorica",
-      averageYield: 8.0,
-      price: 72000,
-      trend: 1,
-      lastUpdated: new Date()
-    },
-    {
-      culture: "Napraforgó",
-      averageYield: 3.1,
-      price: 170000,
-      trend: 0,
-      lastUpdated: new Date()
-    },
-    {
-      culture: "Őszi káposztarepce",
-      averageYield: 3.3,
-      price: 190000,
-      trend: 1,
-      lastUpdated: new Date()
-    },
-    {
-      culture: "Őszi árpa",
-      averageYield: 5.2,
-      price: 70000,
-      trend: -1,
-      lastUpdated: new Date()
-    },
-    {
-      culture: "Tavaszi árpa",
-      averageYield: 4.8,
-      price: 73000,
-      trend: -1,
-      lastUpdated: new Date()
-    }
-  ];
-  
-  // Ellenőrizzük, hogy a kapott adatok tartalmazzák-e a szükséges mezőket
-  const cultures = Array.isArray(extractedData.cultures) ? extractedData.cultures : [];
-  console.log(`Processing ${cultures.length} cultures`);
-  
-  // Kultúrák feldolgozása és bevétel számítás
-  const culturesWithRevenue = cultures.map(culture => {
-    // Ellenőrizzük és biztosítsuk az alapadatokat
-    const cultureName = typeof culture.name === 'string' ? culture.name : 'Ismeretlen';
-    const cultureHectares = typeof culture.hectares === 'number' && !isNaN(culture.hectares) ? 
-      culture.hectares : parseFloat(culture.hectares) || 0;
-    
-    // Keresünk megfelelő piaci árat
-    const marketPrice = defaultMarketPrices.find(mp => mp.culture === cultureName) || 
-      defaultMarketPrices.find(mp => cultureName.includes(mp.culture)) || 
-      { averageYield: 4.5, price: 80000 };
-    
-    const yieldPerHa = marketPrice.averageYield;
-    const pricePerTon = marketPrice.price;
-    
-    // Bevétel számítása: terület * hozam * ár
-    const estimatedRevenue = cultureHectares * yieldPerHa * pricePerTon;
-    
-    console.log(`Culture: ${cultureName}, Hectares: ${cultureHectares}, Yield: ${yieldPerHa} t/ha, Price: ${pricePerTon} Ft/t, Revenue: ${estimatedRevenue} Ft`);
-    
-    return {
-      name: cultureName,
-      hectares: cultureHectares,
-      estimatedRevenue
-    };
-  });
-  
-  // Teljes bevétel számítása
-  const totalRevenue = culturesWithRevenue.reduce((sum, culture) => sum + culture.estimatedRevenue, 0);
-  console.log(`Calculated total revenue: ${totalRevenue} Ft`);
-  
-  // Kapcsolódó piaci adatok gyűjtése
-  const relevantMarketPrices = cultures.map(culture => {
-    const cultureName = typeof culture.name === 'string' ? culture.name : 'Ismeretlen';
-    
-    // Keresünk megfelelő piaci árat
-    const marketPrice = defaultMarketPrices.find(mp => mp.culture === cultureName) || 
-      defaultMarketPrices.find(mp => cultureName.includes(mp.culture)) || 
-      { 
-        culture: cultureName, 
-        averageYield: 4.5, 
-        price: 80000, 
-        trend: 0, 
-        lastUpdated: new Date() 
-      };
-    
-    return {
-      culture: cultureName,
-      averageYield: marketPrice.averageYield,
-      price: marketPrice.price,
-      trend: marketPrice.trend,
-      lastUpdated: marketPrice.lastUpdated
-    };
-  });
-  
-  // Alapértelmezett értékek a nem definiált mezőkhöz
-  const hectares = typeof extractedData.hectares === 'number' && !isNaN(extractedData.hectares) ? 
-    extractedData.hectares : parseFloat(extractedData.hectares) || 
-    culturesWithRevenue.reduce((sum, culture) => sum + culture.hectares, 0);
-  
-  const blockIds = Array.isArray(extractedData.blockIds) ? extractedData.blockIds : [];
-  
-  return {
-    ...extractedData,
-    cultures: culturesWithRevenue,
-    totalRevenue,
-    marketPrices: relevantMarketPrices,
-    hectares,
-    blockIds
-  };
-}
-
-// Store Processed Data in Supabase
-async function storeProcessedData(userId: string, farmData: any) {
-  try {
-    // Insert farm data
-    const { data: farmRecord, error: farmError } = await supabase
-      .from('farms')
-      .insert({
-        user_id: userId,
-        document_id: farmData.documentId || 'UNKNOWN',
-        hectares: farmData.hectares,
-        total_revenue: farmData.totalRevenue,
-        region: farmData.region || 'Magyarország',
-        year: farmData.year || new Date().getFullYear().toString()
-      })
-      .select('id')
-      .single();
-    
-    if (farmError) throw farmError;
-    
-    // Insert cultures
-    for (const culture of farmData.cultures) {
-      await supabase
-        .from('cultures')
-        .insert({
-          farm_id: farmRecord.id,
-          name: culture.name,
-          hectares: culture.hectares,
-          estimated_revenue: culture.estimatedRevenue
-        });
-    }
-    
-    // Store market prices and additional details
-    await supabase
-      .from('farm_details')
-      .insert({
-        farm_id: farmRecord.id,
-        market_prices: farmData.marketPrices,
-        block_ids: farmData.blockIds
-      });
-    
-  } catch (error) {
-    console.error("Error storing processed data:", error);
+    console.error("🚨 Teljes feldolgozási hiba:", error);
     throw error;
   }
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-  
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+
   try {
-    // Validate OpenAI API key
-    if (!openaiApiKey) {
-      return new Response(
-        JSON.stringify({ error: 'OpenAI API key is not set' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Validate user authorization
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'No authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Create Supabase client with user token
-    const userToken = authHeader.replace('Bearer ', '');
-    const userSupabase = createClient(supabaseUrl, supabaseServiceKey, {
-      global: { headers: { Authorization: `Bearer ${userToken}` } }
-    });
-    
-    // Authenticate user
-    const { data: { user }, error: userError } = await userSupabase.auth.getUser(userToken);
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid user token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Process uploaded file
     const formData = await req.formData();
     const file = formData.get('file') as File;
     
-    if (!file) {
-      return new Response(
-        JSON.stringify({ error: 'No file provided' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Convert file to ArrayBuffer
+    if (!file) throw new Error('Nem érkezett fájl');
+
     const fileBuffer = await file.arrayBuffer();
+    const processedData = await processDocumentWithOpenAI(fileBuffer, file.name, 'debug_user');
+
+    return new Response(JSON.stringify(processedData), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
     
-    // Process document
-    const farmData = await processDocumentWithOpenAI(fileBuffer, file.name, user.id);
-    
-    // Return processed data
-    return new Response(
-      JSON.stringify(farmData),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
   } catch (error) {
-    console.error("Error in process-saps-document function:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error("🔥 Végső hibakezelés:", error);
+    return new Response(JSON.stringify({ 
+      error: error.message, 
+      details: error.toString() 
+    }), { 
+      status: 500, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    });
   }
 });
