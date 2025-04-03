@@ -55,14 +55,16 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
     console.log(`🤖 Asszisztens létrehozva. ID: ${assistant.id}`);
 
     // Thread létrehozása
-    const thread = await openai.beta.threads.create({
-      messages: [{
-        role: "user",
-        content: "Olvasd ki a SAPS dokumentum részleteit JSON formátumban.",
-        file_ids: [file.id]
-      }]
-    });
+    const thread = await openai.beta.threads.create();
     console.log(`📝 Thread létrehozva. ID: ${thread.id}`);
+    
+    // Üzenet hozzáadása a thread-hez
+    await openai.beta.threads.messages.create(thread.id, {
+      role: "user",
+      content: "Olvasd ki a SAPS dokumentum részleteit JSON formátumban.",
+      file_ids: [file.id]  // Itt adjuk át a file_id-t
+    });
+    console.log(`📤 Üzenet létrehozva a file_id-val: ${file.id}`);
 
     // Futtatás
     const run = await openai.beta.threads.runs.create(thread.id, {
@@ -163,4 +165,3 @@ serve(async (req) => {
     });
   }
 });
-
