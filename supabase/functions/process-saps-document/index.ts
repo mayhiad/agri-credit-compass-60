@@ -19,69 +19,53 @@ const openai = new OpenAI({
   defaultHeaders: { 'OpenAI-Beta': 'assistants=v2' }
 });
 
-// Részletes diagnosztikai logging hozzáadása
 async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: string, userId: string) {
   console.log(`🔍 Dokumentum feldolgozás megkezdése: ${fileName}`);
   console.log(`📦 Dokumentum mérete: ${fileBuffer.byteLength} bájt`);
 
   try {
-    // Fájl feltöltés részletes logolása
     const file = await openai.files.create({
       file: new File([fileBuffer], fileName),
       purpose: "assistants"
     });
     console.log(`📤 Fájl sikeresen feltöltve. File ID: ${file.id}`);
 
-    // Asszisztens létrehozás diagnosztikai adatokkal
     const assistant = await openai.beta.assistants.create({
-      name: "SAPS Dokumentum Elemző Diagnosztika",
-      instructions: `
-        DIAGNOSZTIKAI MINTA:
-        Részletes JSON kibontás a dokumentumból:
+      name: "SAPS Dokumentum Elemző",
+      instructions: `Olvasd ki a dokumentumból a következő mezőket JSON formátumban:
         {
-          "debug": {
-            "fileSize": "${fileBuffer.byteLength}",
-            "fileName": "${fileName}"
-          },
-          "applicantName": "Kérelmező teljes neve",
+          "hectares": "Összes terület hektárban",
           "cultures": [
             {
               "name": "Kultúra neve",
-              "hectares": "Terület nagysága",
-              "detailedInfo": "Opcionális részletek"
+              "hectares": "Kultúra területe",
+              "estimatedRevenue": "Becsült árbevétel"
             }
-          ]
-        }
-      `,
-      tools: [{ type: "retrieval" }],
+          ],
+          "totalRevenue": "Összes becsült árbevétel",
+          "region": "Gazdaság régiója",
+          "blockIds": ["Blokkazonosítók listája"]
+        }`,
+      tools: [{ type: "file_search" }],
       model: "gpt-4o",
       file_ids: [file.id]
     });
     console.log(`🤖 Asszisztens létrehozva. ID: ${assistant.id}`);
 
-    // Thread és üzenet létrehozás diagnosztikai céllal
-    const thread = await openai.beta.threads.create();
+    const thread = await openai.beta.threads.create({
+      messages: [{
+        role: "user",
+        content: "Olvasd ki a SAPS dokumentum részleteit JSON formátumban.",
+        file_ids: [file.id]
+      }]
+    });
     console.log(`📝 Thread létrehozva. ID: ${thread.id}`);
 
-    await openai.beta.threads.messages.create(thread.id, {
-      role: "user",
-      content: `
-        DIAGNOSZTIKAI FELDOLGOZÁS:
-        1. Olvasd ki a dokumentum összes lehetséges adatát
-        2. Részletes JSON formátum
-        3. Debug információk feltüntetése
-      `,
-      file_ids: [file.id]
-    });
-
-    // Futtatás és részletes állapotkövetés
     const run = await openai.beta.threads.runs.create(thread.id, {
       assistant_id: assistant.id
     });
-
     console.log(`🏃 Feldolgozás elindítva. Run ID: ${run.id}`);
 
-    // Futtatás állapotának részletes nyomonkövetése
     let runStatus: string;
     const maxAttempts = 10;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -96,10 +80,9 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
         throw new Error(`Feldolgozás sikertelen: ${retrievedRun.last_error?.message}`);
       }
 
-      await new Promise(resolve => setTimeout(resolve, 3000)); // Hosszabb várakozási idő
+      await new Promise(resolve => setTimeout(resolve, 3000));
     }
 
-    // Üzenetek lekérése részletes logolással
     const messages = await openai.beta.threads.messages.list(thread.id);
     const assistantMessages = messages.data.filter(msg => msg.role === 'assistant');
     
@@ -111,7 +94,6 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
 
     console.log("📋 Nyers kivont tartalom:", extractedContent);
 
-    // Robusztus JSON kibontás
     const jsonData = extractedContent.reduce((acc, content) => {
       try {
         const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
@@ -127,7 +109,6 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
 
     console.log("🔍 Feldolgozott JSON:", jsonData);
 
-    // Diagnosztikai adatok mentése Supabase-be
     await supabase.from('diagnostic_logs').insert({
       user_id: userId,
       file_name: fileName,

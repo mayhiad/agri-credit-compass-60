@@ -47,6 +47,33 @@ export type Database = {
           },
         ]
       }
+      diagnostic_logs: {
+        Row: {
+          created_at: string | null
+          extraction_data: Json | null
+          file_name: string | null
+          file_size: number | null
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          extraction_data?: Json | null
+          file_name?: string | null
+          file_size?: number | null
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          extraction_data?: Json | null
+          file_name?: string | null
+          file_size?: number | null
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       farm_details: {
         Row: {
           created_at: string
