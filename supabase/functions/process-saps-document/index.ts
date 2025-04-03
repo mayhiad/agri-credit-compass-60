@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -15,8 +16,13 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 // Create Supabase client
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Create OpenAI client
-const openai = new OpenAI({ apiKey: openaiApiKey });
+// Create OpenAI client with Beta header for Assistants API
+const openai = new OpenAI({
+  apiKey: openaiApiKey,
+  defaultHeaders: {
+    'OpenAI-Beta': 'assistants=v2'
+  }
+});
 
 // Upload file to OpenAI
 async function uploadFileToOpenAI(fileBuffer: ArrayBuffer, fileName: string): Promise<string> {
@@ -123,7 +129,7 @@ async function retrieveThreadMessages(threadId: string): Promise<any> {
     throw new Error("No assistant messages found");
   }
   
-  const lastMessage = assistantMessages[assistantMessages.length - 1];
+  const lastMessage = assistantMessages[0];
   const content = lastMessage.content[0] as { text: { value: string } };
   
   try {
@@ -291,6 +297,7 @@ async function calculateRevenueAndMarketPrices(extractedData: any): Promise<any>
   const blockIds = Array.isArray(extractedData.blockIds) ? extractedData.blockIds : [];
   
   return {
+    ...extractedData,
     cultures: culturesWithRevenue,
     totalRevenue,
     marketPrices: relevantMarketPrices,
