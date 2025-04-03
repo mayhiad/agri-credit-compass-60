@@ -16,7 +16,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 // Create Supabase client
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Create OpenAI client with Beta header for Assistants API
+// Create OpenAI client with the required v2 Beta header for Assistants API
 const openai = new OpenAI({
   apiKey: openaiApiKey,
   defaultHeaders: {
