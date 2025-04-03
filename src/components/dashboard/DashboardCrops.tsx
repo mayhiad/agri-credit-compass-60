@@ -48,7 +48,9 @@ const DashboardCrops = ({ farmData }: DashboardCropsProps) => {
           <div>
             <CardTitle>Növénykultúrák</CardTitle>
             <CardDescription>
-              A SAPS dokumentum alapján rögzített növénykultúrák - {farmData.documentId || ""}
+              {farmData.applicantName 
+                ? `${farmData.applicantName} - ${farmData.documentId || ""}`
+                : `SAPS dokumentum alapján rögzített növénykultúrák - ${farmData.documentId || ""}`}
             </CardDescription>
           </div>
           {farmData.year && (
@@ -80,7 +82,7 @@ const DashboardCrops = ({ farmData }: DashboardCropsProps) => {
                   return (
                     <TableRow key={idx}>
                       <TableCell>{culture.name}</TableCell>
-                      <TableCell className="text-right">{culture.hectares}</TableCell>
+                      <TableCell className="text-right">{culture.hectares.toFixed(2).replace('.', ',')}</TableCell>
                       <TableCell className="text-right">{yield_per_ha}</TableCell>
                       <TableCell className="text-right">{formatCurrency(price)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(culture.estimatedRevenue)}</TableCell>
@@ -89,7 +91,7 @@ const DashboardCrops = ({ farmData }: DashboardCropsProps) => {
                 })}
                 <TableRow>
                   <TableCell className="font-medium">Összesen</TableCell>
-                  <TableCell className="text-right font-medium">{farmData.hectares} ha</TableCell>
+                  <TableCell className="text-right font-medium">{farmData.hectares.toFixed(2).replace('.', ',')} ha</TableCell>
                   <TableCell className="text-right"></TableCell>
                   <TableCell className="text-right"></TableCell>
                   <TableCell className="text-right font-medium">{formatCurrency(farmData.totalRevenue)}</TableCell>

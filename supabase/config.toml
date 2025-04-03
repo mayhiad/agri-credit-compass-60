@@ -1,29 +1,5 @@
 
-project_id = "ynfciltkzptrsmrjylkd"
-
-[api]
-enabled = true
-port = 54321
-schemas = ["public", "storage", "graphql_public"]
-
-[db]
-port = 54322
-
-[studio]
-enabled = true
-port = 54323
-api_url = "http://localhost:54321"
-
-[inbucket]
-enabled = true
-port = 54324
-
-[storage]
-enabled = true
-
-[auth]
-enabled = true
-site_url = "http://localhost:3000"
-
+# A `project_id` is required for this file to be accepted.
+project_id = "your-project-id"
 [functions.process-saps-document]
 verify_jwt = true
