@@ -1,5 +1,6 @@
 
 # A `project_id` is required for this file to be accepted.
 project_id = "ynfciltkzptrsmrjylkd"
-[functions.process-saps-document]
+
+[functions.openai-scan]
 verify_jwt = true
