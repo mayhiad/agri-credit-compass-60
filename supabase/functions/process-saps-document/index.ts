@@ -49,8 +49,7 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
           "blockIds": ["Blokkazonosítók listája"]
         }`,
       tools: [{ type: "file_search" }],
-      model: "gpt-4o",
-      file_ids: [file.id]
+      model: "gpt-4o"
     });
     console.log(`🤖 Asszisztens létrehozva. ID: ${assistant.id}`);
 
@@ -62,7 +61,7 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
     await openai.beta.threads.messages.create(thread.id, {
       role: "user",
       content: "Olvasd ki a SAPS dokumentum részleteit JSON formátumban.",
-      file_ids: [file.id]  // Itt adjuk át a file_id-t
+      file_ids: [file.id]
     });
     console.log(`📤 Üzenet létrehozva a file_id-val: ${file.id}`);
 
@@ -87,6 +86,7 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
         throw new Error(`Feldolgozás sikertelen: ${retrievedRun.last_error?.message}`);
       }
 
+      // 3 másodperc várakozás a következő próbálkozás előtt
       await new Promise(resolve => setTimeout(resolve, 3000));
     }
 
@@ -146,6 +146,9 @@ serve(async (req) => {
     const file = formData.get('file') as File;
     
     if (!file) throw new Error('Nem érkezett fájl');
+
+    console.log("📄 Fájl fogadva:", file.name, "méret:", file.size);
+    console.log("🔑 OpenAI API kulcs állapota:", openaiApiKey ? "beállítva" : "hiányzik");
 
     const fileBuffer = await file.arrayBuffer();
     const processedData = await processDocumentWithOpenAI(fileBuffer, file.name, 'debug_user');
