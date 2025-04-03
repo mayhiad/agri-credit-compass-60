@@ -64,13 +64,9 @@ serve(async (req) => {
     const fileUploadStart = Date.now();
 
     try {
-      // Create an Assistant first
-      const assistant = await openai.beta.assistants.create({
-        name: "SAPS Document Analyzer",
-        instructions: "You are an expert at analyzing agricultural SAPS documents. Extract key information like land parcels, crop types, and agricultural details.",
-        model: "gpt-4o-mini"
-      });
-      console.log(`✅ Assistant created. ID: ${assistant.id}`);
+      // Use existing assistant instead of creating a new one
+      const assistantId = "asst_O4mDtAf0vkjjbm4hUbB0gTD4";
+      console.log(`✅ Using existing assistant ID: ${assistantId}`);
 
       // Upload file to OpenAI
       const uploadedFile = await openai.files.create({
@@ -81,11 +77,11 @@ serve(async (req) => {
       const fileUploadTime = Date.now() - fileUploadStart;
       console.log(`✅ File uploaded successfully (${fileUploadTime}ms). File ID: ${uploadedFile.id}`);
 
-      // Create a thread with the uploaded file
+      // Create a thread with the uploaded file and system instructions
       const thread = await openai.beta.threads.create({
         messages: [{
           role: "user",
-          content: "Analyze this SAPS document and extract all relevant agricultural information.",
+          content: "Analyze this SAPS document and extract all relevant agricultural information. Please return the data in the following JSON format: {\"hectares\": number, \"cultures\": [{\"name\": string, \"hectares\": number, \"estimatedRevenue\": number}], \"totalRevenue\": number, \"region\": string, \"blockIds\": [string]}",
           attachments: [{ file_id: uploadedFile.id }]
         }]
       });
@@ -95,7 +91,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ 
         message: 'Document processed successfully', 
         fileId: uploadedFile.id,
-        assistantId: assistant.id,
+        assistantId: assistantId,
         threadId: thread.id
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
