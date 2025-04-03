@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -16,7 +15,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 // Create Supabase client
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Create OpenAI client with the required v2 Beta header for Assistants API
+// Create OpenAI client configured for Assistants API v2
 const openai = new OpenAI({
   apiKey: openaiApiKey,
   defaultHeaders: {
@@ -70,13 +69,21 @@ async function createAssistant(fileId: string): Promise<string> {
   return assistant.id;
 }
 
-// Create Thread and Add Message
-async function createThreadAndAddMessage(assistantId: string, fileId: string): Promise<{ threadId: string, runId: string }> {
-  console.log("Creating thread and adding message");
+// Create Thread
+async function createThread(): Promise<string> {
+  console.log("Creating thread");
   
   const thread = await openai.beta.threads.create();
   
-  await openai.beta.threads.messages.create(thread.id, {
+  console.log("Thread created. Thread ID:", thread.id);
+  return thread.id;
+}
+
+// Add Message to Thread
+async function addMessageToThread(threadId: string, fileId: string): Promise<void> {
+  console.log("Adding message to thread", threadId);
+  
+  await openai.beta.threads.messages.create(threadId, {
     role: "user",
     content: `Elemezd ki részletesen a csatolt SAPS dokumentumot. 
     Kérem JSON formátumban add meg a dokumentum részleteit, 
@@ -84,22 +91,32 @@ async function createThreadAndAddMessage(assistantId: string, fileId: string): P
     file_ids: [fileId]
   });
   
-  const run = await openai.beta.threads.runs.create(thread.id, {
+  console.log("Message added to thread");
+}
+
+// Run Assistant
+async function runAssistant(threadId: string, assistantId: string): Promise<string> {
+  console.log("Running assistant", assistantId, "on thread", threadId);
+  
+  const run = await openai.beta.threads.runs.create(threadId, {
     assistant_id: assistantId
   });
   
-  console.log("Thread created. Thread ID:", thread.id, "Run ID:", run.id);
-  return { threadId: thread.id, runId: run.id };
+  console.log("Run created. Run ID:", run.id);
+  return run.id;
 }
 
 // Check Run Status
 async function checkRunStatus(threadId: string, runId: string): Promise<string> {
   const run = await openai.beta.threads.runs.retrieve(threadId, runId);
+  console.log("Run status:", run.status);
   return run.status;
 }
 
 // Wait for Run Completion
 async function waitForRunCompletion(threadId: string, runId: string, maxAttempts = 30): Promise<void> {
+  console.log("Waiting for run completion...");
+  
   for (let i = 0; i < maxAttempts; i++) {
     const status = await checkRunStatus(threadId, runId);
     
@@ -112,6 +129,7 @@ async function waitForRunCompletion(threadId: string, runId: string, maxAttempts
       throw new Error(`Run ended with status: ${status}`);
     }
     
+    console.log(`Attempt ${i + 1}/${maxAttempts}: Status is ${status}, waiting 2 seconds...`);
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
   
@@ -120,6 +138,8 @@ async function waitForRunCompletion(threadId: string, runId: string, maxAttempts
 
 // Retrieve Thread Messages
 async function retrieveThreadMessages(threadId: string): Promise<any> {
+  console.log("Retrieving messages from thread", threadId);
+  
   const messages = await openai.beta.threads.messages.list(threadId);
   
   // Find the last assistant message
@@ -130,19 +150,31 @@ async function retrieveThreadMessages(threadId: string): Promise<any> {
   }
   
   const lastMessage = assistantMessages[0];
-  const content = lastMessage.content[0] as { text: { value: string } };
+  
+  if (!lastMessage.content || lastMessage.content.length === 0) {
+    throw new Error("Empty message content");
+  }
+  
+  const content = lastMessage.content[0];
+  
+  if (content.type !== 'text') {
+    throw new Error(`Unexpected content type: ${content.type}`);
+  }
+  
+  const textContent = content.text.value;
+  console.log("Retrieved message:", textContent);
   
   try {
     // Try to parse the message as JSON
-    const jsonMatch = content.text.value.match(/```json\s*([\s\S]*?)\s*```/);
+    const jsonMatch = textContent.match(/```json\s*([\s\S]*?)\s*```/);
     if (jsonMatch && jsonMatch[1]) {
       return JSON.parse(jsonMatch[1]);
     }
     
-    return JSON.parse(content.text.value);
+    return JSON.parse(textContent);
   } catch (error) {
     console.warn("Failed to parse message as JSON:", error);
-    return { rawMessage: content.text.value };
+    return { rawMessage: textContent };
   }
 }
 
@@ -157,20 +189,26 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
     // 2. Create Assistant
     const assistantId = await createAssistant(fileId);
     
-    // 3. Create Thread and Add Message
-    const { threadId, runId } = await createThreadAndAddMessage(assistantId, fileId);
+    // 3. Create Thread
+    const threadId = await createThread();
     
-    // 4. Wait for Run Completion
+    // 4. Add Message to Thread
+    await addMessageToThread(threadId, fileId);
+    
+    // 5. Run Assistant
+    const runId = await runAssistant(threadId, assistantId);
+    
+    // 6. Wait for Run Completion
     await waitForRunCompletion(threadId, runId);
     
-    // 5. Retrieve Thread Messages
+    // 7. Retrieve Thread Messages
     const extractedData = await retrieveThreadMessages(threadId);
     console.log("Extracted data:", extractedData);
     
-    // 6. Calculate Revenue and Market Prices
+    // 8. Calculate Revenue and Market Prices
     const processedData = await calculateRevenueAndMarketPrices(extractedData);
     
-    // 7. Store Data in Supabase
+    // 9. Store Data in Supabase
     await storeProcessedData(userId, processedData);
     
     return processedData;
