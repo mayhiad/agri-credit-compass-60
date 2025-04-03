@@ -24,12 +24,14 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
   console.log(`📦 Dokumentum mérete: ${fileBuffer.byteLength} bájt`);
 
   try {
+    // Fájl feltöltése OpenAI-ba
     const file = await openai.files.create({
-      file: new File([fileBuffer], fileName),
+      file: new File([fileBuffer], fileName, { type: 'application/pdf' }),
       purpose: "assistants"
     });
     console.log(`📤 Fájl sikeresen feltöltve. File ID: ${file.id}`);
 
+    // Asszisztens létrehozása
     const assistant = await openai.beta.assistants.create({
       name: "SAPS Dokumentum Elemző",
       instructions: `Olvasd ki a dokumentumból a következő mezőket JSON formátumban:
@@ -52,6 +54,7 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
     });
     console.log(`🤖 Asszisztens létrehozva. ID: ${assistant.id}`);
 
+    // Thread létrehozása
     const thread = await openai.beta.threads.create({
       messages: [{
         role: "user",
@@ -61,11 +64,13 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
     });
     console.log(`📝 Thread létrehozva. ID: ${thread.id}`);
 
+    // Futtatás
     const run = await openai.beta.threads.runs.create(thread.id, {
       assistant_id: assistant.id
     });
     console.log(`🏃 Feldolgozás elindítva. Run ID: ${run.id}`);
 
+    // Várunk a befejezésig max 10x
     let runStatus: string;
     const maxAttempts = 10;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -83,17 +88,20 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
       await new Promise(resolve => setTimeout(resolve, 3000));
     }
 
+    // Üzenetek lekérése
     const messages = await openai.beta.threads.messages.list(thread.id);
     const assistantMessages = messages.data.filter(msg => msg.role === 'assistant');
     
     console.log(`📬 Érkezett asszisztensi üzenetek: ${assistantMessages.length}`);
 
+    // Tartalom kinyerése
     const extractedContent = assistantMessages
       .map(msg => msg.content[0].type === 'text' ? msg.content[0].text.value : null)
       .filter(Boolean);
 
     console.log("📋 Nyers kivont tartalom:", extractedContent);
 
+    // JSON konvertálás
     const jsonData = extractedContent.reduce((acc, content) => {
       try {
         const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
@@ -109,6 +117,7 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
 
     console.log("🔍 Feldolgozott JSON:", jsonData);
 
+    // Diagnosztikai adatok mentése
     await supabase.from('diagnostic_logs').insert({
       user_id: userId,
       file_name: fileName,
@@ -154,3 +163,4 @@ serve(async (req) => {
     });
   }
 });
+
