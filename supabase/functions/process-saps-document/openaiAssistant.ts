@@ -154,16 +154,17 @@ export async function startRun(threadId: string, assistantId: string, fileId: st
     
     console.log(`✅ Fájl sikeresen hozzáadva a thread-hez. Message ID: ${fileMessage.id}`);
     
-    // Majd indítsuk el a futtatást a megfelelő v2 formátummal
-    console.log(`🔄 Run létrehozása a tool_resources használatával...`);
+    // Majd indítsuk el a futtatást a 2025-ös új API formátummal
+    console.log(`🔄 Run létrehozása az attachments paraméterrel...`);
     
     const run = await openai.beta.threads.runs.create(threadId, {
       assistant_id: assistantId,
-      tool_resources: {
-        file_search: {
-          file_ids: [fileId]
+      attachments: [
+        {
+          file_id: fileId,
+          tools: ["file_search"]
         }
-      }
+      ]
     });
     
     const runTime = Date.now() - runStart;
