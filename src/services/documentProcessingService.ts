@@ -1,8 +1,6 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { FarmData } from "@/components/LoanApplication";
 
-// Process document with OpenAI
 export const processDocumentWithOpenAI = async (file: File, user: any): Promise<{
   threadId: string;
   runId: string;
@@ -20,9 +18,8 @@ export const processDocumentWithOpenAI = async (file: File, user: any): Promise<
     const formData = new FormData();
     formData.append('file', file);
     
-    console.log("Dokumentum feltöltése az OpenAI funkcióhoz...");
+    console.log("📡 Küldés a Supabase process-saps-document végpontra...");
     
-    // Használjuk a teljes URL-t a edge function meghívásához
     const scanResponse = await fetch(
       'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-saps-document',
       {
@@ -31,8 +28,7 @@ export const processDocumentWithOpenAI = async (file: File, user: any): Promise<
           'Authorization': `Bearer ${session.access_token}`,
         },
         body: formData,
-        // Növeljük a timeout-ot, mert az OpenAI feldolgozás lassú lehet
-        signal: AbortSignal.timeout(90000), // 90 másodperc timeout
+        signal: AbortSignal.timeout(90000),
       }
     );
     
@@ -66,7 +62,6 @@ export const processDocumentWithOpenAI = async (file: File, user: any): Promise<
   }
 };
 
-// Check processing results
 export const checkProcessingResults = async (threadId: string, runId: string): Promise<{ 
   completed: boolean;
   status: string;

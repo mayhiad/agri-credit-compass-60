@@ -5,6 +5,9 @@ import { corsHeaders } from "./cors.ts";
 import { processDocumentWithOpenAI } from "./processDocument.ts";
 
 serve(async (req) => {
+  // Add initial log message
+  console.log("📥 Supabase function meg lett hívva!");
+
   // CORS kezelése
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
