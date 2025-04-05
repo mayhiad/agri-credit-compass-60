@@ -162,14 +162,20 @@ async function createThread() {
 
 // Üzenet hozzáadása egy threadhez file_id-val
 async function addMessageToThread(threadId: string, fileId: string) {
-  console.log(`📤 Üzenet létrehozása`);
+  console.log(`📤 Üzenet létrehozása fileId-val: ${fileId}`);
   const messageStart = Date.now();
   
-  await openai.beta.threads.messages.create(threadId, {
-    role: "user",
-    content: "Olvasd ki a SAPS dokumentum részleteit JSON formátumban.",
-    file_ids: [fileId]
-  }).catch(error => {
+  try {
+    const message = await openai.beta.threads.messages.create(threadId, {
+      role: "user",
+      content: "Olvasd ki a SAPS dokumentum részleteit JSON formátumban.",
+      file_ids: [fileId]  // Helyesen formázott file_ids paraméter (array)
+    });
+    
+    const messageTime = Date.now() - messageStart;
+    console.log(`✅ Üzenet sikeresen létrehozva (${messageTime}ms). Message ID: ${message.id}`);
+    return message;
+  } catch (error) {
     console.error("❌ Hiba az üzenet létrehozása során:", JSON.stringify({
       status: error.status,
       message: error.message,
@@ -177,10 +183,7 @@ async function addMessageToThread(threadId: string, fileId: string) {
       code: error.code
     }));
     throw error;
-  });
-  
-  const messageTime = Date.now() - messageStart;
-  console.log(`✅ Üzenet létrehozva (${messageTime}ms).`);
+  }
 }
 
 // Futtatás indítása
