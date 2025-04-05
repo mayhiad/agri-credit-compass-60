@@ -1,3 +1,4 @@
+
 import OpenAI from "https://esm.sh/openai@4.38.0";
 import { getErrorDetails } from "./openaiClient.ts";
 
@@ -115,25 +116,26 @@ export async function addMessageToThread(threadId, content = "Kérlek, dolgozd f
 
 // Fájl hozzáadása a thread-hez és futtatás indítása
 export async function startRun(threadId, assistantId, fileId) {
-  console.log(`🏃 Futtatás indítása: Thread ID ${threadId}, Assistant ID ${assistantId}, File ID ${fileId}`);
-  const start = Date.now();
-
+  console.log(`🏃 Feldolgozás indítása asszisztens ID-val: ${assistantId} és fájl ID-val: ${fileId}`);
+  const runStart = Date.now();
   try {
+    // ✅ NE adjunk hozzá fájlt a messages.create()-hez v2-ben!
+
     const run = await openai.beta.threads.runs.create(threadId, {
       assistant_id: assistantId,
       attachments: [
         {
           file_id: fileId,
-          tools: ["file_search"] // ❗ Kulcsfontosságú: tools hozzáadva
+          tools: ["file_search"]
         }
       ]
     });
 
-    const runTime = Date.now() - start;
+    const runTime = Date.now() - runStart;
     console.log(`✅ Feldolgozás elindítva (${runTime}ms). Run ID: ${run.id}`);
     return run;
   } catch (error) {
-    console.error("❌ Hiba a run indításakor:", getErrorDetails(error));
+    console.error("❌ Hiba a futtatás létrehozása során:", getErrorDetails(error));
     throw error;
   }
 }
