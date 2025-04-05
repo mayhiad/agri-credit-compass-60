@@ -143,13 +143,18 @@ export async function startRun(threadId: string, assistantId: string, fileId: st
   const runStart = Date.now();
   
   try {
-    // Először adjuk hozzá a fájlt egy új üzenethez - a OpenAI API módosult, így külön kell kezelni a fájlt
+    // Először adjuk hozzá a fájlt egy új üzenethez
     console.log(`📎 Fájl hozzáadása a thread-hez: ${fileId}`);
     
     const fileMessage = await openai.beta.threads.messages.create(threadId, {
       role: "user",
       content: "Ez a feltöltött SAPS dokumentum, kérlek elemezd a korábbi kérésem szerint.",
-      attachments: [{ file_id: fileId, type: "file_attachment" }]
+      attachments: [
+        { 
+          file_id: fileId, 
+          type: "file_attachment" 
+        }
+      ]
     });
     
     console.log(`✅ Fájl sikeresen hozzáadva a thread-hez. Message ID: ${fileMessage.id}`);
