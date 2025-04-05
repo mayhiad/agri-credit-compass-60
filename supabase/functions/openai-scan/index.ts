@@ -85,10 +85,15 @@ serve(async (req) => {
       
       const messageContent = "Analyze this SAPS document and extract all relevant agricultural information. Please return the data in the following JSON format: {\"hectares\": number, \"cultures\": [{\"name\": string, \"hectares\": number, \"estimatedRevenue\": number}], \"totalRevenue\": number, \"region\": string, \"blockIds\": [string]}";
       
+      // Create message with appropriate attachment format
+      // The error indicates file_ids is not recognized, so we need to use a different approach
       const message = await openai.beta.threads.messages.create(thread.id, {
         role: "user",
         content: messageContent,
-        file_ids: [uploadedFile.id]
+        attachments: [{ 
+          file_id: uploadedFile.id,
+          type: "file_attachment"
+        }]
       });
       
       console.log(`✅ Message created with ID: ${message.id}`);
