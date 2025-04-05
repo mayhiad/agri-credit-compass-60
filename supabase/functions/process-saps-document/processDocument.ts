@@ -1,5 +1,5 @@
 
-import { openai } from "./openaiClient.ts";
+import { openai, supabase } from "./openaiClient.ts";
 import { API_TIMEOUT } from "./fetchUtils.ts";
 
 // Dokumentum feldolgozása OpenAI segítségével
@@ -8,6 +8,9 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
   console.log(`📦 Dokumentum mérete: ${fileBuffer.byteLength} bájt`);
 
   try {
+    // Dokumentum mentése a Supabase tárolóba
+    await saveDocumentToStorage(fileBuffer, fileName, userId);
+    
     // Fájl feltöltése OpenAI-ba
     const file = await uploadFileToOpenAI(fileBuffer, fileName);
     // Asszisztens létrehozása
@@ -26,6 +29,39 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
   } catch (error) {
     console.error("🚨 Teljes feldolgozási hiba:", error);
     throw error;
+  }
+}
+
+// Dokumentum mentése a Supabase tárolóba
+async function saveDocumentToStorage(fileBuffer: ArrayBuffer, fileName: string, userId: string) {
+  try {
+    console.log("💾 Dokumentum mentése a Supabase tárolóba...");
+    const saveStart = Date.now();
+    
+    // Generálunk egy egyedi fájl nevet
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileExtension = fileName.split('.').pop();
+    const storagePath = `saps/${userId}/${timestamp}-${fileName}`;
+    
+    const { data, error } = await supabase.storage
+      .from('dokumentumok')
+      .upload(storagePath, fileBuffer, {
+        contentType: fileExtension === 'pdf' ? 'application/pdf' : 
+                    (fileExtension === 'xlsx' || fileExtension === 'xls') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 
+                    'application/octet-stream',
+        upsert: false
+      });
+    
+    if (error) {
+      console.error("❌ Hiba a dokumentum tárolása során:", error.message);
+      // Folytatjuk a feldolgozást annak ellenére, hogy nem sikerült tárolni
+    } else {
+      const saveTime = Date.now() - saveStart;
+      console.log(`✅ Dokumentum sikeresen tárolva (${saveTime}ms). Path: ${storagePath}`);
+    }
+  } catch (storageError) {
+    console.error("❌ Váratlan hiba a dokumentum tárolása során:", storageError);
+    // Folytatjuk a feldolgozást annak ellenére, hogy nem sikerült tárolni
   }
 }
 

@@ -21,8 +21,34 @@ serve(async (req) => {
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     console.log("🔑 OpenAI API kulcs állapota:", openaiApiKey ? "beállítva (" + openaiApiKey.substring(0, 5) + "...)" : "hiányzik");
 
+    // Felhasználói azonosító kinyerése a JWT tokenből vagy alapértelmezett használata
+    let userId = 'debug_user';
+    
+    const authHeader = req.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        // JWT token feldolgozása a userId kinyeréséhez
+        // Ez egy példa, a valóságban a JWT-t megfelelően kellene ellenőrizni
+        const token = authHeader.split(' ')[1];
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        
+        const payload = JSON.parse(jsonPayload);
+        if (payload.sub) {
+          userId = payload.sub;
+          console.log("👤 Felhasználó azonosítva:", userId);
+        }
+      } catch (jwtError) {
+        console.warn("⚠️ Nem sikerült a JWT tokent feldolgozni:", jwtError);
+        // Folytatjuk az alapértelmezett userId-val
+      }
+    }
+
     const fileBuffer = await file.arrayBuffer();
-    const processResult = await processDocumentWithOpenAI(fileBuffer, file.name, 'debug_user');
+    const processResult = await processDocumentWithOpenAI(fileBuffer, file.name, userId);
 
     return new Response(JSON.stringify(processResult), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
