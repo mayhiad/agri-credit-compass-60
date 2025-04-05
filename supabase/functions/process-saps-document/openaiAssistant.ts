@@ -1,4 +1,3 @@
-
 import OpenAI from "https://esm.sh/openai@4.38.0";
 import { getErrorDetails } from "./openaiClient.ts";
 
