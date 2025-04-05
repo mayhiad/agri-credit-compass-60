@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,7 +68,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       
       setProcessingStatus({
         step: "Dokumentum feldolgozása",
-        progress: 50,
+        progress: 30,
       });
       
       const { data: { session } } = await supabase.auth.getSession();
@@ -76,8 +76,8 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         throw new Error("Nincs érvényes felhasználói munkamenet");
       }
       
-      const response = await fetch(
-        `https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-saps-document`,
+      const scanResponse = await fetch(
+        'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/openai-scan',
         {
           method: 'POST',
           headers: {
@@ -87,21 +87,79 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         }
       );
       
-      if (!response.ok) {
-        const errorData = await response.json();
+      if (!scanResponse.ok) {
+        const errorData = await scanResponse.json();
+        console.error("SAPS dokumentum feltöltési hiba:", errorData);
         throw new Error(errorData.error || "Hiba a dokumentum feldolgozása közben");
       }
       
-      const farmData = await response.json();
+      const scanData = await scanResponse.json();
+      const { threadId, runId } = scanData;
       
-      // Alapvető validáció a válasz struktúrájára
-      if (!farmData.hectares || !farmData.cultures || farmData.cultures.length === 0) {
-        throw new Error("A feldolgozott adatok hiányosak");
+      if (!threadId || !runId) {
+        throw new Error("Hiányzó thread vagy run azonosító");
       }
       
       setProcessingStatus({
-        step: "Adatok elemzése",
-        progress: 90,
+        step: "AI feldolgozás folyamatban",
+        progress: 50,
+        details: "Az AI feldolgozza a dokumentumot, ez akár 1-2 percet is igénybe vehet..."
+      });
+      
+      let isComplete = false;
+      let farmData: FarmData | null = null;
+      let attempts = 0;
+      const maxAttempts = 30;
+      
+      while (!isComplete && attempts < maxAttempts) {
+        attempts++;
+        
+        await new Promise(resolve => setTimeout(resolve, 6000));
+        
+        try {
+          const resultResponse = await fetch(
+            'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/get-thread-results',
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ threadId, runId })
+            }
+          );
+          
+          if (!resultResponse.ok) {
+            console.warn(`Ellenőrzési hiba (${attempts}. kísérlet):`, await resultResponse.text());
+            continue;
+          }
+          
+          const resultData = await resultResponse.json();
+          
+          let progress = 50 + Math.min(40, attempts * 2);
+          setProcessingStatus({
+            step: resultData.status === 'completed' ? "Dokumentum elemzése befejezve" : "AI feldolgozás folyamatban",
+            progress: progress,
+            details: `Feldolgozás: ${resultData.status || 'folyamatban'} (${attempts}. ellenőrzés)`
+          });
+          
+          if (resultData.completed) {
+            isComplete = true;
+            farmData = resultData.data as FarmData;
+            break;
+          }
+        } catch (checkError) {
+          console.error(`Eredmény ellenőrzési hiba (${attempts}. kísérlet):`, checkError);
+        }
+      }
+      
+      if (!isComplete || !farmData) {
+        throw new Error("A dokumentum feldolgozása túl sokáig tartott vagy sikertelen volt");
+      }
+      
+      setProcessingStatus({
+        step: "Adatok feldolgozása",
+        progress: 100,
         details: `${farmData.blockIds?.length || 0} blokkazonosító, ${farmData.cultures.length} növénykultúra feldolgozva`
       });
       

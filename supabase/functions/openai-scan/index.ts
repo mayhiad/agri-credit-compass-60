@@ -82,7 +82,7 @@ serve(async (req) => {
         messages: [{
           role: "user",
           content: "Analyze this SAPS document and extract all relevant agricultural information. Please return the data in the following JSON format: {\"hectares\": number, \"cultures\": [{\"name\": string, \"hectares\": number, \"estimatedRevenue\": number}], \"totalRevenue\": number, \"region\": string, \"blockIds\": [string]}",
-          attachments: [{ file_id: uploadedFile.id }]
+          attachments: [{ file_id: uploadedFile.id, type: "file_attachment" }]
         }]
       });
       console.log(`✅ Thread created. ID: ${thread.id}`);
