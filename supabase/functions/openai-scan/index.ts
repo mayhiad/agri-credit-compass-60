@@ -78,14 +78,15 @@ serve(async (req) => {
       console.log(`✅ File uploaded successfully (${fileUploadTime}ms). File ID: ${uploadedFile.id}`);
 
       // Create a thread with the uploaded file and system instructions
-      const thread = await openai.beta.threads.create({
-        messages: [{
-          role: "user",
-          content: "Analyze this SAPS document and extract all relevant agricultural information. Please return the data in the following JSON format: {\"hectares\": number, \"cultures\": [{\"name\": string, \"hectares\": number, \"estimatedRevenue\": number}], \"totalRevenue\": number, \"region\": string, \"blockIds\": [string]}",
-          attachments: [{ file_id: uploadedFile.id, type: "file_attachment" }]
-        }]
-      });
+      const thread = await openai.beta.threads.create();
       console.log(`✅ Thread created. ID: ${thread.id}`);
+      
+      // Add a message to the thread
+      await openai.beta.threads.messages.create(thread.id, {
+        role: "user",
+        content: "Analyze this SAPS document and extract all relevant agricultural information. Please return the data in the following JSON format: {\"hectares\": number, \"cultures\": [{\"name\": string, \"hectares\": number, \"estimatedRevenue\": number}], \"totalRevenue\": number, \"region\": string, \"blockIds\": [string]}",
+        file_ids: [uploadedFile.id]
+      });
       
       // Run the assistant on the thread
       console.log(`🏃 Starting run with assistant ID: ${assistantId}`);
@@ -100,7 +101,7 @@ serve(async (req) => {
       
       // Return successful response with details (we're not waiting for completion in this function)
       return new Response(JSON.stringify({ 
-        message: 'Document processed successfully', 
+        message: 'Document processing started', 
         fileId: uploadedFile.id,
         assistantId: assistantId,
         threadId: thread.id,
