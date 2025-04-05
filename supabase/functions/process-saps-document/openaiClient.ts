@@ -16,13 +16,31 @@ export const openai = new OpenAI({
 
 // Konfiguráció ellenőrzése
 export function validateConfig() {
+  // OpenAI API kulcs ellenőrzése
   if (!openaiApiKey) {
     throw new Error('OpenAI API kulcs nincs beállítva');
   }
   
+  // Supabase konfiguráció ellenőrzése
   if (!supabaseUrl || !supabaseServiceKey) {
     throw new Error('Supabase konfigurációs adatok hiányoznak');
   }
   
   return true;
+}
+
+// Segédfüggvény a hibakezeléshez
+export function getErrorDetails(error: any): string {
+  try {
+    if (error.response) {
+      // OpenAI API hibaválasz feldolgozása
+      return `Státusz: ${error.response.status}, Hibaüzenet: ${error.response.data?.error?.message || JSON.stringify(error.response.data)}`;
+    } else if (error.message) {
+      return error.message;
+    } else {
+      return JSON.stringify(error);
+    }
+  } catch (e) {
+    return "Nem sikerült feldolgozni a hibaüzenetet";
+  }
 }

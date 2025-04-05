@@ -1,5 +1,5 @@
 
-import { openai, supabase } from "./openaiClient.ts";
+import { openai, supabase, getErrorDetails } from "./openaiClient.ts";
 import { API_TIMEOUT } from "./fetchUtils.ts";
 
 // Dokumentum feldolgozása OpenAI segítségével
@@ -27,7 +27,7 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
     };
 
   } catch (error) {
-    console.error("🚨 Teljes feldolgozási hiba:", error);
+    console.error("🚨 Teljes feldolgozási hiba:", getErrorDetails(error));
     throw error;
   }
 }
@@ -37,6 +37,12 @@ async function saveDocumentToStorage(fileBuffer: ArrayBuffer, fileName: string, 
   try {
     console.log("💾 Dokumentum mentése a Supabase tárolóba...");
     const saveStart = Date.now();
+    
+    // Validáljuk a Supabase kliens állapotát
+    if (!supabase || !supabase.storage) {
+      console.error("❌ Supabase kliens nem elérhető vagy nincs inicializálva");
+      return; // Folytatjuk a feldolgozást annak ellenére, hogy nem sikerült tárolni
+    }
     
     // Generálunk egy egyedi fájl nevet
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -53,14 +59,14 @@ async function saveDocumentToStorage(fileBuffer: ArrayBuffer, fileName: string, 
       });
     
     if (error) {
-      console.error("❌ Hiba a dokumentum tárolása során:", error.message);
+      console.error("❌ Hiba a dokumentum tárolása során:", error.message, error.details);
       // Folytatjuk a feldolgozást annak ellenére, hogy nem sikerült tárolni
     } else {
       const saveTime = Date.now() - saveStart;
       console.log(`✅ Dokumentum sikeresen tárolva (${saveTime}ms). Path: ${storagePath}`);
     }
   } catch (storageError) {
-    console.error("❌ Váratlan hiba a dokumentum tárolása során:", storageError);
+    console.error("❌ Váratlan hiba a dokumentum tárolása során:", getErrorDetails(storageError));
     // Folytatjuk a feldolgozást annak ellenére, hogy nem sikerült tárolni
   }
 }

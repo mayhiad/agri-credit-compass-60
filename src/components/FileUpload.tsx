@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,43 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
     }
   };
   
+  // Fájl feltöltése a Supabase tárolóba
+  const uploadFileToStorage = async (fileToUpload: File): Promise<string | null> => {
+    try {
+      if (!user) {
+        console.error("Nincs bejelentkezett felhasználó, nem lehet fájlt feltölteni");
+        return null;
+      }
+      
+      // Egyedi fájlnév generálása timestamppel
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const fileExtension = fileToUpload.name.split('.').pop();
+      const storagePath = `saps/${user.id}/${timestamp}-${fileToUpload.name}`;
+      
+      console.log("Fájl feltöltése a Storage-ba:", storagePath);
+      
+      const { data, error } = await supabase.storage
+        .from('dokumentumok')
+        .upload(storagePath, fileToUpload, {
+          contentType: fileExtension === 'pdf' ? 'application/pdf' : 
+                      (fileExtension === 'xlsx' || fileExtension === 'xls') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 
+                      'application/octet-stream',
+          upsert: false
+        });
+      
+      if (error) {
+        console.error("Hiba a dokumentum tárolása során:", error.message);
+        return null;
+      }
+      
+      console.log("Dokumentum sikeresen tárolva:", storagePath);
+      return storagePath;
+    } catch (err) {
+      console.error("Váratlan hiba a tárolás során:", err);
+      return null;
+    }
+  };
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -63,6 +101,19 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         progress: 10,
       });
       
+      // Először feltöltjük a dokumentumot a Storage-ba
+      const storagePath = await uploadFileToStorage(file);
+      
+      if (storagePath) {
+        setProcessingStatus({
+          step: "Dokumentum mentve a tárhelyre",
+          progress: 20,
+          details: `Fájl sikeresen mentve: ${storagePath}`
+        });
+      } else {
+        console.warn("A fájl mentése a tárhelyre sikertelen volt, de a feldolgozás folytatódik");
+      }
+      
       const formData = new FormData();
       formData.append('file', file);
       
@@ -78,7 +129,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       
       console.log("Dokumentum feltöltése az OpenAI funkcióhoz...");
       const scanResponse = await fetch(
-        'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/openai-scan',
+        'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-saps-document',
         {
           method: 'POST',
           headers: {
