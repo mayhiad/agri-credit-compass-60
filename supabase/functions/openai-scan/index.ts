@@ -80,31 +80,34 @@ serve(async (req) => {
       const thread = await openai.beta.threads.create();
       console.log(`✅ Thread created. ID: ${thread.id}`);
       
-      // Add a message to the thread with the file attached
-      console.log(`📤 Creating message with file_id: ${uploadedFile.id}`);
+      // Add a message to the thread WITHOUT the file attached (per OpenAI v2 API)
+      console.log(`📤 Creating message with instructions (without file attachment)`);
       
       const messageContent = "Analyze this SAPS document and extract all relevant agricultural information. Please return the data in the following JSON format: {\"hectares\": number, \"cultures\": [{\"name\": string, \"hectares\": number, \"estimatedRevenue\": number}], \"totalRevenue\": number, \"region\": string, \"blockIds\": [string]}";
       
-      // Fix: Use the correct parameter structure for file attachments
-      // The previous code used 'file_ids' which is not recognized by the API
+      // Create message without file attachment
       const message = await openai.beta.threads.messages.create(thread.id, {
         role: "user",
-        content: messageContent,
-        attachments: [{ 
-          file_id: uploadedFile.id, 
-          type: "file_attachment" 
-        }]
+        content: messageContent
       });
       
       console.log(`✅ Message created with ID: ${message.id}`);
       
-      // Run the assistant on the thread
-      console.log(`🏃 Starting run with assistant ID: ${assistantId}`);
+      // Run the assistant on the thread WITH file attachment in the run itself (per OpenAI v2 API)
+      console.log(`🏃 Starting run with assistant ID: ${assistantId} and file ID: ${uploadedFile.id}`);
       const runStart = Date.now();
       
+      // Using correct v2 API structure: pass file in tool_resources
       const run = await openai.beta.threads.runs.create(
         thread.id,
-        { assistant_id: assistantId }
+        { 
+          assistant_id: assistantId,
+          tool_resources: {
+            file_search: {
+              file_ids: [uploadedFile.id]
+            }
+          }
+        }
       );
       
       console.log(`✅ Run created. ID: ${run.id}`);

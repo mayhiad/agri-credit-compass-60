@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -96,21 +97,19 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
     const threadTime = Date.now() - threadStart;
     console.log(`✅ Thread létrehozva (${threadTime}ms). ID: ${thread.id}`);
     
-    // Üzenet hozzáadása a thread-hez
-    console.log(`📤 Üzenet létrehozása file_id-val: ${file.id}`);
+    // Üzenet hozzáadása a thread-hez - a fájl nélkül
+    console.log(`📤 Üzenet létrehozása (fájl hivatkozás nélkül)`);
     const messageStart = Date.now();
     
     const message = await openai.beta.threads.messages.create(thread.id, {
       role: "user",
-      content: "Olvasd ki a SAPS dokumentum részleteit JSON formátumban.",
-      file_ids: [file.id]
+      content: "Olvasd ki a SAPS dokumentum részleteit JSON formátumban."
     }).catch(error => {
       console.error("❌ Hiba az üzenet létrehozása során:", JSON.stringify({
         status: error.status,
         message: error.message,
         type: error.type,
-        code: error.code,
-        request: { role: "user", content: "Olvasd ki a SAPS dokumentum részleteit JSON formátumban.", file_ids: [file.id] }
+        code: error.code
       }));
       throw error;
     });
@@ -118,12 +117,17 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
     const messageTime = Date.now() - messageStart;
     console.log(`✅ Üzenet létrehozva (${messageTime}ms). ID: ${message.id}`);
 
-    // Futtatás
-    console.log(`🏃 Feldolgozás indítása asszisztens ID-val: ${assistant.id}`);
+    // Futtatás - a fájl azonosítót itt adjuk át a tool_resources-ban
+    console.log(`🏃 Feldolgozás indítása asszisztens ID-val: ${assistant.id} és fájl ID-val: ${file.id}`);
     const runStart = Date.now();
     
     const run = await openai.beta.threads.runs.create(thread.id, {
-      assistant_id: assistant.id
+      assistant_id: assistant.id,
+      tool_resources: {
+        file_search: {
+          file_ids: [file.id]
+        }
+      }
     }).catch(error => {
       console.error("❌ Hiba a futtatás létrehozása során:", JSON.stringify({
         status: error.status,
