@@ -35,7 +35,10 @@ serve(async (req) => {
     });
 
     // Parse request body for thread and run IDs
-    const { threadId, runId } = await req.json();
+    const requestData = await req.json();
+    console.log('Request data:', requestData);
+    
+    const { threadId, runId } = requestData;
     
     if (!threadId) {
       return new Response(JSON.stringify({ error: 'Thread ID is required' }), {
@@ -67,8 +70,11 @@ serve(async (req) => {
       // Retrieve messages from the thread
       const messages = await openai.beta.threads.messages.list(threadId);
       
+      console.log(`📩 Retrieved ${messages.data.length} messages from thread`);
+      
       // Filter for assistant messages only
       const assistantMessages = messages.data.filter(msg => msg.role === 'assistant');
+      console.log(`🤖 Found ${assistantMessages.length} assistant messages`);
       
       if (assistantMessages.length === 0) {
         return new Response(JSON.stringify({ 
@@ -86,6 +92,7 @@ serve(async (req) => {
       
       if (latestMessage.content[0].type === 'text') {
         content = latestMessage.content[0].text.value;
+        console.log(`📝 Message content: ${content.substring(0, 100)}...`);
       }
       
       // Try to extract JSON data from the message content
@@ -94,11 +101,15 @@ serve(async (req) => {
         // Look for JSON content (may be in a code block)
         const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
         if (jsonMatch) {
+          console.log(`🔍 Found JSON in code block`);
           jsonData = JSON.parse(jsonMatch[1]);
         } else {
           // Try to parse the entire content as JSON
+          console.log(`🔍 Attempting to parse entire content as JSON`);
           jsonData = JSON.parse(content);
         }
+        
+        console.log(`✅ Successfully parsed JSON data`);
       } catch (e) {
         console.warn('⚠️ Could not parse JSON from message content:', e);
         // Return the raw content if parsing fails

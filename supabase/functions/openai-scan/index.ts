@@ -33,7 +33,6 @@ serve(async (req) => {
       });
     }
 
-    // Log API key status (without revealing the actual key)
     console.log('🔑 OpenAI API Key status: Configured');
 
     // Initialize OpenAI client
@@ -54,7 +53,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`📄 File received: ${file.name}, Size: ${file.size} bytes`);
+    console.log(`📄 File received: ${file.name}, Size: ${file.size} bytes, Type: ${file.type}`);
 
     // Convert file to ArrayBuffer
     const fileBuffer = await file.arrayBuffer();
@@ -81,14 +80,18 @@ serve(async (req) => {
       const thread = await openai.beta.threads.create();
       console.log(`✅ Thread created. ID: ${thread.id}`);
       
-      // Add a message to the thread with file attachment
-      await openai.beta.threads.messages.create(thread.id, {
+      // Add a message to the thread with the file attached
+      console.log(`📤 Creating message with file_id: ${uploadedFile.id}`);
+      
+      const messageContent = "Analyze this SAPS document and extract all relevant agricultural information. Please return the data in the following JSON format: {\"hectares\": number, \"cultures\": [{\"name\": string, \"hectares\": number, \"estimatedRevenue\": number}], \"totalRevenue\": number, \"region\": string, \"blockIds\": [string]}";
+      
+      const message = await openai.beta.threads.messages.create(thread.id, {
         role: "user",
-        content: "Analyze this SAPS document and extract all relevant agricultural information. Please return the data in the following JSON format: {\"hectares\": number, \"cultures\": [{\"name\": string, \"hectares\": number, \"estimatedRevenue\": number}], \"totalRevenue\": number, \"region\": string, \"blockIds\": [string]}",
+        content: messageContent,
         file_ids: [uploadedFile.id]
       });
       
-      console.log(`✅ Message with file attachment created in thread`);
+      console.log(`✅ Message created with ID: ${message.id}`);
       
       // Run the assistant on the thread
       console.log(`🏃 Starting run with assistant ID: ${assistantId}`);
@@ -119,13 +122,15 @@ serve(async (req) => {
         message: uploadError.message,
         type: uploadError.type,
         code: uploadError.code,
+        param: uploadError.param,
         details: uploadError
       }));
 
       return new Response(JSON.stringify({ 
         error: 'Failed to process document', 
         details: uploadError.message,
-        fullError: uploadError
+        code: uploadError.code,
+        param: uploadError.param
       }), {
         status: uploadError.status || 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

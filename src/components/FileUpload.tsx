@@ -67,7 +67,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       formData.append('file', file);
       
       setProcessingStatus({
-        step: "Dokumentum feldolgozása",
+        step: "Dokumentum feltöltése",
         progress: 30,
       });
       
@@ -76,6 +76,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         throw new Error("Nincs érvényes felhasználói munkamenet");
       }
       
+      console.log("Dokumentum feltöltése az OpenAI funkcióhoz...");
       const scanResponse = await fetch(
         'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/openai-scan',
         {
@@ -94,6 +95,8 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       }
       
       const scanData = await scanResponse.json();
+      console.log("OpenAI scan válasz:", scanData);
+      
       const { threadId, runId } = scanData;
       
       if (!threadId || !runId) {
@@ -117,6 +120,8 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         await new Promise(resolve => setTimeout(resolve, 6000));
         
         try {
+          console.log(`Eredmény ellenőrzése (${attempts}. kísérlet) a thread ID-val: ${threadId}, run ID-val: ${runId}`);
+          
           const resultResponse = await fetch(
             'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/get-thread-results',
             {
@@ -130,11 +135,13 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
           );
           
           if (!resultResponse.ok) {
-            console.warn(`Ellenőrzési hiba (${attempts}. kísérlet):`, await resultResponse.text());
+            const errorText = await resultResponse.text();
+            console.warn(`Ellenőrzési hiba (${attempts}. kísérlet):`, errorText);
             continue;
           }
           
           const resultData = await resultResponse.json();
+          console.log(`Eredmény ellenőrzés válasz (${attempts}. kísérlet):`, resultData);
           
           let progress = 50 + Math.min(40, attempts * 2);
           setProcessingStatus({
