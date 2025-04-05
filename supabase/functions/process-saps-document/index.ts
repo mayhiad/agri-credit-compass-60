@@ -19,6 +19,30 @@ const openai = new OpenAI({
   defaultHeaders: { 'OpenAI-Beta': 'assistants=v2' }
 });
 
+// API kérési timeout ms-ben (30 másodperc)
+const API_TIMEOUT = 30000;
+
+// Timeout-os fetch implementáció
+const fetchWithTimeout = async (url: string, options: RequestInit, timeout: number) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    if (error.name === 'AbortError') {
+      throw new Error('API request timed out');
+    }
+    throw error;
+  }
+};
+
 async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: string, userId: string) {
   console.log(`🔍 Dokumentum feldolgozás megkezdése: ${fileName}`);
   console.log(`📦 Dokumentum mérete: ${fileBuffer.byteLength} bájt`);
@@ -97,13 +121,14 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
     const threadTime = Date.now() - threadStart;
     console.log(`✅ Thread létrehozva (${threadTime}ms). ID: ${thread.id}`);
     
-    // Üzenet hozzáadása a thread-hez - a fájl nélkül
-    console.log(`📤 Üzenet létrehozása (fájl hivatkozás nélkül)`);
+    // Üzenet hozzáadása a thread-hez
+    console.log(`📤 Üzenet létrehozása`);
     const messageStart = Date.now();
     
     const message = await openai.beta.threads.messages.create(thread.id, {
       role: "user",
-      content: "Olvasd ki a SAPS dokumentum részleteit JSON formátumban."
+      content: "Olvasd ki a SAPS dokumentum részleteit JSON formátumban.",
+      file_ids: [file.id]  // A fájl azonosítóját itt adjuk át, a message létrehozásakor
     }).catch(error => {
       console.error("❌ Hiba az üzenet létrehozása során:", JSON.stringify({
         status: error.status,
@@ -117,17 +142,13 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
     const messageTime = Date.now() - messageStart;
     console.log(`✅ Üzenet létrehozva (${messageTime}ms). ID: ${message.id}`);
 
-    // Futtatás - a fájl azonosítót itt adjuk át a tool_resources-ban
-    console.log(`🏃 Feldolgozás indítása asszisztens ID-val: ${assistant.id} és fájl ID-val: ${file.id}`);
+    // Futtatás
+    console.log(`🏃 Feldolgozás indítása asszisztens ID-val: ${assistant.id}`);
     const runStart = Date.now();
     
     const run = await openai.beta.threads.runs.create(thread.id, {
-      assistant_id: assistant.id,
-      tool_resources: {
-        file_search: {
-          file_ids: [file.id]
-        }
-      }
+      assistant_id: assistant.id
+      // Ne add át itt a file_ids vagy tool_resources paramétert
     }).catch(error => {
       console.error("❌ Hiba a futtatás létrehozása során:", JSON.stringify({
         status: error.status,
@@ -141,107 +162,11 @@ async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: stri
     const runTime = Date.now() - runStart;
     console.log(`✅ Feldolgozás elindítva (${runTime}ms). Run ID: ${run.id}`);
 
-    // Várunk a befejezésig max 10x
-    let runStatus: string;
-    const maxAttempts = 10;
-    let finalRunDetails: any = null;
-    
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      console.log(`⏱️ ${attempt}. próbálkozás a futtatás állapotának ellenőrzésére...`);
-      const statusStart = Date.now();
-      
-      const retrievedRun = await openai.beta.threads.runs.retrieve(
-        thread.id, 
-        run.id
-      ).catch(error => {
-        console.error(`❌ Hiba a ${attempt}. állapotellenőrzés során:`, JSON.stringify({
-          status: error.status,
-          message: error.message,
-          type: error.type,
-          code: error.code
-        }));
-        throw error;
-      });
-      
-      const statusTime = Date.now() - statusStart;
-      runStatus = retrievedRun.status;
-      finalRunDetails = retrievedRun;
-      
-      console.log(`🕒 ${attempt}. próbálkozás - Státusz: ${runStatus} (${statusTime}ms)`);
-
-      if (runStatus === 'completed') {
-        console.log("✅ Feldolgozás sikeresen befejeződött!");
-        break;
-      }
-      
-      if (runStatus === 'failed') {
-        console.error("❌ Feldolgozás sikertelen", JSON.stringify(retrievedRun));
-        throw new Error(`Feldolgozás sikertelen: ${retrievedRun.last_error?.message}`);
-      }
-
-      if (attempt === maxAttempts) {
-        console.warn(`⚠️ Elértük a maximum próbálkozások számát (${maxAttempts}), de a feldolgozás nem fejeződött be.`);
-        console.warn("Utolsó ismert állapot:", JSON.stringify(finalRunDetails));
-      }
-
-      // 3 másodperc várakozás a következő próbálkozás előtt
-      await new Promise(resolve => setTimeout(resolve, 3000));
-    }
-
-    // Üzenetek lekérése
-    console.log("📬 Üzenetek lekérése a threadből...");
-    const messagesStart = Date.now();
-    
-    const messages = await openai.beta.threads.messages.list(thread.id).catch(error => {
-      console.error("❌ Hiba az üzenetek lekérése során:", JSON.stringify({
-        status: error.status,
-        message: error.message,
-        type: error.type,
-        code: error.code
-      }));
-      throw error;
-    });
-    
-    const messagesTime = Date.now() - messagesStart;
-    const assistantMessages = messages.data.filter(msg => msg.role === 'assistant');
-    
-    console.log(`📬 Érkezett asszisztensi üzenetek (${messagesTime}ms): ${assistantMessages.length}`);
-
-    // Tartalom kinyerése
-    const extractedContent = assistantMessages
-      .map(msg => msg.content[0].type === 'text' ? msg.content[0].text.value : null)
-      .filter(Boolean);
-
-    console.log("📋 Nyers kivont tartalom:", extractedContent);
-
-    // JSON konvertálás
-    const jsonData = extractedContent.reduce((acc, content) => {
-      try {
-        const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
-        const parsedJson = jsonMatch 
-          ? JSON.parse(jsonMatch[1]) 
-          : JSON.parse(content);
-        return { ...acc, ...parsedJson };
-      } catch (parseError) {
-        console.warn("❗ JSON parsing hiba:", parseError);
-        return acc;
-      }
-    }, {});
-
-    console.log("🔍 Feldolgozott JSON:", jsonData);
-
-    // Diagnosztikai adatok mentése
-    await supabase.from('diagnostic_logs').insert({
-      user_id: userId,
-      file_name: fileName,
-      file_size: fileBuffer.byteLength,
-      extraction_data: jsonData,
-      created_at: new Date().toISOString()
-    });
-
-    console.log("✅ Diagnosztikai adatok sikeresen mentve");
-
-    return jsonData;
+    return {
+      threadId: thread.id,
+      runId: run.id,
+      fileId: file.id
+    };
 
   } catch (error) {
     console.error("🚨 Teljes feldolgozási hiba:", error);
@@ -265,9 +190,9 @@ serve(async (req) => {
     console.log("🔑 OpenAI API kulcs állapota:", openaiApiKey ? "beállítva (" + openaiApiKey.substring(0, 5) + "...)" : "hiányzik");
 
     const fileBuffer = await file.arrayBuffer();
-    const processedData = await processDocumentWithOpenAI(fileBuffer, file.name, 'debug_user');
+    const processResult = await processDocumentWithOpenAI(fileBuffer, file.name, 'debug_user');
 
-    return new Response(JSON.stringify(processedData), {
+    return new Response(JSON.stringify(processResult), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
     
