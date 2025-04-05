@@ -21,14 +21,23 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
     
     // Fájl feltöltése OpenAI-ba
     const file = await uploadFileToOpenAI(fileBuffer, fileName);
+    console.log(`✅ Fájl sikeresen feltöltve OpenAI-ba. File ID: ${file.id}`);
+    
     // Asszisztens létrehozása
     const assistant = await createAssistant();
+    console.log(`✅ Asszisztens sikeresen létrehozva. Assistant ID: ${assistant.id}`);
+    
     // Thread létrehozása
     const thread = await createThread();
-    // Üzenet hozzáadása a threadhez (csak szöveges utasítással)
+    console.log(`✅ Thread sikeresen létrehozva. Thread ID: ${thread.id}`);
+    
+    // Üzenet hozzáadása a threadhez (csak szöveges utasítással, fájl nélkül)
     await addMessageToThread(thread.id);
+    console.log(`✅ Üzenet sikeresen hozzáadva a threadhez`);
+    
     // Futtatás indítása a fájl hozzáadásával
     const run = await startRun(thread.id, assistant.id, file.id);
+    console.log(`✅ Futtatás sikeresen elindítva. Run ID: ${run.id}`);
 
     return {
       threadId: thread.id,

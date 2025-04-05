@@ -21,6 +21,8 @@ export const processDocumentWithOpenAI = async (file: File, user: any): Promise<
     formData.append('file', file);
     
     console.log("Dokumentum feltöltése az OpenAI funkcióhoz...");
+    
+    // Használjuk a teljes URL-t a edge function meghívásához
     const scanResponse = await fetch(
       'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-saps-document',
       {
@@ -33,8 +35,16 @@ export const processDocumentWithOpenAI = async (file: File, user: any): Promise<
     );
     
     if (!scanResponse.ok) {
-      const errorData = await scanResponse.json();
-      console.error("SAPS dokumentum feltöltési hiba:", errorData);
+      const errorText = await scanResponse.text();
+      console.error("SAPS dokumentum feltöltési hiba:", errorText);
+      let errorData;
+      
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (parseError) {
+        errorData = { error: errorText || "Ismeretlen hiba történt" };
+      }
+      
       throw new Error(errorData.error || "Hiba a dokumentum feldolgozása közben");
     }
     

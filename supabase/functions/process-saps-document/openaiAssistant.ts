@@ -112,7 +112,7 @@ export async function createThread() {
   return thread;
 }
 
-// Üzenet hozzáadása egy threadhez
+// Üzenet hozzáadása egy threadhez (fájl nélkül)
 export async function addMessageToThread(threadId: string, content: string = "Olvasd ki a SAPS dokumentum részleteit JSON formátumban.") {
   console.log(`📤 Üzenet létrehozása`);
   const messageStart = Date.now();
