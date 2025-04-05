@@ -170,7 +170,8 @@ async function addMessageToThread(threadId: string, fileId: string) {
     content: "Olvasd ki a SAPS dokumentum részleteit JSON formátumban.",
     attachments: [{ 
       file_id: fileId,
-      type: "file_attachment"
+      type: "file_attachment",
+      tools: [{ type: "file_search" }]  // Itt adjuk hozzá a hiányzó tools paramétert
     }]
   }).catch(error => {
     console.error("❌ Hiba az üzenet létrehozása során:", JSON.stringify({
