@@ -1,14 +1,19 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { UploadCloud, Clock, ArrowRight, FileWarning, FileCheck, FileScan } from "lucide-react";
+import { Clock, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { FarmData } from "@/components/LoanApplication";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/App";
+import UploadArea from "@/components/upload/UploadArea";
+import ProcessingStatus from "@/components/upload/ProcessingStatus";
+import ErrorDisplay from "@/components/upload/ErrorDisplay";
+import SuccessMessage from "@/components/upload/SuccessMessage";
+import { uploadFileToStorage } from "@/utils/storageUtils";
+import { processDocumentWithOpenAI, checkProcessingResults } from "@/services/documentProcessingService";
 
 interface FileUploadProps {
   onComplete: (farmData: FarmData) => void;
@@ -41,46 +46,6 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
     }
   };
   
-  // Fájl feltöltése a Supabase tárolóba
-  const uploadFileToStorage = async (fileToUpload: File): Promise<string | null> => {
-    try {
-      if (!user) {
-        console.error("Nincs bejelentkezett felhasználó, nem lehet fájlt feltölteni");
-        return null;
-      }
-      
-      // Egyedi fájlnév generálása timestamppel
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const fileExtension = fileToUpload.name.split('.').pop();
-      
-      // Speciális karakterek eltávolítása a fájlnévből
-      const cleanFileName = fileToUpload.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const storagePath = `saps/${user.id}/${timestamp}-${cleanFileName}`;
-      
-      console.log("Fájl feltöltése a Storage-ba:", storagePath);
-      
-      const { data, error } = await supabase.storage
-        .from('dokumentumok')
-        .upload(storagePath, fileToUpload, {
-          contentType: fileExtension === 'pdf' ? 'application/pdf' : 
-                      (fileExtension === 'xlsx' || fileExtension === 'xls') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 
-                      'application/octet-stream',
-          upsert: false
-        });
-      
-      if (error) {
-        console.error("Hiba a dokumentum tárolása során:", error.message);
-        return null;
-      }
-      
-      console.log("Dokumentum sikeresen tárolva:", storagePath);
-      return storagePath;
-    } catch (err) {
-      console.error("Váratlan hiba a tárolás során:", err);
-      return null;
-    }
-  };
-  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -104,7 +69,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       });
       
       // Először feltöltjük a dokumentumot a Storage-ba
-      const storagePath = await uploadFileToStorage(file);
+      const storagePath = await uploadFileToStorage(file, user.id);
       
       if (storagePath) {
         setProcessingStatus({
@@ -116,45 +81,19 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         console.warn("A fájl mentése a tárhelyre sikertelen volt, de a feldolgozás folytatódik");
       }
       
-      const formData = new FormData();
-      formData.append('file', file);
-      
       setProcessingStatus({
         step: "Dokumentum feltöltése",
         progress: 30,
       });
       
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("Nincs érvényes felhasználói munkamenet");
+      // Dokumentum feldolgozása OpenAI-val
+      const processResult = await processDocumentWithOpenAI(file, user);
+      
+      if (!processResult) {
+        throw new Error("Hiba történt a dokumentum feldolgozása során");
       }
       
-      console.log("Dokumentum feltöltése az OpenAI funkcióhoz...");
-      const scanResponse = await fetch(
-        'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-saps-document',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: formData,
-        }
-      );
-      
-      if (!scanResponse.ok) {
-        const errorData = await scanResponse.json();
-        console.error("SAPS dokumentum feltöltési hiba:", errorData);
-        throw new Error(errorData.error || "Hiba a dokumentum feldolgozása közben");
-      }
-      
-      const scanData = await scanResponse.json();
-      console.log("OpenAI scan válasz:", scanData);
-      
-      const { threadId, runId } = scanData;
-      
-      if (!threadId || !runId) {
-        throw new Error("Hiányzó thread vagy run azonosító");
-      }
+      const { threadId, runId } = processResult;
       
       setProcessingStatus({
         step: "AI feldolgozás folyamatban",
@@ -173,28 +112,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         await new Promise(resolve => setTimeout(resolve, 6000));
         
         try {
-          console.log(`Eredmény ellenőrzése (${attempts}. kísérlet) a thread ID-val: ${threadId}, run ID-val: ${runId}`);
-          
-          const resultResponse = await fetch(
-            'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/get-thread-results',
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ threadId, runId })
-            }
-          );
-          
-          if (!resultResponse.ok) {
-            const errorText = await resultResponse.text();
-            console.warn(`Ellenőrzési hiba (${attempts}. kísérlet):`, errorText);
-            continue;
-          }
-          
-          const resultData = await resultResponse.json();
-          console.log(`Eredmény ellenőrzés válasz (${attempts}. kísérlet):`, resultData);
+          const resultData = await checkProcessingResults(threadId, runId);
           
           let progress = 50 + Math.min(40, attempts * 2);
           setProcessingStatus({
@@ -203,9 +121,9 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
             details: `Feldolgozás: ${resultData.status || 'folyamatban'} (${attempts}. ellenőrzés)`
           });
           
-          if (resultData.completed) {
+          if (resultData.completed && resultData.data) {
             isComplete = true;
-            farmData = resultData.data as FarmData;
+            farmData = resultData.data;
             break;
           }
         } catch (checkError) {
@@ -239,28 +157,6 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
     } finally {
       setUploading(false);
     }
-  };
-  
-  const renderProgressBar = () => {
-    if (!processingStatus) return null;
-    
-    return (
-      <div className="mt-4">
-        <div className="flex justify-between text-xs mb-1">
-          <span>{processingStatus.step}</span>
-          <span>{processingStatus.progress}%</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2.5">
-          <div 
-            className="bg-primary h-2.5 rounded-full transition-all duration-300 ease-in-out" 
-            style={{ width: `${processingStatus.progress}%` }}
-          />
-        </div>
-        {processingStatus.details && (
-          <p className="text-xs text-muted-foreground mt-2">{processingStatus.details}</p>
-        )}
-      </div>
-    );
   };
   
   return (
@@ -298,51 +194,10 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
           </div>
           
           <form onSubmit={handleSubmit}>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center space-y-4">
-              <UploadCloud className="h-12 w-12 mx-auto text-gray-400" />
-              <div className="space-y-2">
-                <p className="text-sm text-gray-500">
-                  PDF vagy XLS formátumban
-                </p>
-                <label htmlFor="file-upload" className="cursor-pointer">
-                  <span className="px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium">
-                    Fájl kiválasztása
-                  </span>
-                  <Input
-                    id="file-upload"
-                    type="file"
-                    accept=".pdf,.xls,.xlsx"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-              {file && (
-                <div className="text-sm text-gray-700 mt-2 flex items-center justify-center gap-2">
-                  <FileScan className="h-4 w-4 text-primary" />
-                  <span>Kiválasztott fájl: <span className="font-medium">{file.name}</span></span>
-                </div>
-              )}
-            </div>
-
-            {renderProgressBar()}
-
-            {error && (
-              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-600 flex items-start">
-                <FileWarning className="h-5 w-5 mr-2 flex-shrink-0" />
-                <p className="text-sm">{error}</p>
-              </div>
-            )}
-            
-            {processingStatus?.progress === 100 && (
-              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md text-green-600 flex items-start">
-                <FileCheck className="h-5 w-5 mr-2 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium">Dokumentum sikeresen feldolgozva</p>
-                  <p className="text-xs mt-1">{processingStatus.details}</p>
-                </div>
-              </div>
-            )}
+            <UploadArea file={file} onFileChange={handleFileChange} />
+            <ProcessingStatus status={processingStatus} />
+            <ErrorDisplay message={error} />
+            <SuccessMessage status={processingStatus} />
           </form>
         </div>
       </CardContent>
