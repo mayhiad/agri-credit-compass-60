@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -53,7 +52,10 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       // Egyedi fájlnév generálása timestamppel
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const fileExtension = fileToUpload.name.split('.').pop();
-      const storagePath = `saps/${user.id}/${timestamp}-${fileToUpload.name}`;
+      
+      // Speciális karakterek eltávolítása a fájlnévből
+      const cleanFileName = fileToUpload.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const storagePath = `saps/${user.id}/${timestamp}-${cleanFileName}`;
       
       console.log("Fájl feltöltése a Storage-ba:", storagePath);
       

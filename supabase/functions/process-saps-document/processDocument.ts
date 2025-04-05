@@ -15,8 +15,10 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
     const file = await uploadFileToOpenAI(fileBuffer, fileName);
     // Asszisztens létrehozása
     const assistant = await createAssistant();
-    // Thread létrehozása és üzenet hozzáadása
-    const thread = await createThreadWithMessage(file.id);
+    // Thread létrehozása
+    const thread = await createThread();
+    // Üzenet hozzáadása a threadhez file_id-val
+    await addMessageToThread(thread.id, file.id);
     // Futtatás
     const run = await startRun(thread.id, assistant.id);
 
@@ -47,7 +49,10 @@ async function saveDocumentToStorage(fileBuffer: ArrayBuffer, fileName: string, 
     // Generálunk egy egyedi fájl nevet
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileExtension = fileName.split('.').pop();
-    const storagePath = `saps/${userId}/${timestamp}-${fileName}`;
+    
+    // Tisztítjuk a fájlnevet a speciális karakterektől
+    const cleanFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const storagePath = `saps/${userId}/${timestamp}-${cleanFileName}`;
     
     const { data, error } = await supabase.storage
       .from('dokumentumok')
@@ -134,9 +139,8 @@ async function createAssistant() {
   return assistant;
 }
 
-// Thread létrehozása és üzenet hozzáadása
-async function createThreadWithMessage(fileId: string) {
-  // Thread létrehozása
+// Thread létrehozása
+async function createThread() {
   console.log("📝 Thread létrehozása...");
   const threadStart = Date.now();
   
@@ -153,14 +157,21 @@ async function createThreadWithMessage(fileId: string) {
   const threadTime = Date.now() - threadStart;
   console.log(`✅ Thread létrehozva (${threadTime}ms). ID: ${thread.id}`);
   
-  // Üzenet hozzáadása a thread-hez
+  return thread;
+}
+
+// Üzenet hozzáadása egy threadhez file_id-val
+async function addMessageToThread(threadId: string, fileId: string) {
   console.log(`📤 Üzenet létrehozása`);
   const messageStart = Date.now();
   
-  await openai.beta.threads.messages.create(thread.id, {
+  await openai.beta.threads.messages.create(threadId, {
     role: "user",
     content: "Olvasd ki a SAPS dokumentum részleteit JSON formátumban.",
-    file_ids: [fileId]
+    attachments: [{ 
+      file_id: fileId,
+      type: "file_attachment"
+    }]
   }).catch(error => {
     console.error("❌ Hiba az üzenet létrehozása során:", JSON.stringify({
       status: error.status,
@@ -173,8 +184,6 @@ async function createThreadWithMessage(fileId: string) {
   
   const messageTime = Date.now() - messageStart;
   console.log(`✅ Üzenet létrehozva (${messageTime}ms).`);
-  
-  return thread;
 }
 
 // Futtatás indítása
