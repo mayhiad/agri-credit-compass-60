@@ -77,16 +77,18 @@ serve(async (req) => {
       const fileUploadTime = Date.now() - fileUploadStart;
       console.log(`✅ File uploaded successfully (${fileUploadTime}ms). File ID: ${uploadedFile.id}`);
 
-      // Create a thread with the uploaded file and system instructions
+      // Create a thread
       const thread = await openai.beta.threads.create();
       console.log(`✅ Thread created. ID: ${thread.id}`);
       
-      // Add a message to the thread
+      // Add a message to the thread with file attachment
       await openai.beta.threads.messages.create(thread.id, {
         role: "user",
         content: "Analyze this SAPS document and extract all relevant agricultural information. Please return the data in the following JSON format: {\"hectares\": number, \"cultures\": [{\"name\": string, \"hectares\": number, \"estimatedRevenue\": number}], \"totalRevenue\": number, \"region\": string, \"blockIds\": [string]}",
         file_ids: [uploadedFile.id]
       });
+      
+      console.log(`✅ Message with file attachment created in thread`);
       
       // Run the assistant on the thread
       console.log(`🏃 Starting run with assistant ID: ${assistantId}`);
