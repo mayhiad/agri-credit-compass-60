@@ -25,10 +25,10 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
     const assistant = await createAssistant();
     // Thread létrehozása
     const thread = await createThread();
-    // Üzenet hozzáadása a threadhez file_id-val
-    await addMessageToThread(thread.id, file.id);
-    // Futtatás
-    const run = await startRun(thread.id, assistant.id);
+    // Üzenet hozzáadása a threadhez (csak szöveges utasítással)
+    await addMessageToThread(thread.id);
+    // Futtatás indítása a fájl hozzáadásával
+    const run = await startRun(thread.id, assistant.id, file.id);
 
     return {
       threadId: thread.id,

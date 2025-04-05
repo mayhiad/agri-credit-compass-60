@@ -112,16 +112,15 @@ export async function createThread() {
   return thread;
 }
 
-// Üzenet hozzáadása egy threadhez file_id-val
-export async function addMessageToThread(threadId: string, fileId: string) {
-  console.log(`📤 Üzenet létrehozása fileId-val: ${fileId}`);
+// Üzenet hozzáadása egy threadhez
+export async function addMessageToThread(threadId: string, content: string = "Olvasd ki a SAPS dokumentum részleteit JSON formátumban.") {
+  console.log(`📤 Üzenet létrehozása`);
   const messageStart = Date.now();
   
   try {
     const message = await openai.beta.threads.messages.create(threadId, {
       role: "user",
-      content: "Olvasd ki a SAPS dokumentum részleteit JSON formátumban.",
-      file_ids: [fileId]  // Helyesen formázott file_ids paraméter (array)
+      content: content
     });
     
     const messageTime = Date.now() - messageStart;
@@ -138,13 +137,18 @@ export async function addMessageToThread(threadId: string, fileId: string) {
   }
 }
 
-// Futtatás indítása
-export async function startRun(threadId: string, assistantId: string) {
-  console.log(`🏃 Feldolgozás indítása asszisztens ID-val: ${assistantId}`);
+// Futtatás indítása fájl megadásával
+export async function startRun(threadId: string, assistantId: string, fileId: string) {
+  console.log(`🏃 Feldolgozás indítása asszisztens ID-val: ${assistantId} és fájl ID-val: ${fileId}`);
   const runStart = Date.now();
   
   const run = await openai.beta.threads.runs.create(threadId, {
-    assistant_id: assistantId
+    assistant_id: assistantId,
+    tool_resources: {
+      file_search: {
+        file_ids: [fileId]
+      }
+    }
   }).catch(error => {
     console.error("❌ Hiba a futtatás létrehozása során:", JSON.stringify({
       status: error.status,
