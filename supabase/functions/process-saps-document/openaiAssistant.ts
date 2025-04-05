@@ -137,18 +137,19 @@ export async function addMessageToThread(threadId: string, content: string = "Ol
   }
 }
 
-// Futtatás indítása fájl megadásával
+// Fájl hozzáadása a thread-hez és futtatás indítása
 export async function startRun(threadId: string, assistantId: string, fileId: string) {
   console.log(`🏃 Feldolgozás indítása asszisztens ID-val: ${assistantId} és fájl ID-val: ${fileId}`);
   const runStart = Date.now();
   
   try {
-    // A frissített OpenAI API-ban a file_ids a messages szinten van és nem a tool_resources-ben
-    // Először adjuk hozzá a fájlt egy új üzenethez
+    // Először adjuk hozzá a fájlt egy új üzenethez - a OpenAI API módosult, így külön kell kezelni a fájlt
+    console.log(`📎 Fájl hozzáadása a thread-hez: ${fileId}`);
+    
     const fileMessage = await openai.beta.threads.messages.create(threadId, {
       role: "user",
       content: "Ez a feltöltött SAPS dokumentum, kérlek elemezd a korábbi kérésem szerint.",
-      file_ids: [fileId]
+      attachments: [{ file_id: fileId, type: "file_attachment" }]
     });
     
     console.log(`✅ Fájl sikeresen hozzáadva a thread-hez. Message ID: ${fileMessage.id}`);
