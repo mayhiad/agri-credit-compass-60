@@ -115,45 +115,25 @@ export async function addMessageToThread(threadId, content = "Kérlek, dolgozd f
 
 // Fájl hozzáadása a thread-hez és futtatás indítása
 export async function startRun(threadId, assistantId, fileId) {
-  console.log(`🏃 Feldolgozás indítása asszisztens ID-val: ${assistantId} és fájl ID-val: ${fileId}`);
-  const runStart = Date.now();
-  
+  console.log(`🏃 Futtatás indítása: Thread ID ${threadId}, Assistant ID ${assistantId}, File ID ${fileId}`);
+  const start = Date.now();
+
   try {
-    // Először adjuk hozzá a fájlt egy új üzenethez
-    console.log(`📎 Fájl hozzáadása a thread-hez: ${fileId}`);
-    
-    const fileMessage = await openai.beta.threads.messages.create(threadId, {
-      role: "user",
-      content: "Ez a feltöltött SAPS dokumentum, kérlek elemezd a korábbi kérésem szerint.",
-      attachments: [
-        { 
-          file_id: fileId, 
-          type: "file_attachment" 
-        }
-      ]
-    });
-    
-    console.log(`✅ Fájl sikeresen hozzáadva a thread-hez. Message ID: ${fileMessage.id}`);
-    
-    // Majd indítsuk el a futtatást a 2025-ös új API formátummal
-    console.log(`🔄 Run létrehozása az attachments paraméterrel...`);
-    
     const run = await openai.beta.threads.runs.create(threadId, {
       assistant_id: assistantId,
       attachments: [
         {
           file_id: fileId,
-          tools: ["file_search"]
+          tools: ["file_search"] // ❗ Kulcsfontosságú: tools hozzáadva
         }
       ]
     });
-    
-    const runTime = Date.now() - runStart;
+
+    const runTime = Date.now() - start;
     console.log(`✅ Feldolgozás elindítva (${runTime}ms). Run ID: ${run.id}`);
-    
     return run;
   } catch (error) {
-    console.error("❌ Hiba a futtatás létrehozása során:", getErrorDetails(error));
+    console.error("❌ Hiba a run indításakor:", getErrorDetails(error));
     throw error;
   }
 }
