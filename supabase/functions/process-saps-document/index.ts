@@ -28,7 +28,6 @@ serve(async (req) => {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       try {
         // JWT token feldolgozása a userId kinyeréséhez
-        // Ez egy példa, a valóságban a JWT-t megfelelően kellene ellenőrizni
         const token = authHeader.split(' ')[1];
         const base64Url = token.split('.')[1];
         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
