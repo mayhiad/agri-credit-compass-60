@@ -1,4 +1,5 @@
 
+
 import { openai, supabase, getErrorDetails } from "./openaiClient.ts";
 import { API_TIMEOUT } from "./fetchUtils.ts";
 
@@ -168,11 +169,7 @@ async function addMessageToThread(threadId: string, fileId: string) {
   await openai.beta.threads.messages.create(threadId, {
     role: "user",
     content: "Olvasd ki a SAPS dokumentum részleteit JSON formátumban.",
-    attachments: [{ 
-      file_id: fileId,
-      type: "file_attachment",
-      tools: [{ type: "file_search" }]  // Itt adjuk hozzá a hiányzó tools paramétert
-    }]
+    file_ids: [fileId]
   }).catch(error => {
     console.error("❌ Hiba az üzenet létrehozása során:", JSON.stringify({
       status: error.status,
@@ -209,3 +206,4 @@ async function startRun(threadId: string, assistantId: string) {
   
   return run;
 }
+
