@@ -8,6 +8,30 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// API kérési timeout ms-ben (30 másodperc)
+const API_TIMEOUT = 30000;
+
+// Timeout-os fetch implementáció
+const fetchWithTimeout = async (url: string, options: RequestInit, timeout: number) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    if (error.name === 'AbortError') {
+      throw new Error('API request timed out');
+    }
+    throw error;
+  }
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -40,8 +64,14 @@ serve(async (req) => {
     
     const { threadId, runId } = requestData;
     
+    // Ellenőrizzük, hogy a threadId és runId értékek meg vannak-e adva
     if (!threadId) {
-      return new Response(JSON.stringify({ error: 'Thread ID is required' }), {
+      console.error('❌ Thread ID hiányzik');
+      return new Response(JSON.stringify({ 
+        error: 'Thread ID kötelező', 
+        completed: false,
+        timestamp: new Date().toISOString()
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -50,13 +80,26 @@ serve(async (req) => {
     console.log(`📄 Checking status for Thread ID: ${threadId}, Run ID: ${runId || 'Not provided'}`);
 
     try {
-      // If runId is provided, check its status
+      // Ha a runId meg van adva, ellenőrizzük az állapotát
       if (runId) {
         const run = await openai.beta.threads.runs.retrieve(threadId, runId);
         
         console.log(`🏃 Run status: ${run.status}`);
         
-        // If the run is still in progress, return the status
+        // Külön kezeljük a hiba állapotot
+        if (run.status === 'failed') {
+          return new Response(JSON.stringify({ 
+            status: 'failed',
+            completed: false,
+            error: run.last_error?.message || 'Ismeretlen hiba történt a futtatás során',
+            code: run.last_error?.code,
+            timestamp: new Date().toISOString()
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Ha a run még folyamatban van, visszaadjuk az állapotát
         if (run.status !== 'completed') {
           return new Response(JSON.stringify({ 
             status: run.status,
@@ -68,26 +111,27 @@ serve(async (req) => {
         }
       }
       
-      // Retrieve messages from the thread
+      // Lekérjük az üzeneteket a thread-ből
       const messages = await openai.beta.threads.messages.list(threadId);
       
       console.log(`📩 Retrieved ${messages.data.length} messages from thread`);
       
-      // Filter for assistant messages only
+      // Szűrjük az asszisztens üzenetekre
       const assistantMessages = messages.data.filter(msg => msg.role === 'assistant');
       console.log(`🤖 Found ${assistantMessages.length} assistant messages`);
       
       if (assistantMessages.length === 0) {
         return new Response(JSON.stringify({ 
           error: 'No assistant responses found in thread',
-          completed: false
+          completed: false,
+          timestamp: new Date().toISOString()
         }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
       
-      // Extract content from the most recent assistant message
+      // A legfrissebb asszisztens üzenet tartalmának kinyerése
       const latestMessage = assistantMessages[0];
       let content = '';
       
@@ -96,32 +140,53 @@ serve(async (req) => {
         console.log(`📝 Message content: ${content.substring(0, 100)}...`);
       }
       
-      // Try to extract JSON data from the message content
+      // Próbáljunk meg JSON adatot kinyerni az üzenet tartalmából
       let jsonData = {};
+      let dataFormat = 'unknown';
+      
       try {
-        // Look for JSON content (may be in a code block)
+        // JSON kód blokk keresése különböző formátumokra
         const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
+        const yamlMatch = content.match(/```ya?ml\s*([\s\S]*?)\s*```/);
+        const xmlMatch = content.match(/```xml\s*([\s\S]*?)\s*```/);
+        
         if (jsonMatch) {
           console.log(`🔍 Found JSON in code block`);
           jsonData = JSON.parse(jsonMatch[1]);
+          dataFormat = 'json';
+        } else if (yamlMatch) {
+          console.log(`🔍 Found YAML in code block`);
+          // YAML parsing helyettesítő (valós implementációhoz YAML parser szükséges)
+          jsonData = { rawYAML: yamlMatch[1] };
+          dataFormat = 'yaml';
+        } else if (xmlMatch) {
+          console.log(`🔍 Found XML in code block`);
+          // XML parsing helyettesítő (valós implementációhoz XML parser szükséges)
+          jsonData = { rawXML: xmlMatch[1] };
+          dataFormat = 'xml';
         } else {
-          // Try to parse the entire content as JSON
+          // Próbáljuk meg az egész tartalmat JSON-ként értelmezni
           console.log(`🔍 Attempting to parse entire content as JSON`);
           jsonData = JSON.parse(content);
+          dataFormat = 'json';
         }
         
-        console.log(`✅ Successfully parsed JSON data`);
+        console.log(`✅ Successfully parsed ${dataFormat} data`);
       } catch (e) {
-        console.warn('⚠️ Could not parse JSON from message content:', e);
-        // Return the raw content if parsing fails
+        console.warn('⚠️ Could not parse structured data from message content:', e);
+        // Ha a parsing sikertelen, visszaadjuk a nyers tartalmat
         jsonData = { rawContent: content };
+        dataFormat = 'raw';
       }
       
       return new Response(JSON.stringify({
         status: 'completed',
         completed: true,
         data: jsonData,
+        dataFormat: dataFormat,
         rawContent: content,
+        message_id: latestMessage.id,
+        thread_id: threadId,
         timestamp: new Date().toISOString()
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -129,12 +194,29 @@ serve(async (req) => {
 
     } catch (error) {
       console.error('❌ Error retrieving thread results:', error);
+      
+      // Részletesebb hibaüzenetek a különböző hibatípusokra
+      let errorMessage = 'Failed to retrieve thread results';
+      let errorStatus = 500;
+      
+      if (error.status === 404) {
+        errorMessage = `Resource not found: ${error.message || 'thread or run was not found'}`;
+        errorStatus = 404;
+      } else if (error.message.includes('timed out')) {
+        errorMessage = 'Request timed out while retrieving results';
+        errorStatus = 408;
+      } else if (error.status === 401 || error.status === 403) {
+        errorMessage = 'Authorization error: ' + (error.message || 'invalid API key or permissions');
+        errorStatus = error.status;
+      }
+      
       return new Response(JSON.stringify({ 
-        error: 'Failed to retrieve thread results', 
+        error: errorMessage, 
         details: error.message,
-        completed: false
+        completed: false,
+        timestamp: new Date().toISOString()
       }), {
-        status: 500,
+        status: errorStatus,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -143,7 +225,8 @@ serve(async (req) => {
     console.error('🔥 Unhandled error in Get Thread Results Function:', error);
     return new Response(JSON.stringify({ 
       error: 'Internal server error', 
-      details: error.message
+      details: error.message,
+      timestamp: new Date().toISOString()
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
