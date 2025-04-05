@@ -1,15 +1,26 @@
 
-import { openai, getErrorDetails } from "./openaiClient.ts";
+import OpenAI from "https://esm.sh/openai@4.38.0";
+import { getErrorDetails } from "./openaiClient.ts";
 
-// Asszisztens létrehozása
+// OpenAI kliens inicializálása
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const openai = new OpenAI({
+  apiKey: openAIApiKey,
+  defaultHeaders: { 'OpenAI-Beta': 'assistants=v2' }
+});
+
+// Asszisztens létrehozása (opcionálisan egyszer, majd assistantId mentés .env-be)
 export async function createAssistant() {
   console.log("🤖 Asszisztens létrehozása...");
-  const assistantStart = Date.now();
-  
-  const assistant = await openai.beta.assistants.create({
-    name: "SAPS Dokumentum Elemző",
-    instructions: `Olvasd ki a dokumentumból a gazdálkodó nevét, az iratazonosítószámot, a kérelmező ügyfél (gazdálkodó) ügyfél-azonosító számát. Keresd meg a dokumentum azon részét, amelyben az elmúlt öt év historikus gazdálkodási adatait látjuk, azaz, hogy mekkora területen milyen növénykultúrát termelt. Rendezd ezt táblázatba, dolgozd fel ezeket az adatokat és párosíts mellé az azokban az években nyilvánosan elérhető kultúrához tartozó világpiaci átlagárat, szorozd fel a területeken az adott években, adott régióban elvárható termésátlaggal, ezáltal becsüld meg az adott években termelt árbevételt. Majd keresd meg az összesítő táblázatot, amely a tárgyévre vonatkozik; olvasd be ugyanígy a területek méretét és az adott területeken előállított kultúrát, becsüld meg a területen az elmúlt öt év termésátlagát véve a várható terméshozamot (tonna), és szorozd fel a most aktuális, vagy az aratáskor várható világpiaci átlagárral. Így megkapjuk a tárgyévi, jövőbeni várható árbevételt. 
-Rendezd struktúráltan, feldolgozhatóan.
+  const start = Date.now();
+
+  try {
+    const assistant = await openai.beta.assistants.create({
+      name: "SAPS Dokumentum Elemző",
+      model: "gpt-4o-mini",
+      tools: [{ type: "file_search" }],
+      instructions: `
+Olvasd ki a dokumentumból a gazdálkodó nevét, az iratazonosítószámot, a kérelmező ügyfél (gazdálkodó) ügyfél-azonosító számát. Keresd meg a dokumentum azon részét, amelyben az elmúlt öt év historikus gazdálkodási adatait látjuk, azaz, hogy mekkora területen milyen növénykultúrát termelt. Rendezd ezt táblázatba, dolgozd fel ezeket az adatokat és párosíts mellé az azokban az években nyilvánosan elérhető kultúrához tartozó világpiaci átlagárat, szorozd fel a területeken az adott években, adott régióban elvárható termésátlaggal, ezáltal becsüld meg az adott években termelt árbevételt. Majd keresd meg az összesítő táblázatot, amely a tárgyévre vonatkozik; olvasd be ugyanígy a területek méretét és az adott területeken előállított kultúrát, becsüld meg a területen az elmúlt öt év termésátlagát véve a várható terméshozamot (tonna), és szorozd fel a most aktuális, vagy az aratáskor várható világpiaci átlagárral. Így megkapjuk a tárgyévi, jövőbeni várható árbevételt. Rendezd struktúráltan, feldolgozhatóan.
 
 Használd az alábbi becsült adatokat az árbevétel számításhoz:
 - Őszi búza: 6 t/ha, 230 €/t
@@ -64,81 +75,47 @@ Kérlek, add vissza JSON formátumban a következő mezőkkel:
     }
   ]
 }
+`
+    });
 
-Amikor becsült árbevételt számolsz:
-- A területet szorozd meg a hozammal (t/ha), majd az eredményt a világpiaci árral (€/t)
-- Az eredményt egész számként, ezer euróra kerekítve add vissza
-- Forintba átszámolva használd a 380 HUF/EUR árfolyamot
-
-Amikor az árbevételt becsülöd, nem kultúránként van rá szükség, hanem évenként szeretnénk elsősorban látni a becsült árbevételt, azon belül pedig kultúránkénti bontásban.
-
-A histórikus adatok 5 évre visszamenően vannak a táblázatban, tehát eredményként mutasd meg az elmúlt öt év árbevételét egy összegző táblázatban!`,
-    tools: [{ type: "file_search" }],
-    model: "gpt-4o-mini"
-  }).catch(error => {
-    console.error("❌ Hiba az asszisztens létrehozása során:", JSON.stringify({
-      status: error.status,
-      message: error.message,
-      type: error.type,
-      code: error.code
-    }));
+    const ms = Date.now() - start;
+    console.log(`✅ Asszisztens létrehozva ${ms}ms alatt: ${assistant.id}`);
+    return assistant;
+  } catch (error) {
+    console.error("❌ Hiba az asszisztens létrehozásakor:", getErrorDetails(error));
     throw error;
-  });
-  
-  const assistantTime = Date.now() - assistantStart;
-  console.log(`✅ Asszisztens létrehozva (${assistantTime}ms). ID: ${assistant.id}`);
-  
-  return assistant;
+  }
 }
 
 // Thread létrehozása
 export async function createThread() {
-  console.log("📝 Thread létrehozása...");
-  const threadStart = Date.now();
-  
-  const thread = await openai.beta.threads.create().catch(error => {
-    console.error("❌ Hiba a thread létrehozása során:", JSON.stringify({
-      status: error.status,
-      message: error.message,
-      type: error.type,
-      code: error.code
-    }));
+  try {
+    const thread = await openai.beta.threads.create();
+    console.log(`✅ Thread létrehozva: ${thread.id}`);
+    return thread;
+  } catch (error) {
+    console.error("❌ Hiba thread létrehozáskor:", getErrorDetails(error));
     throw error;
-  });
-  
-  const threadTime = Date.now() - threadStart;
-  console.log(`✅ Thread létrehozva (${threadTime}ms). ID: ${thread.id}`);
-  
-  return thread;
+  }
 }
 
-// Üzenet hozzáadása egy threadhez (fájl nélkül)
-export async function addMessageToThread(threadId: string, content: string = "Olvasd ki a SAPS dokumentum részleteit JSON formátumban.") {
-  console.log(`📤 Üzenet létrehozása`);
-  const messageStart = Date.now();
-  
+// Üzenet hozzáadása egy threadhez
+export async function addMessageToThread(threadId, content = "Kérlek, dolgozd fel a SAPS dokumentumot!") {
   try {
     const message = await openai.beta.threads.messages.create(threadId, {
       role: "user",
-      content: content
+      content
     });
-    
-    const messageTime = Date.now() - messageStart;
-    console.log(`✅ Üzenet sikeresen létrehozva (${messageTime}ms). Message ID: ${message.id}`);
+    console.log(`✅ Üzenet létrehozva: ${message.id}`);
     return message;
   } catch (error) {
-    console.error("❌ Hiba az üzenet létrehozása során:", JSON.stringify({
-      status: error.status,
-      message: error.message,
-      type: error.type,
-      code: error.code
-    }));
+    console.error("❌ Hiba az üzenet hozzáadásakor:", getErrorDetails(error));
     throw error;
   }
 }
 
 // Fájl hozzáadása a thread-hez és futtatás indítása
-export async function startRun(threadId: string, assistantId: string, fileId: string) {
+export async function startRun(threadId, assistantId, fileId) {
   console.log(`🏃 Feldolgozás indítása asszisztens ID-val: ${assistantId} és fájl ID-val: ${fileId}`);
   const runStart = Date.now();
   
@@ -177,12 +154,7 @@ export async function startRun(threadId: string, assistantId: string, fileId: st
     
     return run;
   } catch (error) {
-    console.error("❌ Hiba a futtatás létrehozása során:", JSON.stringify({
-      status: error.status,
-      message: error.message,
-      type: error.type,
-      code: error.code
-    }));
+    console.error("❌ Hiba a futtatás létrehozása során:", getErrorDetails(error));
     throw error;
   }
 }
