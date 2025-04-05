@@ -28,7 +28,7 @@ serve(async (req) => {
       });
     }
 
-    // Initialize OpenAI client
+    // Initialize OpenAI client with v2 API header
     const openai = new OpenAI({
       apiKey: openaiApiKey,
       defaultHeaders: { 'OpenAI-Beta': 'assistants=v2' }
@@ -60,7 +60,8 @@ serve(async (req) => {
         if (run.status !== 'completed') {
           return new Response(JSON.stringify({ 
             status: run.status,
-            completed: false
+            completed: false,
+            timestamp: new Date().toISOString()
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
@@ -90,7 +91,7 @@ serve(async (req) => {
       const latestMessage = assistantMessages[0];
       let content = '';
       
-      if (latestMessage.content[0].type === 'text') {
+      if (latestMessage.content && latestMessage.content.length > 0 && latestMessage.content[0].type === 'text') {
         content = latestMessage.content[0].text.value;
         console.log(`📝 Message content: ${content.substring(0, 100)}...`);
       }
@@ -120,7 +121,8 @@ serve(async (req) => {
         status: 'completed',
         completed: true,
         data: jsonData,
-        rawContent: content
+        rawContent: content,
+        timestamp: new Date().toISOString()
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
