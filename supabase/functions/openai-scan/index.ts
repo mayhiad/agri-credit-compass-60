@@ -86,13 +86,26 @@ serve(async (req) => {
         }]
       });
       console.log(`✅ Thread created. ID: ${thread.id}`);
-
-      // Return successful response with details
+      
+      // Run the assistant on the thread
+      console.log(`🏃 Starting run with assistant ID: ${assistantId}`);
+      const runStart = Date.now();
+      
+      const run = await openai.beta.threads.runs.create(
+        thread.id,
+        { assistant_id: assistantId }
+      );
+      
+      console.log(`✅ Run created. ID: ${run.id}`);
+      
+      // Return successful response with details (we're not waiting for completion in this function)
       return new Response(JSON.stringify({ 
         message: 'Document processed successfully', 
         fileId: uploadedFile.id,
         assistantId: assistantId,
-        threadId: thread.id
+        threadId: thread.id,
+        runId: run.id,
+        status: 'processing'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });

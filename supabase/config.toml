@@ -4,3 +4,6 @@ project_id = "ynfciltkzptrsmrjylkd"
 
 [functions.openai-scan]
 verify_jwt = true
+
+[functions.get-thread-results]
+verify_jwt = true
