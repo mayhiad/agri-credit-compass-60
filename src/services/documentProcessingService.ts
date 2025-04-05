@@ -31,6 +31,8 @@ export const processDocumentWithOpenAI = async (file: File, user: any): Promise<
           'Authorization': `Bearer ${session.access_token}`,
         },
         body: formData,
+        // Növeljük a timeout-ot, mert az OpenAI feldolgozás lassú lehet
+        signal: AbortSignal.timeout(90000), // 90 másodperc timeout
       }
     );
     

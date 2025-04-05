@@ -5,6 +5,7 @@ import { corsHeaders } from "./cors.ts";
 import { processDocumentWithOpenAI } from "./processDocument.ts";
 
 serve(async (req) => {
+  // CORS kezelése
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
@@ -55,10 +56,26 @@ serve(async (req) => {
     
   } catch (error) {
     console.error("🔥 Végső hibakezelés:", error);
+    
+    // Részletesebb hibaválasz küldése a frontendnek
+    let errorMessage = "Ismeretlen hiba történt";
+    let errorDetails = "";
+    let errorStack = "";
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      errorDetails = error.toString();
+      errorStack = error.stack || "";
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    } else if (error && typeof error === 'object') {
+      errorMessage = JSON.stringify(error);
+    }
+    
     return new Response(JSON.stringify({ 
-      error: error.message, 
-      details: error.toString(),
-      stack: error.stack
+      error: errorMessage, 
+      details: errorDetails,
+      stack: errorStack
     }), { 
       status: 500, 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
