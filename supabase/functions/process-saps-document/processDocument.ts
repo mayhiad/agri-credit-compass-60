@@ -1,5 +1,4 @@
 
-
 import { openai, supabase, getErrorDetails } from "./openaiClient.ts";
 import { API_TIMEOUT } from "./fetchUtils.ts";
 
@@ -206,4 +205,3 @@ async function startRun(threadId: string, assistantId: string) {
   
   return run;
 }
-
