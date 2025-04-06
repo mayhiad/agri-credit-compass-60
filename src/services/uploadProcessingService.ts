@@ -51,10 +51,16 @@ export const processSapsDocument = async (
   });
   
   // Dokumentum feldolgozása OpenAI-val
-  const processResult = await processDocumentWithOpenAI(file, user);
-  
-  if (!processResult) {
-    throw new Error("Hiba történt a dokumentum feldolgozása során");
+  let processResult;
+  try {
+    processResult = await processDocumentWithOpenAI(file, user);
+    
+    if (!processResult) {
+      throw new Error("Hiba történt a dokumentum feldolgozása során");
+    }
+  } catch (error) {
+    console.error("OpenAI feldolgozási hiba:", error);
+    throw new Error(`Az AI feldolgozás sikertelen volt: ${error.message || "Ismeretlen hiba"}`);
   }
   
   const { threadId, runId } = processResult;
@@ -68,57 +74,82 @@ export const processSapsDocument = async (
   let isComplete = false;
   let farmData: FarmData | null = null;
   let attempts = 0;
-  const maxAttempts = 30;
+  const maxAttempts = 45; // Növeljük a próbálkozások számát
+  const waitTimeMs = 5000; // 5 másodperc várakozás próbálkozások között
   
+  // Várjunk az eredményre
   while (!isComplete && attempts < maxAttempts) {
     attempts++;
     
-    await new Promise(resolve => setTimeout(resolve, 6000));
+    await new Promise(resolve => setTimeout(resolve, waitTimeMs));
     
     try {
       const resultData = await checkProcessingResults(threadId, runId);
       
-      let progress = 50 + Math.min(40, attempts * 2);
+      let progress = 50 + Math.min(40, Math.floor((attempts / maxAttempts) * 40));
       updateStatus({
         step: resultData.status === 'completed' ? "Dokumentum elemzése befejezve" : "AI feldolgozás folyamatban",
         progress: progress,
-        details: `Feldolgozás: ${resultData.status || 'folyamatban'} (${attempts}. ellenőrzés)`
+        details: `Feldolgozás: ${resultData.status || 'folyamatban'} (${attempts}/${maxAttempts}. ellenőrzés)`
       });
       
       if (resultData.completed && resultData.data) {
         isComplete = true;
         farmData = resultData.data;
+        
+        // Validáljuk az adatokat és győződjünk meg róla, hogy nem nulla értékek
+        if (!farmData.hectares || farmData.hectares <= 0 || 
+            !farmData.cultures || farmData.cultures.length === 0 ||
+            !farmData.totalRevenue || farmData.totalRevenue <= 0) {
+          
+          console.warn("Az AI által feldolgozott adatok hiányosak vagy nullák:", farmData);
+          
+          // Jelezzük a felhasználónak, hogy hiányos adatok vannak
+          updateStatus({
+            step: "Hiányos adatok",
+            progress: 70,
+            details: "Az AI által kinyert adatok hiányosak. Újbóli feldolgozás..."
+          });
+          
+          // Újra próbáljuk a feldolgozást, ha még van hátralévő próbálkozás
+          if (attempts < maxAttempts - 5) {
+            isComplete = false;
+            farmData = null;
+            continue;
+          }
+          
+          throw new Error("A dokumentumból nem sikerült érvényes adatokat kinyerni. Kérjük, ellenőrizze a feltöltött dokumentumot.");
+        }
+        
         break;
       }
     } catch (checkError) {
       console.error(`Eredmény ellenőrzési hiba (${attempts}. kísérlet):`, checkError);
+      
+      // Ha elértük a maximális próbálkozások számát, dobjunk hibát
+      if (attempts >= maxAttempts) {
+        throw new Error("Nem sikerült feldolgozni a dokumentumot a megadott időn belül. Kérjük, próbálja újra később.");
+      }
     }
   }
   
+  // Ha nem sikerült feldolgozni az AI-val, dobjunk hibát
   if (!isComplete || !farmData) {
-    // Ha nem sikerült feldolgozni az AI-val, használjunk minta adatokat
-    console.log("AI feldolgozás sikertelen, minta adatok használata helyette");
-    farmData = generateFallbackFarmData(user.email || user.id, file.name, file.size);
-    
-    updateStatus({
-      step: "Alapértelmezett adatok feldolgozása",
-      progress: 100,
-      details: `${farmData.blockIds?.length || 0} blokkazonosító, ${farmData.cultures.length} növénykultúra feldolgozva (minta adatok)`
-    });
-  } else {
-    // Add file metadata
-    farmData.fileName = file.name;
-    farmData.fileSize = file.size;
-    
-    // További validáció és hiányzó mezők pótlása
-    farmData = validateAndFixFarmData(farmData);
-    
-    updateStatus({
-      step: "Adatok feldolgozása",
-      progress: 90,
-      details: `${farmData.blockIds?.length || 0} blokkazonosító, ${farmData.cultures?.length || 0} növénykultúra feldolgozva`
-    });
+    throw new Error("A dokumentum feldolgozása sikertelen volt. Kérjük, ellenőrizze a dokumentum formátumát és tartalmát.");
   }
+  
+  // Add file metadata
+  farmData.fileName = file.name;
+  farmData.fileSize = file.size;
+  
+  // További validáció és hiányzó mezők pótlása
+  farmData = validateAndFixFarmData(farmData);
+  
+  updateStatus({
+    step: "Adatok feldolgozása",
+    progress: 90,
+    details: `${farmData.blockIds?.length || 0} blokkazonosító, ${farmData.cultures?.length || 0} növénykultúra feldolgozva`
+  });
   
   return farmData;
 };

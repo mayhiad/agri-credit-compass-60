@@ -1,8 +1,9 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Upload, FileText, BarChart3 } from "lucide-react";
+import { Upload, FileText, BarChart3, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const EmptyHistoricalState = () => {
   const navigate = useNavigate();
@@ -21,6 +22,14 @@ const EmptyHistoricalState = () => {
       </div>
       
       <p className="mb-4">Töltsön fel SAPS dokumentumokat a korábbi évekből a történeti adatok megjelenítéséhez.</p>
+      
+      <Alert className="mb-6 bg-amber-50 border-amber-200">
+        <AlertTriangle className="h-4 w-4 text-amber-600" />
+        <AlertDescription className="text-amber-800">
+          A rendszer csak a megfelelő formátumú és tartalmú SAPS dokumentumokból tud adatokat kinyerni. 
+          Kérjük, ellenőrizze, hogy a feltöltött dokumentum tartalmaz-e növénykultúra és területadatokat.
+        </AlertDescription>
+      </Alert>
       
       <div className="grid gap-4 md:grid-cols-2 max-w-lg mx-auto mb-6">
         <div className="bg-amber-50 p-4 rounded-lg text-left">

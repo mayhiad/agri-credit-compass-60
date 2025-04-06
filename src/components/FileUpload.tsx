@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, ArrowRight } from "lucide-react";
+import { Clock, ArrowRight, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { FarmData } from "@/components/LoanApplication";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -60,7 +60,20 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
     
     try {
       // Feldolgozzuk a dokumentumot
+      setProcessingStatus({
+        step: "Dokumentum AI elemzése",
+        progress: 10,
+        details: "A feltöltött dokumentum AI elemzése folyamatban..."
+      });
+      
       const farmData = await processSapsDocument(file, user, setProcessingStatus);
+      
+      // Ellenőrizzük, hogy az adatok érvényesek-e
+      if (!farmData.cultures || farmData.cultures.length === 0 || 
+          !farmData.hectares || farmData.hectares <= 0 ||
+          !farmData.totalRevenue || farmData.totalRevenue <= 0) {
+        throw new Error("A dokumentumból nem sikerült érvényes mezőgazdasági adatokat kinyerni. Kérjük, ellenőrizze, hogy a feltöltött dokumentum tartalmaz-e növénykultúra és területadatokat.");
+      }
       
       // Mentsük el az adatbázisba a feldolgozott adatokat
       setProcessingStatus({
@@ -83,7 +96,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       setProcessingStatus({
         step: "Feldolgozás befejezve",
         progress: 100,
-        details: "Az adatok sikeresen feldolgozásra és mentésre kerültek"
+        details: `${farmData.cultures.length} növénykultúra, ${farmData.hectares} hektár és ${farmData.totalRevenue} Ft árbevétel sikeresen feldolgozva és mentve.`
       });
       
       onComplete(farmData);
@@ -116,6 +129,13 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
               A teljes folyamat mindössze <span className="font-bold">10 percet</span> vesz igénybe, és a szerződéskötéstől számított <span className="font-bold">48 órán belül</span> folyósítunk!
             </AlertDescription>
           </div>
+        </Alert>
+
+        <Alert className="mb-4 bg-amber-50 border-amber-200">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800">
+            A dokumentumnak tartalmaznia kell a növénykultúrák neveit és területadatait (hektár), ezek nélkül a feldolgozás sikertelen lehet.
+          </AlertDescription>
         </Alert>
 
         <div className="space-y-4">

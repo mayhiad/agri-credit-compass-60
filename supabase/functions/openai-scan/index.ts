@@ -84,13 +84,26 @@ serve(async (req) => {
       console.log(`📤 Creating message with instructions (without file attachment)`);
       
       const messageContent = `
-Elemezd ezt a SAPS dokumentumot és nyerd ki belőle az összes mezőgazdasági információt. 
+NAGYON FONTOS! OLVASD EL ALAPOSAN ÉS KÖVESD PONTOSAN AZ UTASÍTÁSOKAT!
 
-FONTOS! A FELDOLGOZÁS CÉLJA EGY HITELIGÉNYLÉSHEZ SZÜKSÉGES ADATOK KINYERÉSE:
-1. A területadatok (hektár) pontos kinyerése növénykultúránként
-2. A növénykultúrák helyes azonosítása (pl. kukorica, búza, napraforgó stb.)
-3. Egy teljes árbevétel kalkuláció, ami a terület × hozam × piaci ár értékekből adódik
-4. Az összesített területméret és árbevétel adatok számítása
+Elemezd ezt a SAPS dokumentumot és nyerd ki belőle a mezőgazdasági információkat.
+
+A FELADAT: A feltöltött SAPS dokumentumból ki kell nyerned a következő információkat:
+1. A gazdálkodó neve
+2. A dokumentum azonosítója
+3. A régió (megye) neve
+4. Az összes növénykultúra neve és területe hektárban
+5. Minden kultúrához reális termésátlag (t/ha) értéket és piaci árat (Ft/t) kell rendelned
+
+KÖVETELMÉNYEK:
+1. MINDEN SZÁMSZERŰ ÉRTÉKNEK NAGYOBBNAK KELL LENNIE NULLÁNÁL - ez különösen fontos a hektár, termésátlag és ár adatoknál!
+2. Ha a dokumentumból nem tudod kiolvasni a pontos hektárszámot egy kultúrához, akkor NE HASZNÁLJ KITALÁLT ADATOT, hanem hagyj ki azt a kultúrát.
+3. A termésátlag (yieldPerHectare) értékeknek reális magyar értékeknek kell lenniük (pl. búza: 5-6 t/ha, kukorica: 7-9 t/ha)
+4. A piaci áraknak (pricePerTon) aktuális magyarországi áraknak kell lenniük (pl. búza: ~80-90ezer Ft/t, kukorica: ~70-75ezer Ft/t)
+5. Az árbevétel számítása: hektár × termésátlag × ár képlettel történik minden kultúrára
+6. A teljes árbevétel az összes kultúra árbevételének összege
+7. TILTOTT A RANDOM ADATOK GENERÁLÁSA! Csak valós, a dokumentumból kiolvasott vagy ahhoz kapcsolódó reális adatokat használj!
+8. Ha nem tudod kiolvasni az adatokat, akkor inkább hagyj üres adatstruktúrát, de NE adj meg kitalált értékeket!
 
 Az adatokat a következő JSON formátumban add vissza:
 {
@@ -119,17 +132,11 @@ Az adatokat a következő JSON formátumban add vissza:
   "totalRevenue": 63291975
 }
 
-FONTOS INSTRUKCIÓK:
-1. Minden kultúrához adj meg valós termésátlagot (tonna/hektár) és piaci árat (Ft/tonna).
-2. A termésátlag (yieldPerHectare) tonna/hektár értékben, reális értékekkel (búza: 5-6 t/ha, kukorica: 7-9 t/ha, napraforgó: 2,5-3,5 t/ha).
-3. A piaci árak (pricePerTon) Ft/tonna értékben legyenek aktuális magyarországi árak (búza: ~80-90ezer Ft/t, kukorica: ~70-75ezer Ft/t, napraforgó: ~160-180ezer Ft/t)
-4. A becsült bevételt (estimatedRevenue) számold ki: terület × termésátlag × ár képlettel.
-5. A teljes bevételt (totalRevenue) számold ki az összes kultúra becsült bevételének összegeként.
-6. Minden esetben számszerű értékekkel dolgozz - a mezőkben sehol se szerepeljen null vagy ismeretlen érték.
-7. Ha egyes értékek hiányoznak a dokumentumból, akkor becsüld meg azokat a piaci átlagok alapján.
-8. Az "year" mezőbe írj egy konkrét évszámot (ne használj "nem található" vagy hasonló kifejezést).
+FIGYELEM! Ne generálj véletlenszerű adatokat! Ha nem találod az információt a dokumentumban, akkor inkább használj üres listát vagy nullát, de ne találj ki adatokat!
 
-MINDENKÉPPEN ADD MEG A FENTI FORMÁTUMÚ, MINDEN ÉRTÉKET TARTALMAZÓ OBJEKTUMOT!`;
+FELDOLGOZÁSI ELŐFELTÉTEL: A dokumentumnak tartalmaznia kell legalább egy növénykultúrát és területadatot, különben nem feldolgozható.
+
+HA NEM TUDOD KINYERNI A SZÜKSÉGES ADATOKAT, AZT JELEZD EGYÉRTELMŰEN, de adj vissza egy üres adatstruktúrát a megadott formátumban.`;
       
       // Create message without file attachment
       const message = await openai.beta.threads.messages.create(thread.id, {
