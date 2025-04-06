@@ -1,10 +1,9 @@
-
 import { FarmData } from "@/components/LoanApplication";
 
 /**
  * Generate fallback data when document processing fails
  */
-export const generateFallbackFarmData = (userId: string, fileName: string = 'dokumentum.pdf', fileSize: number = 1024 * 1024): FarmData => {
+export const generateFallbackFarmData = (userId: string, fileName?: string, fileSize?: number): FarmData => {
   // Get the current year
   const currentYear = new Date().getFullYear();
   
@@ -51,25 +50,25 @@ export const generateFallbackFarmData = (userId: string, fileName: string = 'dok
     fileSize: fileSize,
     marketPrices: [
       {
-        culture: "Őszi búza",
-        averageYield: 5.5,
+        culture: "Búza",
+        averageYield: 7.2,
         price: 76000,
-        trend: 1,
-        lastUpdated: new Date().toISOString()
+        trend: 3,
+        lastUpdated: new Date() // Use an actual Date object instead of a string
       },
       {
         culture: "Kukorica",
-        averageYield: 8.0,
-        price: 72000,
-        trend: 0,
-        lastUpdated: new Date().toISOString()
+        averageYield: 8.5,
+        price: 68000,
+        trend: -2,
+        lastUpdated: new Date() // Use an actual Date object instead of a string
       },
       {
         culture: "Napraforgó",
-        averageYield: 3.1,
-        price: 170000,
-        trend: 1,
-        lastUpdated: new Date().toISOString()
+        averageYield: 3.2,
+        price: 180000,
+        trend: 5,
+        lastUpdated: new Date() // Use an actual Date object instead of a string
       }
     ],
     parcels: [

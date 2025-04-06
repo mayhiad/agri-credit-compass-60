@@ -315,13 +315,3 @@ const processWithOpenAI = async (
   
   return farmData;
 };
-
-/**
- * Extracts farm data from OCR text
- * @param ocrText - The OCR text to extract data from
- * @returns An object containing extracted farm data
- */
-const extractFarmDataFromOcrText = (ocrText: string): any => {
-  // Implement OCR text parsing logic here
-  return {};
-};

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,12 @@ import { useToast } from "@/components/ui/use-toast";
 import { useSearchParams } from "react-router-dom";
 import { ParcelData } from "@/services/sapsProcessor";
 import { HistoricalCropData } from "@/components/farm/HistoricalCrops";
+
+export interface Culture {
+  name: string;
+  hectares: number;
+  estimatedRevenue: number;
+}
 
 export interface MarketPrice {
   culture: string;

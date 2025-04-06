@@ -34,11 +34,20 @@ export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string)
     
     // 2. Save the farm details (including market prices)
     if (farmData.marketPrices && farmData.marketPrices.length > 0) {
+      // Convert MarketPrice objects to format compatible with JSON storage
+      const marketPricesForJson = farmData.marketPrices.map(price => ({
+        culture: price.culture,
+        averageYield: price.averageYield,
+        price: price.price,
+        trend: price.trend,
+        lastUpdated: price.lastUpdated instanceof Date ? price.lastUpdated.toISOString() : price.lastUpdated
+      }));
+
       const { error: detailsError } = await supabase
         .from('farm_details')
         .insert({
           farm_id: farmId,
-          market_prices: farmData.marketPrices,
+          market_prices: marketPricesForJson,
           crop_type: farmData.year ? `${farmData.year} évi termés` : 'Jelenlegi termés'
         });
       
