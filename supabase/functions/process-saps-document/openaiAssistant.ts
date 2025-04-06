@@ -81,6 +81,14 @@ Csak a gazdálkodó nevét add vissza JSON formátumban:
 // Fájl hozzáadása a thread-hez és futtatás indítása
 export async function startRun(threadId, assistantId, fileId) {
   console.log(`🏃 Feldolgozás indítása - Thread ID: ${threadId}, Asszisztens ID: ${assistantId}, Fájl ID: ${fileId}`);
+  
+  // Ellenőrizzük a file ID formátumát
+  if (!fileId.startsWith('file-')) {
+    console.warn(`⚠️ FIGYELEM: A fileId (${fileId}) nem a várt "file-" formátumban van. Ez problémát okozhat a feldolgozás során.`);
+  } else {
+    console.log(`✓ File ID formátum megfelelő: ${fileId}`);
+  }
+  
   const runStart = Date.now();
   
   try {
@@ -91,7 +99,7 @@ export async function startRun(threadId, assistantId, fileId) {
       content: "Kérlek, olvasd ki a gazdálkodó nevét a dokumentumból!",
       file_ids: [fileId]
     });
-    console.log(`✅ Üzenet létrehozva fájllal: ${messageWithFile.id}`);
+    console.log(`✅ Üzenet létrehozva fájllal: ${messageWithFile.id}, Fájl ID-k: ${JSON.stringify(messageWithFile.file_ids)}`);
     
     // Indítsuk el a futtatást, de ne adjunk meg külön file_ids-t itt
     console.log(`🚀 Futtatás indítása a threaden (${threadId}) az asszisztenssel (${assistantId})...`);

@@ -43,7 +43,11 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
     console.log(`✅ Üzenet sikeresen hozzáadva a threadhez`);
     
     // Futtatás indítása a fájl hozzáadásával
-    console.log(`🚀 Futtatás előkészítése a következő adatokkal: Thread ID: ${thread.id}, Assistant ID: ${assistant.id}, File ID: ${file.id}`);
+    console.log(`🚀 Futtatás előkészítése a következő adatokkal:`);
+    console.log(`    - Thread ID: ${thread.id}`);
+    console.log(`    - Assistant ID: ${assistant.id}`);
+    console.log(`    - File ID: ${file.id} (formátum ellenőrzése: ${file.id.startsWith('file-') ? 'helyes' : 'nem megfelelő!'})`);
+    
     const run = await startRun(thread.id, assistant.id, file.id);
     console.log(`✅ Futtatás sikeresen elindítva. Run ID: ${run.id}, Státusz: ${run.status}`);
 

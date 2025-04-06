@@ -15,6 +15,13 @@ export async function uploadFileToOpenAI(fileBuffer: ArrayBuffer, fileName: stri
     const fileUploadTime = Date.now() - fileUploadStart;
     console.log(`✅ Fájl sikeresen feltöltve (${fileUploadTime}ms). File ID: ${file.id}, Név: ${file.filename}, Méret: ${file.bytes} bájt, Célja: ${file.purpose}`);
     
+    // Ellenőrizzük a fájl ID formátumát
+    if (!file.id.startsWith('file-')) {
+      console.warn(`⚠️ Váratlan fájl ID formátum: ${file.id}. Az OpenAI általában "file-" előtaggal kezdődő ID-kat használ.`);
+    } else {
+      console.log(`✓ Helyes fájl ID formátum: ${file.id}`);
+    }
+    
     return file;
   } catch (error) {
     console.error("❌ Hiba a fájl feltöltése során:", JSON.stringify({
