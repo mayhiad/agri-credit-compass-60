@@ -1,4 +1,3 @@
-
 import { supabase, getErrorDetails } from "./openaiClient.ts";
 
 // Egyszerű PDF és Excel dokumentum szöveg kinyerése
@@ -48,6 +47,25 @@ export async function extractTextFromDocument(fileBuffer: ArrayBuffer, fileName:
       extractedText = `Ismeretlen dokumentum formátum: ${fileExtension}. 
       Kérlek próbáld meg PDF vagy Excel formátumban feltölteni a dokumentumot.`;
     }
+    
+    // RÉSZLETES NAPLÓZÁS
+    console.log(`🔍 TELJES KINYERT SZÖVEG (${extractedText.length} karakter):`);
+    console.log('---START OF DOCUMENT TEXT---');
+    console.log(extractedText);
+    console.log('---END OF DOCUMENT TEXT---');
+    
+    // Kinyert szöveg első és utolsó 500 karakterének részletezése
+    console.log(`📝 Szöveg első 500 karaktere:\n${extractedText.substring(0, 500)}`);
+    console.log(`📝 Szöveg utolsó 500 karaktere:\n${extractedText.substring(extractedText.length - 500)}`);
+    
+    // Sorok és bekezdések statisztikái
+    const lines = extractedText.split('\n');
+    console.log(`📊 Dokumentum statisztikák:`);
+    console.log(`   - Sorok száma: ${lines.length}`);
+    console.log(`   - Első 5 sor:`);
+    lines.slice(0, 5).forEach((line, index) => {
+      console.log(`     ${index + 1}. sor: ${line}`);
+    });
     
     // Ellenőrizzük a kinyert szöveg méretét
     console.log(`📏 Kinyert szöveg hossza: ${extractedText.length} karakter`);
