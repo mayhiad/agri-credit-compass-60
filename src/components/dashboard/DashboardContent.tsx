@@ -1,11 +1,12 @@
 
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutDashboard, Map, Tractor, Upload } from "lucide-react";
+import { LayoutDashboard, Map, Tractor, Upload, History } from "lucide-react";
 import { FarmData } from "@/components/LoanApplication";
 import DashboardOverview from "./DashboardOverview";
 import DashboardCrops from "./DashboardCrops";
 import DashboardMap from "./DashboardMap";
+import DashboardHistorical from "./DashboardHistorical";
 import FileUpload from "@/components/FileUpload";
 import { toast } from "sonner";
 
@@ -33,6 +34,10 @@ const DashboardContent = ({ farmData, onFarmDataUpdate }: DashboardContentProps)
           <Tractor className="h-4 w-4 mr-2" />
           Növénykultúrák
         </TabsTrigger>
+        <TabsTrigger value="historical">
+          <History className="h-4 w-4 mr-2" />
+          Történeti adatok
+        </TabsTrigger>
         <TabsTrigger value="map">
           <Map className="h-4 w-4 mr-2" />
           Földterületek
@@ -49,6 +54,10 @@ const DashboardContent = ({ farmData, onFarmDataUpdate }: DashboardContentProps)
       
       <TabsContent value="crops">
         <DashboardCrops farmData={farmData} />
+      </TabsContent>
+      
+      <TabsContent value="historical">
+        <DashboardHistorical farmData={farmData} />
       </TabsContent>
       
       <TabsContent value="map">

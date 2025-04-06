@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +12,7 @@ import { LoanComplete } from "@/components/LoanComplete";
 import { useToast } from "@/components/ui/use-toast";
 import { useSearchParams } from "react-router-dom";
 import { ParcelData } from "@/services/sapsProcessor";
+import { HistoricalCropData } from "@/components/farm/HistoricalCrops";
 
 export interface MarketPrice {
   culture: string;
@@ -33,7 +33,10 @@ export type FarmData = {
   blockIds?: string[];
   parcels?: ParcelData[];
   marketPrices?: MarketPrice[];
-  year?: string; // Új mező az évszám tárolására
+  year?: string; // Év mező az évszám tárolására
+  // Történeti adatok
+  historicalCrops?: HistoricalCropData[]; // Történeti növénytermesztési adatok
+  documentDate?: string; // Dokumentum dátuma
 };
 
 export type UserData = {
