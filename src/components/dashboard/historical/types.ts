@@ -8,6 +8,8 @@ export interface HistoricalFarmData {
     name: string;
     hectares: number;
     revenue: number;
+    pricePerTon?: number;
+    yieldPerHectare?: number;
   }[];
 }
 
@@ -19,6 +21,8 @@ export interface ExtractionData {
     name: string;
     hectares: number;
     estimatedRevenue: number;
+    yieldPerHectare?: number;
+    pricePerTon?: number;
   }>;
   region?: string;
   documentId?: string;
@@ -32,4 +36,14 @@ export interface ExtractionData {
     lastUpdated?: string;
   }>;
   processedAt?: string;
+}
+
+// Új interfész a piaci árakhoz
+export interface MarketPrice {
+  culture: string;
+  averageYield: number; // t/ha
+  price: number; // Ft/t
+  trend: number; // -1: csökkenő, 0: stabil, 1: növekvő
+  lastUpdated?: string;
+  year?: string;
 }
