@@ -29,7 +29,7 @@ export const processDocumentWithOpenAI = async (file: File, user: any): Promise<
           'Authorization': `Bearer ${session.access_token}`,
         },
         body: formData,
-        signal: AbortSignal.timeout(90000),
+        signal: AbortSignal.timeout(180000), // 3 perc időtúllépés
       }
     );
     
@@ -84,7 +84,8 @@ export const checkProcessingResults = async (threadId: string, runId: string): P
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ threadId, runId })
+        body: JSON.stringify({ threadId, runId }),
+        signal: AbortSignal.timeout(30000) // 30 másodperces időtúllépés az ellenőrzéshez
       }
     );
     

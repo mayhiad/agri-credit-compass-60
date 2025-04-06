@@ -25,7 +25,15 @@ export const ProcessingStatus = ({ status }: ProcessingStatusProps) => {
         />
       </div>
       {status.details && (
-        <p className="text-xs text-muted-foreground mt-2">{status.details}</p>
+        <p className="text-xs text-muted-foreground mt-2">
+          {status.details}
+          {status.progress > 40 && status.progress < 90 && 
+            <span className="block text-amber-600 mt-1">
+              A feldolgozás időtartama a dokumentum méretétől függően akár 3-5 perc is lehet.
+              Kérjük, ne zárja be az ablakot és ne töltse újra az oldalt a feldolgozás alatt!
+            </span>
+          }
+        </p>
       )}
     </div>
   );

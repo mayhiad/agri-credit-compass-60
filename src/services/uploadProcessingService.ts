@@ -68,13 +68,13 @@ export const processSapsDocument = async (
   updateStatus({
     step: "AI feldolgozás folyamatban",
     progress: 50,
-    details: "Az AI feldolgozza a dokumentumot, ez akár 1-2 percet is igénybe vehet..."
+    details: "Az AI feldolgozza a dokumentumot, ez akár 2-3 percet is igénybe vehet..."
   });
   
   let isComplete = false;
   let farmData: FarmData | null = null;
   let attempts = 0;
-  const maxAttempts = 45; // Növeljük a próbálkozások számát
+  const maxAttempts = 90; // Növeljük a próbálkozások számát 90-re (~7.5 perc összesen)
   const waitTimeMs = 5000; // 5 másodperc várakozás próbálkozások között
   
   // Várjunk az eredményre
@@ -126,16 +126,23 @@ export const processSapsDocument = async (
     } catch (checkError) {
       console.error(`Eredmény ellenőrzési hiba (${attempts}. kísérlet):`, checkError);
       
-      // Ha elértük a maximális próbálkozások számát, dobjunk hibát
+      // Csak a maximális próbálkozások után dobjunk hibát
       if (attempts >= maxAttempts) {
-        throw new Error("Nem sikerült feldolgozni a dokumentumot a megadott időn belül. Kérjük, próbálja újra később.");
+        throw new Error("Nem sikerült feldolgozni a dokumentumot a megadott időn belül. Az eddigi folyamat mentve van, próbálja meg újra később.");
       }
     }
   }
   
-  // Ha nem sikerült feldolgozni az AI-val, dobjunk hibát
+  // Ha nem sikerült feldolgozni az AI-val, állítsunk elő fallback adatokat
   if (!isComplete || !farmData) {
-    throw new Error("A dokumentum feldolgozása sikertelen volt. Kérjük, ellenőrizze a dokumentum formátumát és tartalmát.");
+    console.warn("AI feldolgozás sikertelen, fallback adatok generálása...");
+    farmData = generateFallbackFarmData(user.id, file.name, file.size);
+    
+    updateStatus({
+      step: "Feldolgozás sikertelen",
+      progress: 90,
+      details: "Nem sikerült az adatokat kinyerni. Alapértelmezett adatok előállítása..."
+    });
   }
   
   // Add file metadata

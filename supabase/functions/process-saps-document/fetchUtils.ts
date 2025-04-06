@@ -1,6 +1,6 @@
 
-// API kérési timeout ms-ben (90 másodperc)
-export const API_TIMEOUT = 90000;
+// API kérési timeout ms-ben (3 perc)
+export const API_TIMEOUT = 180000;
 
 // Timeout-os fetch implementáció
 export async function fetchWithTimeout(url: string, options: RequestInit, timeout: number = API_TIMEOUT) {
