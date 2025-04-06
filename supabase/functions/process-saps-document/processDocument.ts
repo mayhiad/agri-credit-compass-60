@@ -1,12 +1,11 @@
 
 import { getErrorDetails } from "./openaiClient.ts";
 import { API_TIMEOUT } from "./fetchUtils.ts";
-import { uploadFileToOpenAI, saveDocumentToStorage } from "./fileUtils.ts";
+import { saveDocumentToStorage, extractTextFromDocument } from "./fileUtils.ts";
 import { 
   createAssistant, 
   createThread, 
-  addMessageToThread, 
-  startRun 
+  processDocumentText 
 } from "./openaiAssistant.ts";
 
 // Dokumentum feldolgozása OpenAI segítségével
@@ -22,10 +21,15 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
     const storagePath = await saveDocumentToStorage(fileBuffer, fileName, userId);
     console.log(`✅ Dokumentum mentése a tárolóba ${storagePath ? 'sikeres' : 'sikertelen'}`);
     
-    // Fájl feltöltése OpenAI-ba
-    console.log(`☁️ Fájl feltöltése OpenAI-ba kezdése...`);
-    const file = await uploadFileToOpenAI(fileBuffer, fileName);
-    console.log(`✅ Fájl sikeresen feltöltve OpenAI-ba. File ID: ${file.id}, Név: ${file.filename}, Méret: ${file.bytes} bájt`);
+    // Szöveg kinyerése a dokumentumból
+    console.log(`📄 Szöveg kinyerése a dokumentumból...`);
+    const documentText = await extractTextFromDocument(fileBuffer, fileName);
+    console.log(`✅ Szöveg kinyerése sikeres. Szöveg hossza: ${documentText.length} karakter`);
+    
+    // Ha túl rövid a szöveg, jelezzük, hogy lehet, hogy nem sikerült megfelelően kinyerni
+    if (documentText.length < 100) {
+      console.warn(`⚠️ A dokumentumból kinyert szöveg nagyon rövid (${documentText.length} karakter), lehet, hogy nem sikerült megfelelően feldolgozni.`);
+    }
     
     // Asszisztens létrehozása
     console.log(`🤖 Asszisztens létrehozásának kezdése...`);
@@ -37,24 +41,18 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
     const thread = await createThread();
     console.log(`✅ Thread sikeresen létrehozva. Thread ID: ${thread.id}`);
     
-    // Üzenet hozzáadása a threadhez (csak szöveges utasítással, fájl nélkül)
-    console.log(`📩 Alap üzenet hozzáadása a thread-hez...`);
-    await addMessageToThread(thread.id);
-    console.log(`✅ Üzenet sikeresen hozzáadva a threadhez`);
-    
-    // Futtatás indítása a fájl hozzáadásával
-    console.log(`🚀 Futtatás előkészítése a következő adatokkal:`);
+    // Szöveg feldolgozása az OpenAI-val
+    console.log(`🚀 Dokumentum szöveg feldolgozásának előkészítése a következő adatokkal:`);
     console.log(`    - Thread ID: ${thread.id}`);
     console.log(`    - Assistant ID: ${assistant.id}`);
-    console.log(`    - File ID: ${file.id} (formátum ellenőrzése: ${file.id.startsWith('file-') ? 'helyes' : 'nem megfelelő!'})`);
+    console.log(`    - Dokumentum szöveg hossza: ${documentText.length} karakter`);
     
-    const run = await startRun(thread.id, assistant.id, file.id);
-    console.log(`✅ Futtatás sikeresen elindítva. Run ID: ${run.id}, Státusz: ${run.status}`);
+    const run = await processDocumentText(thread.id, assistant.id, documentText);
+    console.log(`✅ Feldolgozás sikeresen elindítva. Run ID: ${run.id}, Státusz: ${run.status}`);
 
     return {
       threadId: thread.id,
       runId: run.id,
-      fileId: file.id,
       assistantId: assistant.id
     };
 

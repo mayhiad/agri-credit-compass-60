@@ -1,36 +1,70 @@
 
-import { openai, supabase, getErrorDetails } from "./openaiClient.ts";
+import { supabase, getErrorDetails } from "./openaiClient.ts";
 
-// Fájl feltöltése OpenAI-ba
-export async function uploadFileToOpenAI(fileBuffer: ArrayBuffer, fileName: string) {
-  console.log(`📤 Fájl feltöltése az OpenAI-ba kezdése: ${fileName}, méret: ${fileBuffer.byteLength} bájt`);
-  const fileUploadStart = Date.now();
+// Egyszerű PDF és Excel dokumentum szöveg kinyerése
+export async function extractTextFromDocument(fileBuffer: ArrayBuffer, fileName: string): Promise<string> {
+  console.log(`📄 Szöveg kinyerése kezdése: ${fileName}`);
+  const extractStart = Date.now();
   
   try {
-    const file = await openai.files.create({
-      file: new File([fileBuffer], fileName, { type: 'application/pdf' }),
-      purpose: "assistants"
-    });
+    // Alap szöveget próbálunk kinyerni a dokumentumból
+    // PDF esetén csak egyszerűen byte formátumból konvertálunk karakterkódolással
+    let extractedText = "";
     
-    const fileUploadTime = Date.now() - fileUploadStart;
-    console.log(`✅ Fájl sikeresen feltöltve (${fileUploadTime}ms). File ID: ${file.id}, Név: ${file.filename}, Méret: ${file.bytes} bájt, Célja: ${file.purpose}`);
+    // Ellenőrizzük a fájl típusát a neve alapján
+    const fileExtension = fileName.split('.').pop()?.toLowerCase();
     
-    // Ellenőrizzük a fájl ID formátumát
-    if (!file.id.startsWith('file-')) {
-      console.warn(`⚠️ Váratlan fájl ID formátum: ${file.id}. Az OpenAI általában "file-" előtaggal kezdődő ID-kat használ.`);
+    if (fileExtension === 'pdf') {
+      console.log(`📑 PDF dokumentum feldolgozása...`);
+      
+      // Egyszerű PDF feldolgozás - ez csak nagyon alapszintű szöveget ad vissza
+      // Valós megoldásban itt használnánk egy komplexebb PDF parser-t
+      const decoder = new TextDecoder('utf-8');
+      try {
+        extractedText = decoder.decode(fileBuffer);
+      } catch (decodeError) {
+        console.error(`❌ Hiba a PDF dekódolása során: ${decodeError}`);
+        // Próbáljuk meg latin1 kódolással is, ami gyakran működik az európai nyelvekhez
+        try {
+          extractedText = new TextDecoder('latin1').decode(fileBuffer);
+        } catch (secondDecodeError) {
+          console.error(`❌ A másodlagos dekódolás is sikertelen: ${secondDecodeError}`);
+        }
+      }
+      
+      // Tisztítsuk meg a szöveget a bináris karakterektől
+      extractedText = extractedText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '');
+      extractedText = extractedText.replace(/[^\x20-\x7E\xA0-\xFF\u0100-\u017F\u0180-\u024F\u1E00-\u1EFF]/g, ' ');
+      
+    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+      console.log(`📊 Excel dokumentum feldolgozása...`);
+      
+      // Excel esetén csak egy egyszerű üzenetet küldünk vissza, hogy kezelje a modellje
+      extractedText = `Ez egy Excel formátumú SAPS dokumentum. Kérlek olvasd ki a gazdálkodó nevét belőle.
+      Az Excel dokumentumokból nem tudunk automatikusan szöveget kinyerni, kérlek jelezd, ha ez problémát okoz.`;
+      
     } else {
-      console.log(`✓ Helyes fájl ID formátum: ${file.id}`);
+      console.log(`❓ Ismeretlen dokumentum típus: ${fileExtension}`);
+      extractedText = `Ismeretlen dokumentum formátum: ${fileExtension}. 
+      Kérlek próbáld meg PDF vagy Excel formátumban feltölteni a dokumentumot.`;
     }
     
-    return file;
+    // Ellenőrizzük a kinyert szöveg méretét
+    console.log(`📏 Kinyert szöveg hossza: ${extractedText.length} karakter`);
+    
+    if (extractedText.length < 100) {
+      console.warn(`⚠️ A kinyert szöveg nagyon rövid (${extractedText.length} karakter), ez jelentheti, hogy nem sikerült megfelelően kinyerni a szöveget.`);
+    }
+    
+    const extractTime = Date.now() - extractStart;
+    console.log(`✅ Szöveg kinyerése befejezve (${extractTime}ms).`);
+    
+    return extractedText;
   } catch (error) {
-    console.error("❌ Hiba a fájl feltöltése során:", JSON.stringify({
-      status: error.status,
-      message: error.message,
-      type: error.type,
-      code: error.code
-    }, null, 2));
-    throw error;
+    console.error(`❌ Hiba a szöveg kinyerése során: ${getErrorDetails(error)}`);
+    
+    // Hiba esetén egy alapértelmezett szöveget adunk vissza
+    return `Nem sikerült kinyerni a szöveget a dokumentumból. Kérlek olvasd ki a gazdálkodó nevét.`;
   }
 }
 
