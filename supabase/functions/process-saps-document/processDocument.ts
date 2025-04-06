@@ -31,6 +31,10 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
       console.warn(`⚠️ A dokumentumból kinyert szöveg nagyon rövid (${documentText.length} karakter), lehet, hogy nem sikerült megfelelően feldolgozni.`);
     }
     
+    // Szöveg első 500 karakterének naplózása (csak a fejlesztés során)
+    const firstChars = documentText.substring(0, 500);
+    console.log(`📝 Szöveg kezdete (első 500 karakter): ${firstChars}...`);
+    
     // Asszisztens létrehozása
     console.log(`🤖 Asszisztens létrehozásának kezdése...`);
     const assistant = await createAssistant();

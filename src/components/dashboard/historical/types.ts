@@ -38,7 +38,7 @@ export interface ExtractionData {
   processedAt?: string;
   fileName?: string;
   fileSize?: number;
-  error?: string; // Error message if processing failed
+  errorMessage?: string; // Javítás: Hiba üzenetet tárol hibás feldolgozás esetén
 }
 
 export interface MarketPrice {

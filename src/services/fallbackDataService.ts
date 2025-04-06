@@ -29,7 +29,7 @@ export const generateFallbackFarmData = (
     year: currentYear,
     fileName,
     fileSize,
-    // Use proper error handling as defined in FarmData type
+    // Use proper error handling with errorMessage property
     errorMessage: "Document processing failed. Please check the uploaded file and try again."
   };
 };
@@ -73,8 +73,9 @@ export const validateAndFixFarmData = (farmData: FarmData): FarmData => {
     
     if (typeof fixedCulture.estimatedRevenue !== 'number' || isNaN(fixedCulture.estimatedRevenue)) {
       // Calculate revenue based on hectares, yield and price if available
-      const yieldValue = (fixedCulture as any).yieldPerHectare;
-      const priceValue = (fixedCulture as any).pricePerTon;
+      // Proper type casting és biztonságos elérés a yieldPerHectare és pricePerTon mezőkhöz
+      const yieldValue = fixedCulture.yieldPerHectare;
+      const priceValue = fixedCulture.pricePerTon;
       
       if (fixedCulture.hectares && yieldValue && priceValue) {
         fixedCulture.estimatedRevenue = fixedCulture.hectares * yieldValue * priceValue;

@@ -84,59 +84,62 @@ serve(async (req) => {
       console.log(`📤 Creating message with instructions (without file attachment)`);
       
       const messageContent = `
-NAGYON FONTOS! OLVASD EL ALAPOSAN ÉS KÖVESD PONTOSAN AZ UTASÍTÁSOKAT!
+KRITIKUSAN FONTOS! OLVASD EL FIGYELMESEN ÉS KÖVESD PONTOSAN AZ UTASÍTÁSOKAT!
 
-Elemezd ezt a SAPS dokumentumot és nyerd ki belőle a mezőgazdasági információkat.
+SAPS mezőgazdasági dokumentum feldolgozása: Feladatod a feltöltött dokumentumból automatikusan kinyerni és strukturálni a mezőgazdasági adatokat.
 
-A FELADAT: A feltöltött SAPS dokumentumból ki kell nyerned a következő információkat:
-1. A gazdálkodó neve
-2. A dokumentum azonosítója
-3. A régió (megye) neve
-4. Az összes növénykultúra neve és területe hektárban
-5. Minden kultúrához reális termésátlag (t/ha) értéket és piaci árat (Ft/t) kell rendelned
+ALAPVETŐ KÖVETELMÉNY:
+- Ne találj ki adatokat! Ha nem találod meg a dokumentumban, hagyd üresen vagy nullára állítva
+- Sose generálj véletlenszerű adatokat!
+- Ha nem tudsz kinyerni minden adatot, akkor is jelezd, hogy mely adatokat sikerült kinyerned
 
-KÖVETELMÉNYEK:
-1. MINDEN SZÁMSZERŰ ÉRTÉKNEK NAGYOBBNAK KELL LENNIE NULLÁNÁL - ez különösen fontos a hektár, termésátlag és ár adatoknál!
-2. Ha a dokumentumból nem tudod kiolvasni a pontos hektárszámot egy kultúrához, akkor NE HASZNÁLJ KITALÁLT ADATOT, hanem hagyj ki azt a kultúrát.
-3. A termésátlag (yieldPerHectare) értékeknek reális magyar értékeknek kell lenniük (pl. búza: 5-6 t/ha, kukorica: 7-9 t/ha)
-4. A piaci áraknak (pricePerTon) aktuális magyarországi áraknak kell lenniük (pl. búza: ~80-90ezer Ft/t, kukorica: ~70-75ezer Ft/t)
-5. Az árbevétel számítása: hektár × termésátlag × ár képlettel történik minden kultúrára
-6. A teljes árbevétel az összes kultúra árbevételének összege
-7. TILTOTT A RANDOM ADATOK GENERÁLÁSA! Csak valós, a dokumentumból kiolvasott vagy ahhoz kapcsolódó reális adatokat használj!
-8. Ha nem tudod kiolvasni az adatokat, akkor inkább hagyj üres adatstruktúrát, de NE adj meg kitalált értékeket!
+A következő adatokat kell kinyerned:
+1. Gazdálkodó neve (applicantName)
+2. Dokumentum azonosító (documentId): minden SAPS dokumentumnak van egyedi azonosítója
+3. Régió (region): Megye vagy település
+4. Év (year): Amely évre a dokumentum vonatkozik
+5. Összes földterület hektárban (hectares) - CSAK POZITÍV SZÁMOK LEHETNEK!
+6. Növénykultúrák adatai - CSAK POZITÍV SZÁMOK LEHETNEK!
+   - Kultúra neve (name): pl. búza, kukorica, napraforgó
+   - Területe hektárban (hectares): CSAK POZITÍV SZÁMOK LEHETNEK!
+   - Becsült termésátlag (yieldPerHectare): t/ha - CSAK POZITÍV SZÁMOK LEHETNEK!
+   - Becsült egységár (pricePerTon): Ft/t - CSAK POZITÍV SZÁMOK LEHETNEK!
+   - Becsült bevétel (estimatedRevenue): hectares × yieldPerHectare × pricePerTon
+7. Blokkazonosítók (blockIds): a dokumentumban található egyedi azonosítók
 
-Az adatokat a következő JSON formátumban add vissza:
+Várható JSON formátum:
 {
-  "applicantName": "A gazdálkodó neve",
-  "documentId": "Dokumentum/kérelem azonosító",
-  "region": "Régió neve (megye)",
-  "year": "Az év, amelyre a dokumentum vonatkozik",
-  "hectares": 123.45,
+  "applicantName": "string vagy null, ha nem található",
+  "documentId": "string vagy null, ha nem található",
+  "region": "string vagy null, ha nem található",
+  "year": "string vagy null, ha nem található",
+  "hectares": number > 0 vagy 0, ha nem található,
   "cultures": [
     {
-      "name": "Kukorica",
-      "hectares": 45.6,
-      "yieldPerHectare": 8.2,
-      "pricePerTon": 72000,
-      "estimatedRevenue": 26913600
-    },
-    {
-      "name": "Búza",
-      "hectares": 77.85,
-      "yieldPerHectare": 5.5,
-      "pricePerTon": 85000,
-      "estimatedRevenue": 36378375
+      "name": "string",
+      "hectares": number > 0,
+      "yieldPerHectare": number > 0,
+      "pricePerTon": number > 0,
+      "estimatedRevenue": number > 0
     }
   ],
-  "blockIds": ["L12AB-1-23", "K45CD-6-78"],
-  "totalRevenue": 63291975
+  "blockIds": ["string"] vagy [], ha nem található,
+  "totalRevenue": number > 0 vagy 0, ha nem található
 }
 
-FIGYELEM! Ne generálj véletlenszerű adatokat! Ha nem találod az információt a dokumentumban, akkor inkább használj üres listát vagy nullát, de ne találj ki adatokat!
+Ha egyáltalán nem sikerül adatokat kinyerned, adj vissza egy üres objektumot:
+{
+  "applicantName": null,
+  "documentId": null,
+  "region": null,
+  "year": null,
+  "hectares": 0,
+  "cultures": [],
+  "blockIds": [],
+  "totalRevenue": 0
+}
 
-FELDOLGOZÁSI ELŐFELTÉTEL: A dokumentumnak tartalmaznia kell legalább egy növénykultúrát és területadatot, különben nem feldolgozható.
-
-HA NEM TUDOD KINYERNI A SZÜKSÉGES ADATOKAT, AZT JELEZD EGYÉRTELMŰEN, de adj vissza egy üres adatstruktúrát a megadott formátumban.`;
+FONTOS: Ha a dokumentumban nem találhatók növénykultúrák adatai legalább 10 hektár összes területtel, vagy nem lehet kinyerni a fő mezőgazdasági adatokat, akkor az adatkinyerés sikertelennek tekintendő. Ilyen esetben jelezd, hogy sikertelen volt az adatkinyerés.`;
       
       // Create message without file attachment
       const message = await openai.beta.threads.messages.create(thread.id, {
