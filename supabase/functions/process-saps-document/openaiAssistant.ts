@@ -19,12 +19,36 @@ export async function createAssistant() {
       name: "SAPS Dokumentum Elemző",
       model: "gpt-4o-mini",
       instructions: `
-Kérlek olvasd ki a dokumentumból a gazdálkodó nevét. Ez általában a dokumentum elején, a fejlécben vagy az űrlap első oldalán található.
+Te egy SAPS (Egységes Területalapú Támogatási Rendszer) dokumentumokat elemző AI vagy.
+A dokumentumok gazdálkodók területalapú támogatási kérelmeit tartalmazzák.
 
-Csak a gazdálkodó nevét add vissza JSON formátumban:
+Feladatod:
+1. Olvasd ki a gazdálkodó nevét, régióját és a kérelem/dokumentum azonosítóját
+2. Azonosítsd az összes növénykultúrát (pl. búza, kukorica, napraforgó, stb.)
+3. Minden kultúrához határozd meg a hektárszámot
+4. Gyűjtsd ki az összes blokkazonosítót (MePAR azonosítók)
+5. Határozd meg a teljes művelt területet hektárban
+
+Az adatokat a következő JSON formátumban add vissza:
 {
-  "applicantName": "GAZDÁLKODÓ NEVE"
+  "applicantName": "A gazdálkodó neve",
+  "documentId": "Dokumentum/kérelem azonosító",
+  "region": "Régió neve",
+  "hectares": 123.45,
+  "cultures": [
+    {
+      "name": "Kukorica",
+      "hectares": 45.6
+    },
+    {
+      "name": "Búza",
+      "hectares": 77.85
+    }
+  ],
+  "blockIds": ["L12AB-1-23", "K45CD-6-78"]
 }
+
+Ha valamelyik információt nem találod meg, használj üres értéket vagy becsült értéket. A legfontosabbak a növénykultúrák és a hozzájuk tartozó területméretek.
 `
     });
 
@@ -62,9 +86,9 @@ export async function processDocumentText(threadId: string, assistantId: string,
     console.log(`📩 Üzenet hozzáadása a threadhez dokumentum szöveggel...`);
     const message = await openai.beta.threads.messages.create(threadId, {
       role: "user",
-      content: `Kérlek, olvasd ki a gazdálkodó nevét a következő dokumentumból:
+      content: `Elemezd a következő SAPS dokumentumot és olvasd ki belőle a gazdálkodási információkat:
 
-${documentText.substring(0, 8000)}` // Az első 8000 karaktert küldjük csak (limitáljuk a méretét)
+${documentText.substring(0, 25000)}` // Az első 25000 karaktert küldjük csak (limitáljuk a méretét)
     });
     console.log(`✅ Üzenet létrehozva: ${message.id}`);
     
@@ -72,7 +96,7 @@ ${documentText.substring(0, 8000)}` // Az első 8000 karaktert küldjük csak (l
     console.log(`🚀 Futtatás indítása a threaden (${threadId}) az asszisztenssel (${assistantId})...`);
     const run = await openai.beta.threads.runs.create(threadId, {
       assistant_id: assistantId,
-      instructions: "Olvasd ki a gazdálkodó nevét a dokumentumból JSON formátumban."
+      instructions: "Elemezd a SAPS dokumentumot és olvasd ki belőle a gazdálkodási információkat a kért JSON formátumban."
     });
     
     const runTime = Date.now() - runStart;

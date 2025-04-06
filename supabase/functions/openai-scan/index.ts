@@ -83,7 +83,39 @@ serve(async (req) => {
       // Add a message to the thread WITHOUT the file attached (per OpenAI v2 API)
       console.log(`📤 Creating message with instructions (without file attachment)`);
       
-      const messageContent = "Analyze this SAPS document and extract all relevant agricultural information. Please return the data in the following JSON format: {\"hectares\": number, \"cultures\": [{\"name\": string, \"hectares\": number, \"estimatedRevenue\": number}], \"totalRevenue\": number, \"region\": string, \"blockIds\": [string]}";
+      const messageContent = `
+Elemezd ezt a SAPS dokumentumot és nyerd ki belőle az összes releváns mezőgazdasági információt. 
+Az adatokat a következő JSON formátumban add vissza:
+{
+  "applicantName": "A gazdálkodó neve",
+  "documentId": "Dokumentum/kérelem azonosító",
+  "region": "Régió neve",
+  "year": "Az év, amelyre a dokumentum vonatkozik",
+  "hectares": 123.45,
+  "cultures": [
+    {
+      "name": "Kukorica",
+      "hectares": 45.6,
+      "yieldPerHectare": 8.2,
+      "pricePerTon": 72000,
+      "estimatedRevenue": 26913600
+    },
+    {
+      "name": "Búza",
+      "hectares": 77.85,
+      "yieldPerHectare": 5.5,
+      "pricePerTon": 85000,
+      "estimatedRevenue": 36378375
+    }
+  ],
+  "blockIds": ["L12AB-1-23", "K45CD-6-78"],
+  "totalRevenue": 63291975
+}
+
+Minden kultúrához becsüld meg a termésátlagot és az árakat, ha nem találod a dokumentumban!
+A termésátlag (yieldPerHectare) tonna/hektár értékben, az ár (pricePerTon) Ft/tonna értékben legyen megadva.
+A becsült bevételt (estimatedRevenue) számold ki a kultúra × termésátlag × ár képlettel.
+A teljes bevételt (totalRevenue) számold ki az összes kultúra becsült bevételének összegeként.`;
       
       // Create message without file attachment
       const message = await openai.beta.threads.messages.create(thread.id, {

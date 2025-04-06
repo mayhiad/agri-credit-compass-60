@@ -38,7 +38,6 @@ export interface ExtractionData {
   processedAt?: string;
 }
 
-// Új interfész a piaci árakhoz
 export interface MarketPrice {
   culture: string;
   averageYield: number; // t/ha
