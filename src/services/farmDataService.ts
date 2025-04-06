@@ -1,3 +1,4 @@
+
 import { FarmData } from "@/components/LoanApplication";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -7,6 +8,8 @@ export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string)
       console.error("Missing farm data or user ID");
       return null;
     }
+    
+    console.log("Saving farm data to database:", farmData);
     
     // 1. Save the main farm record
     const { data: farm, error: farmError } = await supabase
@@ -44,7 +47,39 @@ export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string)
       }
     }
     
-    // 3. Save each culture
+    // 3. Save OCR information (if available)
+    if (farmData.ocrText || farmData.fileName) {
+      const rawData = {
+        farm_id: farmId,
+        ocr_text: farmData.ocrText,
+        file_name: farmData.fileName,
+        file_size: farmData.fileSize,
+        document_date: farmData.documentDate || farmData.year,
+        extracted_blocks: farmData.blockIds
+      };
+      
+      console.log("Saving OCR information:", rawData);
+      
+      // Don't let this block the operation if it fails
+      try {
+        const { error: ocrError } = await supabase
+          .from('document_extraction_results')
+          .insert({
+            user_id: userId,
+            extracted_data: rawData,
+            processing_status: 'completed',
+            ocr_log_id: '00000000-0000-0000-0000-000000000000' // Placeholder since we don't have the actual log ID
+          });
+          
+        if (ocrError) {
+          console.warn("Warning: Could not save OCR information:", ocrError);
+        }
+      } catch (ocrSaveError) {
+        console.warn("Error saving OCR information:", ocrSaveError);
+      }
+    }
+    
+    // 4. Save each culture
     if (farmData.cultures && farmData.cultures.length > 0) {
       const cultures = farmData.cultures.map(culture => ({
         farm_id: farmId,

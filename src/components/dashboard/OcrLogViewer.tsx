@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Eye, Database, Code } from "lucide-react";
+import { FileText, Eye, Database, Code, AlertTriangle } from "lucide-react";
 import { getDocumentOcrLogs, getExtractionResultById } from "@/services/documentProcessingService";
 import { formatDistanceToNow } from "date-fns";
 import { Separator } from "@/components/ui/separator";
@@ -117,14 +117,21 @@ const OcrLogViewer = () => {
         <div className="flex justify-between">
           <h3 className="text-sm font-medium">OCR Tartalom</h3>
           <p className="text-xs text-muted-foreground">
-            {selectedLog?.ocr_content?.length || 0} karakter
+            {selectedLog?.ocr_content ? selectedLog.ocr_content.length : 0} karakter
           </p>
         </div>
         <Separator />
         {selectedLog?.ocr_content ? (
           <pre className="text-xs whitespace-pre-wrap font-mono">{selectedLog.ocr_content}</pre>
         ) : (
-          <p className="text-sm text-muted-foreground">Nincs elérhető OCR tartalom</p>
+          <div className="py-8 text-center text-amber-600">
+            <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+            <p className="text-sm">Nincs elérhető OCR tartalom</p>
+            <p className="text-xs mt-2">
+              A Google Vision OCR nem tudott szöveget kinyerni a dokumentumból, vagy a dokumentum nem tartalmaz szöveget.
+              Próbáljon egy másik dokumentumot feltölteni, vagy ellenőrizze, hogy a PDF fájl tartalmaz-e szöveget (és nem csak képeket).
+            </p>
+          </div>
         )}
       </div>
     </ScrollArea>
@@ -149,9 +156,19 @@ const OcrLogViewer = () => {
                 </p>
               </div>
             </div>
-            <pre className="text-xs whitespace-pre-wrap font-mono overflow-auto">
-              {JSON.stringify(extractionResult.extracted_data, null, 2)}
-            </pre>
+            {extractionResult.extracted_data ? (
+              <pre className="text-xs whitespace-pre-wrap font-mono overflow-auto">
+                {JSON.stringify(extractionResult.extracted_data, null, 2)}
+              </pre>
+            ) : (
+              <div className="py-8 text-center text-amber-600">
+                <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+                <p className="text-sm">Nincs feldolgozási eredmény</p>
+                <p className="text-xs mt-2">
+                  Az AI nem tudott adatokat kinyerni a dokumentumból, de az OCR tartalmat megtekintheti a másik fülön.
+                </p>
+              </div>
+            )}
           </>
         ) : (
           <p className="text-sm text-muted-foreground">Nincs elérhető feldolgozási eredmény</p>

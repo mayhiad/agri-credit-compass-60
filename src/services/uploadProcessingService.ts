@@ -1,4 +1,3 @@
-
 import { FarmData } from "@/components/LoanApplication";
 import { supabase } from "@/integrations/supabase/client";
 import { processDocumentWithOpenAI, checkProcessingResults, processDocumentWithGoogleVision } from "@/services/documentProcessingService";
@@ -87,17 +86,28 @@ const processWithGoogleVision = async (
       details: "OCR szkennelés sikeresen befejezve, feldolgozott szöveg elemzése..."
     });
     
-    // Itt folytatjuk az OCR eredmény feldolgozását AI-val vagy manuális elemzéssel
-    // Mivel most csak az OCR szkennelés a cél, generálunk néhány placeholder adatot
-    
-    // Fallback adatok generálása
-    const farmData = generateFallbackFarmData(user.id, file.name, file.size);
+    // Fallback adatok generálása alapértelmezettként
+    let farmData = generateFallbackFarmData(user.id, file.name, file.size);
     farmData.fileName = file.name;
     farmData.fileSize = file.size;
     
-    // Ha van OCR eredmény, mentjük a nyers adatokba
+    // Ha van OCR eredmény, mentjük a nyers adatokba és próbáljuk kinyerni az adatokat
     if (visionResult.ocrText) {
       farmData.ocrText = visionResult.ocrText;
+      
+      // Próbáljuk meg kinyerni az adatokat az OCR szövegből
+      const extractedData = extractFarmDataFromOcrText(visionResult.ocrText);
+      console.log("Extracted farm data from OCR:", extractedData);
+      
+      // Csak azokat az adatokat írjuk felül, amelyeket sikerült kinyerni
+      if (extractedData.documentId) farmData.documentId = extractedData.documentId;
+      if (extractedData.hectares && extractedData.hectares > 0) farmData.hectares = extractedData.hectares;
+      if (extractedData.applicantName) farmData.applicantName = extractedData.applicantName;
+      if (extractedData.region) farmData.region = extractedData.region;
+      if (extractedData.year) farmData.year = extractedData.year;
+      if (extractedData.blockIds && extractedData.blockIds.length > 0) farmData.blockIds = extractedData.blockIds;
+    } else {
+      console.warn("No OCR text was extracted from the document");
     }
     
     updateStatus({
@@ -297,4 +307,14 @@ const processWithOpenAI = async (
   });
   
   return farmData;
+};
+
+/**
+ * Extracts farm data from OCR text
+ * @param ocrText - The OCR text to extract data from
+ * @returns An object containing extracted farm data
+ */
+const extractFarmDataFromOcrText = (ocrText: string): any => {
+  // Implement OCR text parsing logic here
+  return {};
 };
