@@ -55,7 +55,8 @@ export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string)
         file_name: farmData.fileName,
         file_size: farmData.fileSize,
         document_date: farmData.documentDate || farmData.year,
-        extracted_blocks: farmData.blockIds
+        extracted_blocks: farmData.blockIds,
+        word_document_url: farmData.wordDocumentUrl
       };
       
       console.log("Saving OCR information:", rawData);

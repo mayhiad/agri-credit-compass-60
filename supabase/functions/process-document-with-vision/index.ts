@@ -125,14 +125,34 @@ serve(async (req) => {
     console.log(`📄 Kinyert szöveg hossza: ${extractedText.length} karakter`);
     console.log(`📄 Szöveg első 500 karaktere: ${extractedText.substring(0, 500)}...`);
     
+    // Metaadatok kinyerése
+    const metadata = {
+      filename: file.name,
+      filesize: file.size,
+      filetype: file.type,
+      processingTime: processingTime,
+      textLength: extractedText.length,
+      extractionMethod: 'Google Vision API',
+      timestamp: new Date().toISOString()
+    };
+    
     // OCR eredmény mentése az adatbázisba
-    const ocrLogId = await saveOcrResult(supabase, userId, file.name, file.size, file.type, extractedText);
+    const ocrLogId = await saveOcrResult(
+      supabase, 
+      userId, 
+      file.name, 
+      file.size, 
+      file.type, 
+      extractedText, 
+      metadata
+    );
     
     return new Response(
       JSON.stringify({
         ocrLogId,
         ocrText: extractedText,
-        processingTime
+        processingTime,
+        metadata
       }),
       { 
         headers: { 
@@ -167,7 +187,8 @@ async function saveOcrResult(
   fileName: string,
   fileSize: number,
   fileType: string,
-  ocrContent: string
+  ocrContent: string,
+  metadata: any = {}
 ): Promise<string | null> {
   try {
     console.log(`📝 OCR eredmények mentése az adatbázisba: ${fileName}`);
@@ -179,7 +200,8 @@ async function saveOcrResult(
         file_name: fileName,
         file_size: fileSize,
         file_type: fileType,
-        ocr_content: ocrContent
+        ocr_content: ocrContent,
+        processing_metadata: metadata
       })
       .select('id')
       .single();

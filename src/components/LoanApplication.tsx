@@ -1,4 +1,4 @@
-
+import React, { useState } from 'react';
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,28 +24,23 @@ export interface MarketPrice {
 }
 
 export type FarmData = {
+  farmId?: string;
   hectares: number;
-  cultures: {
-    name: string;
-    hectares: number;
-    estimatedRevenue: number;
-    yieldPerHectare?: number;
-    pricePerTon?: number;
-  }[];
+  cultures: Culture[];
   totalRevenue: number;
   region?: string;
   documentId?: string;
   applicantName?: string;
   blockIds?: string[];
-  farmId?: string;
   fileName?: string;
   fileSize?: number;
-  errorMessage?: string;
-  marketPrices?: any[];
   ocrText?: string;
+  errorMessage?: string;
+  marketPrices?: MarketPrice[]; 
   year?: string;
   documentDate?: string;
   parcels?: ParcelData[];
+  wordDocumentUrl?: string;
 };
 
 export type UserData = {

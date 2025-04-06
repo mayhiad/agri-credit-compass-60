@@ -1,42 +1,43 @@
 
-import React from "react";
+import React from 'react';
+import { Progress } from "@/components/ui/progress";
+import { ProcessingStatus } from "@/services/uploadProcessingService";
+import { FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface ProcessingStatusProps {
-  status: {
-    step: string;
-    progress: number;
-    details?: string;
-  } | null;
+  status: ProcessingStatus | null;
 }
 
-export const ProcessingStatus = ({ status }: ProcessingStatusProps) => {
+const ProcessingStatusIndicator = ({ status }: ProcessingStatusProps) => {
   if (!status) return null;
 
   return (
-    <div className="mt-4">
-      <div className="flex justify-between text-xs mb-1">
-        <span>{status.step}</span>
-        <span>{status.progress}%</span>
+    <div className="mt-4 space-y-2">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-sm font-medium">{status.step}</span>
+        <span className="text-sm text-muted-foreground">{status.progress}%</span>
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-2.5">
-        <div 
-          className="bg-primary h-2.5 rounded-full transition-all duration-300 ease-in-out" 
-          style={{ width: `${status.progress}%` }}
-        />
-      </div>
+      
+      <Progress value={status.progress} className="h-2" />
+      
       {status.details && (
-        <p className="text-xs text-muted-foreground mt-2">
-          {status.details}
-          {status.progress > 40 && status.progress < 90 && 
-            <span className="block text-amber-600 mt-1">
-              A feldolgozás időtartama a dokumentum méretétől függően akár 3-5 perc is lehet.
-              Kérjük, ne zárja be az ablakot és ne töltse újra az oldalt a feldolgozás alatt!
-            </span>
-          }
-        </p>
+        <p className="text-sm text-muted-foreground mt-1">{status.details}</p>
+      )}
+      
+      {status.wordDocumentUrl && status.progress === 100 && (
+        <div className="flex items-center gap-2 mt-2 bg-green-50 p-2 rounded border border-green-200">
+          <FileText className="h-4 w-4 text-green-600" />
+          <span className="text-sm text-green-800 flex-1">OCR eredmény Word dokumentum</span>
+          <Button variant="outline" size="sm" className="bg-white" asChild>
+            <a href={status.wordDocumentUrl} target="_blank" rel="noopener noreferrer">
+              Letöltés
+            </a>
+          </Button>
+        </div>
       )}
     </div>
   );
 };
 
-export default ProcessingStatus;
+export default ProcessingStatusIndicator;

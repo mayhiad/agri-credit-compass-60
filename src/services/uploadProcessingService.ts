@@ -3,11 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { processDocumentWithOpenAI, checkProcessingResults, processDocumentWithGoogleVision } from "@/services/documentProcessingService";
 import { uploadFileToStorage } from "@/utils/storageUtils";
 import { generateFallbackFarmData, validateAndFixFarmData } from "@/services/fallbackDataService";
+import { extractFarmDataFromOcrText } from "@/services/sapsProcessor";
 
 export type ProcessingStatus = {
   step: string;
   progress: number;
   details?: string;
+  wordDocumentUrl?: string;
 };
 
 /**
@@ -83,7 +85,8 @@ const processWithGoogleVision = async (
     updateStatus({
       step: "Google Vision OCR sikeres",
       progress: 60,
-      details: "OCR szkennelés sikeresen befejezve, feldolgozott szöveg elemzése..."
+      details: "OCR szkennelés sikeresen befejezve, feldolgozott szöveg elemzése...",
+      wordDocumentUrl: visionResult.wordDocumentUrl
     });
     
     // Fallback adatok generálása alapértelmezettként
@@ -94,6 +97,7 @@ const processWithGoogleVision = async (
     // Ha van OCR eredmény, mentjük a nyers adatokba és próbáljuk kinyerni az adatokat
     if (visionResult.ocrText) {
       farmData.ocrText = visionResult.ocrText;
+      farmData.wordDocumentUrl = visionResult.wordDocumentUrl;
       
       // Próbáljuk meg kinyerni az adatokat az OCR szövegből
       const extractedData = extractFarmDataFromOcrText(visionResult.ocrText);
@@ -113,16 +117,19 @@ const processWithGoogleVision = async (
     updateStatus({
       step: "OCR szövegkinyerés befejezve",
       progress: 90,
-      details: "A Google Vision API sikeresen kinyerte a szöveget a dokumentumból."
+      details: "A Google Vision API sikeresen kinyerte a szöveget a dokumentumból.",
+      wordDocumentUrl: visionResult.wordDocumentUrl
     });
     
     // További validáció és hiányzó mezők pótlása
     const validatedData = validateAndFixFarmData(farmData);
+    validatedData.wordDocumentUrl = visionResult.wordDocumentUrl;
     
     updateStatus({
       step: "Adatok feldolgozása",
       progress: 100,
-      details: `OCR feldolgozás befejezve. ${validatedData.ocrText ? validatedData.ocrText.length : 0} karakter kinyerve.`
+      details: `OCR feldolgozás befejezve. ${validatedData.ocrText ? validatedData.ocrText.length : 0} karakter kinyerve.`,
+      wordDocumentUrl: visionResult.wordDocumentUrl
     });
     
     return validatedData;

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, ArrowRight, AlertTriangle } from "lucide-react";
+import { Clock, ArrowRight, AlertTriangle, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { FarmData } from "@/components/LoanApplication";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -77,7 +77,8 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       setProcessingStatus({
         step: "Adatok mentése az adatbázisba",
         progress: 95,
-        details: "Farm adatok és növénykultúrák rögzítése..."
+        details: "Farm adatok és növénykultúrák rögzítése...",
+        wordDocumentUrl: farmData.wordDocumentUrl
       });
       
       const farmId = await saveFarmDataToDatabase(farmData, user.id);
@@ -94,7 +95,8 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       setProcessingStatus({
         step: "Feldolgozás befejezve",
         progress: 100,
-        details: `${farmData.cultures.length} növénykultúra, ${farmData.hectares} hektár és ${farmData.totalRevenue} Ft árbevétel sikeresen feldolgozva és mentve.`
+        details: `${farmData.cultures.length} növénykultúra, ${farmData.hectares} hektár és ${farmData.totalRevenue} Ft árbevétel sikeresen feldolgozva és mentve.`,
+        wordDocumentUrl: farmData.wordDocumentUrl
       });
       
       onComplete(farmData);
@@ -169,6 +171,25 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
             
             <UploadArea file={file} onFileChange={handleFileChange} />
             <ProcessingStatus status={processingStatus} />
+            
+            {processingStatus?.wordDocumentUrl && (
+              <Alert className="mt-4 mb-2 bg-green-50 border-green-200">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-green-600" />
+                  <div className="flex-1">
+                    <AlertDescription className="text-green-800">
+                      Az OCR eredmények Word dokumentumként elérhetőek:
+                    </AlertDescription>
+                  </div>
+                  <Button variant="outline" className="bg-white" size="sm" asChild>
+                    <a href={processingStatus.wordDocumentUrl} target="_blank" rel="noopener noreferrer">
+                      Letöltés
+                    </a>
+                  </Button>
+                </div>
+              </Alert>
+            )}
+            
             <ErrorDisplay message={error} />
             <SuccessMessage status={processingStatus} />
           </form>
