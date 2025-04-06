@@ -1,4 +1,3 @@
-
 import { FarmData } from "@/components/LoanApplication";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -164,6 +163,8 @@ export async function processSapsDocument(file: File): Promise<FarmData> {
         const documentId = "SAPS-2023-568742";
         const applicantName = "Kovács János";
         const region = "Dél-Alföld";
+        const year = "2023"; // Az év, amire a dokumentum vonatkozik
+        const documentDate = "2023.07.20"; // A dokumentum dátuma
         
         // Parcellák összegzése kultúránként
         const cultureGroups: Record<string, {hectares: number, parcels: ParcelData[]}> = {};
@@ -220,7 +221,9 @@ export async function processSapsDocument(file: File): Promise<FarmData> {
             applicantName,
             blockIds: [...new Set(parcels.map(p => p.blockId))], // Összes egyedi blokkazonosító
             parcels: parcels, // Az összes részletes parcella adat
-            marketPrices: marketPrices // Aktuális piaci árak
+            marketPrices: marketPrices, // Aktuális piaci árak
+            year: year, // Az év, amire a dokumentum vonatkozik
+            documentDate: documentDate // A dokumentum dátuma
           };
           
           resolve(farmData);
