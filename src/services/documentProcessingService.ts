@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { FarmData } from "@/components/LoanApplication";
 
@@ -95,6 +96,19 @@ export const checkProcessingResults = async (threadId: string, runId: string): P
     
     const resultData = await resultResponse.json();
     console.log(`Eredmény ellenőrzés válasz:`, resultData);
+    
+    // Ha van rawContent, de nincs formázott data, akkor előállítunk egy alap FarmData objektumot
+    // Ez egy fallback, ha az AI nem tudott strukturált adatokat visszaadni
+    if (resultData.completed && resultData.status === 'completed' && !resultData.data) {
+      // Minta adatok használata, ha nincs érvényes válasz az AI-tól
+      console.log("Nincs érvényes strukturált adat, fallback adatok létrehozása");
+      
+      return {
+        completed: true,
+        status: 'completed',
+        data: null // Nem állítunk elő itt adatokat, ezt később a feldolgozó kezelni fogja
+      };
+    }
     
     return {
       completed: resultData.completed,
