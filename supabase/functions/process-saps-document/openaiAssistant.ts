@@ -80,12 +80,21 @@ Csak a gazdálkodó nevét add vissza JSON formátumban:
 export async function startRun(threadId, assistantId, fileId) {
   console.log(`🏃 Feldolgozás indítása asszisztens ID-val: ${assistantId} és fájl ID-val: ${fileId}`);
   const runStart = Date.now();
+  
   try {
-    const run = await openai.beta.threads.runs.create(threadId, {
-      assistant_id: assistantId,
-      additional_instructions: "Olvasd ki a gazdálkodó nevét a dokumentumból.",
+    // Adjuk hozzá a fájlt a threadhez
+    await openai.beta.threads.messages.create(threadId, {
+      role: "user",
+      content: "Kérlek, olvasd ki a gazdálkodó nevét a dokumentumból!",
       file_ids: [fileId]
     });
+    
+    // Indítsuk el a futtatást, de ne adjunk meg külön file_ids-t itt
+    const run = await openai.beta.threads.runs.create(threadId, {
+      assistant_id: assistantId,
+      instructions: "Olvasd ki a gazdálkodó nevét a dokumentumból JSON formátumban."
+    });
+    
     const runTime = Date.now() - runStart;
     console.log(`✅ Feldolgozás elindítva (${runTime}ms). Run ID: ${run.id}`);
     return run;
