@@ -94,28 +94,40 @@ const DashboardHistorical = () => {
         if (logs && logs.length > 0) {
           for (const log of logs) {
             // Ne duplikáljuk az adatokat, ha már megvan a farm
-            if (farmData.some(f => f.year === log.extraction_data?.year)) continue;
+            if (!log.extraction_data) continue;
             
-            if (log.extraction_data && typeof log.extraction_data === 'object') {
-              const extractionData = log.extraction_data;
-              const euExchangeRate = 380; // Alapértelmezett EUR/HUF árfolyam
-              
-              const logEntry: HistoricalFarmData = {
-                year: extractionData.year || "2022",
-                totalHectares: extractionData.hectares || 0,
-                totalRevenue: extractionData.totalRevenue || 0,
-                totalRevenueEUR: (extractionData.totalRevenue || 0) / euExchangeRate,
-                cultures: extractionData.cultures ? extractionData.cultures.map(c => ({
-                  name: c.name,
-                  hectares: c.hectares || 0,
-                  revenue: c.estimatedRevenue || 0
-                })) : []
-              };
-              
-              // Csak akkor adjuk hozzá, ha tartalmaz értelmes adatokat
-              if (logEntry.totalHectares > 0) {
-                farmData.push(logEntry);
-              }
+            const extractionData = log.extraction_data;
+            if (typeof extractionData !== 'object') continue;
+            
+            // Ellenőrizzük, hogy az év már szerepel-e
+            const extractionYear = extractionData.year?.toString() || "2022";
+            if (farmData.some(f => f.year === extractionYear)) continue;
+            
+            const euExchangeRate = 380; // Alapértelmezett EUR/HUF árfolyam
+            
+            const totalHectares = typeof extractionData.hectares === 'number' ? extractionData.hectares : 0;
+            const totalRevenue = typeof extractionData.totalRevenue === 'number' ? extractionData.totalRevenue : 0;
+            
+            const logEntry: HistoricalFarmData = {
+              year: extractionYear,
+              totalHectares: totalHectares,
+              totalRevenue: totalRevenue,
+              totalRevenueEUR: totalRevenue / euExchangeRate,
+              cultures: []
+            };
+            
+            // Kultúrák feldolgozása, ha vannak
+            if (Array.isArray(extractionData.cultures)) {
+              logEntry.cultures = extractionData.cultures.map((culture: any) => ({
+                name: culture.name || "Ismeretlen",
+                hectares: culture.hectares || 0,
+                revenue: culture.estimatedRevenue || 0
+              }));
+            }
+            
+            // Csak akkor adjuk hozzá, ha tartalmaz értelmes adatokat
+            if (logEntry.totalHectares > 0) {
+              farmData.push(logEntry);
             }
           }
         }
