@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,23 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
     if (!user) {
       console.error("Nincs bejelentkezett felhasználó");
       return;
+    }
+    
+    // Validate required fields before saving
+    if (typeof farmData.hectares !== 'number' || isNaN(farmData.hectares)) {
+      throw new Error("A hektárszám hiányzik vagy érvénytelen");
+    }
+    
+    if (typeof farmData.totalRevenue !== 'number' || isNaN(farmData.totalRevenue)) {
+      throw new Error("A teljes bevétel hiányzik vagy érvénytelen");
+    }
+    
+    if (!farmData.region) {
+      farmData.region = "Ismeretlen régió";
+    }
+    
+    if (!farmData.documentId) {
+      farmData.documentId = `SAPS-${new Date().getFullYear()}-${Math.floor(Math.random() * 900000) + 100000}`;
     }
     
     try {
@@ -238,6 +256,23 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
           details: `${farmData.blockIds?.length || 0} blokkazonosító, ${farmData.cultures.length} növénykultúra feldolgozva (minta adatok)`
         });
       } else {
+        // További validáció és hiányzó mezők pótlása
+        if (typeof farmData.hectares !== 'number' || isNaN(farmData.hectares)) {
+          farmData.hectares = 0;
+        }
+        
+        if (typeof farmData.totalRevenue !== 'number' || isNaN(farmData.totalRevenue)) {
+          farmData.totalRevenue = 0;
+        }
+        
+        if (!farmData.region) {
+          farmData.region = "Ismeretlen régió";
+        }
+        
+        if (!farmData.cultures || !Array.isArray(farmData.cultures)) {
+          farmData.cultures = [];
+        }
+        
         setProcessingStatus({
           step: "Adatok feldolgozása",
           progress: 90,
