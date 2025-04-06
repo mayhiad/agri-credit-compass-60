@@ -1,12 +1,13 @@
 
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutDashboard, Map, Tractor, Upload, History } from "lucide-react";
+import { LayoutDashboard, Map, Tractor, Upload, History, Euro, CreditCard } from "lucide-react";
 import { FarmData } from "@/components/LoanApplication";
 import DashboardOverview from "./DashboardOverview";
 import DashboardCrops from "./DashboardCrops";
 import DashboardMap from "./DashboardMap";
 import DashboardHistorical from "./DashboardHistorical";
+import CurrentYearRevenue from "@/components/farm/CurrentYearRevenue";
 import FileUpload from "@/components/FileUpload";
 import { toast } from "sonner";
 
@@ -34,6 +35,10 @@ const DashboardContent = ({ farmData, onFarmDataUpdate }: DashboardContentProps)
           <Tractor className="h-4 w-4 mr-2" />
           Növénykultúrák
         </TabsTrigger>
+        <TabsTrigger value="currentYear">
+          <Euro className="h-4 w-4 mr-2" />
+          Aktuális bevétel
+        </TabsTrigger>
         <TabsTrigger value="historical">
           <History className="h-4 w-4 mr-2" />
           Történeti adatok
@@ -56,8 +61,15 @@ const DashboardContent = ({ farmData, onFarmDataUpdate }: DashboardContentProps)
         <DashboardCrops farmData={farmData} />
       </TabsContent>
       
+      <TabsContent value="currentYear">
+        <CurrentYearRevenue
+          cultures={farmData.cultures || []}
+          totalRevenue={farmData.totalRevenue || 0}
+        />
+      </TabsContent>
+      
       <TabsContent value="historical">
-        <DashboardHistorical farmData={farmData} />
+        <DashboardHistorical />
       </TabsContent>
       
       <TabsContent value="map">
