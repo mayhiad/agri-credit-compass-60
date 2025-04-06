@@ -1,85 +1,300 @@
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { HistoricalCropData } from "@/components/farm/HistoricalCrops";
-import HistoricalCrops from "@/components/farm/HistoricalCrops";
-import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from "@/lib/utils";
+import { useAuth } from "@/App";
+import { Loader2 } from "lucide-react";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+
+interface HistoricalFarmData {
+  year: string;
+  totalHectares: number;
+  totalRevenue: number;
+  totalRevenueEUR: number;
+  cultures: {
+    name: string;
+    hectares: number;
+    revenue: number;
+  }[];
+}
 
 const DashboardHistorical = () => {
-  const [historicalCropData, setHistoricalCropData] = useState<HistoricalCropData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const [historicalData, setHistoricalData] = useState<HistoricalFarmData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [averageRevenue, setAverageRevenue] = useState<number>(0);
+  const [averageRevenueEUR, setAverageRevenueEUR] = useState<number>(0);
 
   useEffect(() => {
     const fetchHistoricalData = async () => {
-      setLoading(true);
+      if (!user) return;
+      
       try {
-        // Fetch historical data from the market_prices table
-        // This should have been created in the previous PR with the SQL migration
-        const { data, error } = await supabase
-          .from('market_prices')
+        setIsLoading(true);
+        
+        // Először lekérjük a diagnosztikai logokat, hogy lássuk, milyen SAPS dokumentumok lettek feltöltve
+        const { data: logs, error: logsError } = await supabase
+          .from('diagnostic_logs')
           .select('*')
-          .eq('is_forecast', false)
-          .order('year', { ascending: false });
-
-        if (error) {
-          throw error;
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+          
+        if (logsError) throw logsError;
+        
+        // Most lekérjük a felhasználó összes farmját
+        const { data: farms, error: farmsError } = await supabase
+          .from('farms')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+          
+        if (farmsError) throw farmsError;
+        
+        // Minden farmhoz lekérjük a kultúrákat
+        const farmData: HistoricalFarmData[] = [];
+        
+        if (farms && farms.length > 0) {
+          for (const farm of farms) {
+            const { data: cultures, error: culturesError } = await supabase
+              .from('cultures')
+              .select('*')
+              .eq('farm_id', farm.id);
+              
+            if (culturesError) throw culturesError;
+            
+            // Történeti adat összeállítása
+            const yearFromDoc = farm.document_id ? 
+              farm.document_id.match(/\d{4}/) ? farm.document_id.match(/\d{4}/)[0] : "2023" : 
+              "2023";
+            
+            const euExchangeRate = 380; // Alapértelmezett EUR/HUF árfolyam
+            
+            const historyEntry: HistoricalFarmData = {
+              year: yearFromDoc,
+              totalHectares: farm.hectares || 0,
+              totalRevenue: farm.total_revenue || 0,
+              totalRevenueEUR: (farm.total_revenue || 0) / euExchangeRate,
+              cultures: cultures ? cultures.map(c => ({
+                name: c.name,
+                hectares: c.hectares || 0,
+                revenue: c.estimated_revenue || 0
+              })) : []
+            };
+            
+            farmData.push(historyEntry);
+          }
         }
-
-        if (data) {
-          // Transform the data to match the HistoricalCropData interface
-          const transformedData: HistoricalCropData[] = data.map(item => ({
-            year: item.year,
-            culture: item.culture,
-            averageYield: item.average_yield,
-            price: item.price,
-            region: item.region
-          }));
-
-          setHistoricalCropData(transformedData);
+        
+        // Ha van diagnosztikai log, akkor azokból is próbálunk adatokat kinyerni
+        if (logs && logs.length > 0) {
+          for (const log of logs) {
+            // Ne duplikáljuk az adatokat, ha már megvan a farm
+            if (farmData.some(f => f.year === log.extraction_data?.year)) continue;
+            
+            if (log.extraction_data && typeof log.extraction_data === 'object') {
+              const extractionData = log.extraction_data;
+              const euExchangeRate = 380; // Alapértelmezett EUR/HUF árfolyam
+              
+              const logEntry: HistoricalFarmData = {
+                year: extractionData.year || "2022",
+                totalHectares: extractionData.hectares || 0,
+                totalRevenue: extractionData.totalRevenue || 0,
+                totalRevenueEUR: (extractionData.totalRevenue || 0) / euExchangeRate,
+                cultures: extractionData.cultures ? extractionData.cultures.map(c => ({
+                  name: c.name,
+                  hectares: c.hectares || 0,
+                  revenue: c.estimatedRevenue || 0
+                })) : []
+              };
+              
+              // Csak akkor adjuk hozzá, ha tartalmaz értelmes adatokat
+              if (logEntry.totalHectares > 0) {
+                farmData.push(logEntry);
+              }
+            }
+          }
         }
+        
+        // Sortirozzuk év szerint
+        farmData.sort((a, b) => parseInt(b.year) - parseInt(a.year));
+        
+        // Kiszámoljuk az átlagos bevételt az elmúlt 5 évből
+        if (farmData.length > 0) {
+          const sum = farmData.reduce((acc, curr) => acc + curr.totalRevenue, 0);
+          const sumEUR = farmData.reduce((acc, curr) => acc + curr.totalRevenueEUR, 0);
+          setAverageRevenue(sum / farmData.length);
+          setAverageRevenueEUR(sumEUR / farmData.length);
+        }
+        
+        setHistoricalData(farmData);
       } catch (err) {
-        console.error("Error fetching historical data:", err);
-        setError("Nem sikerült betölteni a történeti adatokat. Kérjük, próbálja újra később.");
+        console.error("Hiba a történeti adatok lekérésekor:", err);
+        setError("Nem sikerült betölteni a történeti adatokat");
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
-
+    
     fetchHistoricalData();
-  }, []);
-
-  if (loading) {
+  }, [user]);
+  
+  const chartData = historicalData.map(data => ({
+    name: data.year,
+    'Bevétel (HUF)': data.totalRevenue / 1000000, // millió forintban
+    'Bevétel (EUR)': data.totalRevenueEUR / 1000, // ezer euróban
+    hectares: data.totalHectares
+  }));
+  
+  if (isLoading) {
     return (
       <Card>
-        <CardContent className="p-6">
-          <div className="animate-pulse space-y-4">
-            <div className="h-6 bg-gray-200 rounded w-1/3"></div>
-            <div className="h-40 bg-gray-200 rounded"></div>
-            <div className="h-6 bg-gray-200 rounded w-1/4"></div>
-            <div className="h-20 bg-gray-200 rounded"></div>
+        <CardHeader>
+          <CardTitle>Történeti adatok</CardTitle>
+          <CardDescription>Gazdaság történeti adatainak betöltése folyamatban...</CardDescription>
+        </CardHeader>
+        <CardContent className="flex justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Történeti adatok</CardTitle>
+          <CardDescription>Hiba történt a gazdaság történeti adatainak betöltésekor</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="p-4 text-center">
+            <p className="text-red-500">{error}</p>
           </div>
         </CardContent>
       </Card>
     );
   }
-
-  if (error) {
-    return (
-      <Card>
-        <CardContent className="p-6 text-center text-red-500">
-          <p>{error}</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
+  
   return (
-    <div>
-      <HistoricalCrops 
-        historicalData={historicalCropData} 
-      />
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Történeti adatok</CardTitle>
+        <CardDescription>Gazdaság korábbi éveinek kimutatása a SAPS dokumentumok alapján</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="chart">
+          <TabsList className="mb-4">
+            <TabsTrigger value="chart">Grafikon</TabsTrigger>
+            <TabsTrigger value="table">Táblázat</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="chart">
+            {historicalData.length > 0 ? (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <h3 className="text-lg font-medium">Bevétel trend az elmúlt 5 évben</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Az elmúlt {historicalData.length} év átlagos bevétele: 
+                    <span className="font-bold ml-1">{formatCurrency(averageRevenue)}</span> 
+                    <span className="text-xs ml-1">({formatCurrency(averageRevenueEUR, "EUR")})</span>
+                  </p>
+                  
+                  <div className="h-[350px] mt-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis yAxisId="left" orientation="left" stroke="#82ca9d" />
+                        <YAxis yAxisId="right" orientation="right" stroke="#8884d8" />
+                        <Tooltip formatter={(value, name) => {
+                          if (name === 'Bevétel (HUF)') return [`${value} millió Ft`, 'Bevétel (HUF)'];
+                          if (name === 'Bevétel (EUR)') return [`${value} ezer EUR`, 'Bevétel (EUR)'];
+                          return [value, name];
+                        }} />
+                        <Legend />
+                        <Bar yAxisId="left" dataKey="Bevétel (HUF)" fill="#8884d8" name="Bevétel (millió Ft)" />
+                        <Bar yAxisId="right" dataKey="Bevétel (EUR)" fill="#82ca9d" name="Bevétel (ezer EUR)" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <h3 className="text-lg font-medium">Összterület trend</h3>
+                  <div className="h-[250px] mt-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="hectares" fill="#ffc658" name="Hektár" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="py-8 text-center text-muted-foreground">
+                <p>Nincs megjeleníthető történeti adat.</p>
+                <p className="text-sm mt-2">Töltsön fel SAPS dokumentumokat a korábbi évekből a történeti adatok megjelenítéséhez.</p>
+              </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="table">
+            {historicalData.length > 0 ? (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Összesített éves adatok</h3>
+                  <div className="border rounded-md">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Év</TableHead>
+                          <TableHead className="text-right">Összterület (ha)</TableHead>
+                          <TableHead className="text-right">Bevétel (Ft)</TableHead>
+                          <TableHead className="text-right">Bevétel (EUR)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {historicalData.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell className="font-medium">{item.year}</TableCell>
+                            <TableCell className="text-right">{item.totalHectares.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.totalRevenue)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.totalRevenueEUR, "EUR")}</TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-muted/50">
+                          <TableCell className="font-bold">Átlag</TableCell>
+                          <TableCell className="text-right font-bold">
+                            {(historicalData.reduce((acc, curr) => acc + curr.totalHectares, 0) / historicalData.length).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-bold">{formatCurrency(averageRevenue)}</TableCell>
+                          <TableCell className="text-right font-bold">{formatCurrency(averageRevenueEUR, "EUR")}</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="py-8 text-center text-muted-foreground">
+                <p>Nincs megjeleníthető történeti adat.</p>
+                <p className="text-sm mt-2">Töltsön fel SAPS dokumentumokat a korábbi évekből a történeti adatok megjelenítéséhez.</p>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   );
 };
 

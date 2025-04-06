@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +30,9 @@ export type FarmData = {
   region: string;
   documentId: string;
   applicantName?: string;
-  // Új, részletes adatok
+  // Új azonosító az adatbázis ID-hez
+  farmId?: string;
+  // Részletes adatok
   blockIds?: string[];
   parcels?: ParcelData[];
   marketPrices?: MarketPrice[];
