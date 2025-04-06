@@ -75,7 +75,7 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoProps) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {farmData.cultures.map((culture, idx) => (
+              {farmData.cultures && farmData.cultures.map((culture, idx) => (
                 <TableRow key={idx}>
                   <TableCell>{culture.name}</TableCell>
                   <TableCell className="text-right">{culture.hectares.toFixed(2)}</TableCell>
@@ -145,7 +145,7 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoProps) => {
               </AccordionItem>
             )}
             
-            {farmData.marketPrices && (
+            {farmData.marketPrices && farmData.marketPrices.length > 0 && (
               <AccordionItem value="prices">
                 <AccordionTrigger className="flex items-center gap-2">
                   <Info className="h-4 w-4" />
