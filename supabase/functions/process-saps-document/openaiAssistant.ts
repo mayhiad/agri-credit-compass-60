@@ -82,13 +82,15 @@ export async function startRun(threadId, assistantId, fileId) {
   const runStart = Date.now();
   try {
     // Eltávolítjuk a felesleges rendszerüzenetet, mivel már küldtünk egy üzenetet az addMessageToThread-ben
+    // Helyes használat: tool_resources helyett file_ids a file_search alatt
     const run = await openai.beta.threads.runs.create(threadId, {
       assistant_id: assistantId,
-      tool_resources: {
-        file_search: {
+      tools: [
+        {
+          type: "file_search",
           file_ids: [fileId]
         }
-      }
+      ]
     });
 
     const runTime = Date.now() - runStart;
