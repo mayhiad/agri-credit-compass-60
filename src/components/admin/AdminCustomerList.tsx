@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   Table, TableHeader, TableRow, TableHead, 
@@ -65,7 +64,6 @@ const AdminCustomerList = ({ isAdmin, isFinanceOfficer }: AdminCustomerListProps
   });
 
   const viewCustomerDetails = (customerId: string) => {
-    // Navigate to customer details page
     navigate(`/admin/customer/${customerId}`);
   };
 

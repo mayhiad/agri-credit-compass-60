@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   Table, TableHeader, TableRow, TableHead, 
@@ -65,7 +64,6 @@ const AdminLoanList = ({ isAdmin, isFinanceOfficer }: AdminLoanListProps) => {
 
         if (error) throw error;
         if (data) {
-          // Cast the data to the expected type since we know our interface accommodates the possible response formats
           setLoans(data as unknown as LoanWithDetails[]);
         } else {
           setLoans([]);
@@ -99,9 +97,7 @@ const AdminLoanList = ({ isAdmin, isFinanceOfficer }: AdminLoanListProps) => {
   const filteredLoans = loans.filter(loan => {
     const searchLower = searchTerm.toLowerCase();
     
-    // Handle possible error in profiles or null profiles
     if (!loan.profiles || 'error' in loan.profiles) {
-      // If there's no profiles data or it's an error, only match by contract number
       const contractMatch = loan.contract_number?.toLowerCase().includes(searchLower) || false;
       return contractMatch && (!statusFilter || loan.status === statusFilter);
     }
