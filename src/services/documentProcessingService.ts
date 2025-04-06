@@ -114,12 +114,14 @@ export const checkProcessingResults = async (threadId: string, runId: string, oc
   }
 };
 
-// Használja a customtól API-t a getDocumentOcrLogs helyett, mivel még nem frissültek a Typescript típusok
+// Az RPC függvényhívásokat javítjuk TypeScript hibák miatt
 export const getDocumentOcrLogs = async (): Promise<any[]> => {
   try {
-    // Közvetlenül SQL lekérdezést használunk a típushibák elkerülése érdekében
+    // Közvetlenül SQL lekérdezést használunk
     const { data, error } = await supabase
-      .rpc('get_ocr_logs');
+      .from('document_ocr_logs')
+      .select('*')
+      .order('created_at', { ascending: false });
       
     if (error) {
       console.error("Hiba az OCR naplók lekérésekor:", error);
@@ -133,21 +135,82 @@ export const getDocumentOcrLogs = async (): Promise<any[]> => {
   }
 };
 
-// Használja a custom API-t a getExtractionResultById helyett, mivel még nem frissültek a Typescript típusok
+// Az RPC függvényhívásokat javítjuk TypeScript hibák miatt
 export const getExtractionResultById = async (logId: string): Promise<any | null> => {
   try {
-    // Közvetlenül SQL lekérdezést használunk a típushibák elkerülése érdekében
+    // Közvetlenül SQL lekérdezést használunk
     const { data, error } = await supabase
-      .rpc('get_extraction_result', { log_id: logId });
+      .from('document_extraction_results')
+      .select('*')
+      .eq('ocr_log_id', logId)
+      .single();
       
     if (error) {
       console.error("Hiba a feldolgozási eredmény lekérésekor:", error);
       return null;
     }
     
-    return data?.[0] || null;
+    return data || null;
   } catch (error) {
     console.error("Váratlan hiba a feldolgozási eredmény lekérésekor:", error);
     return null;
+  }
+};
+
+// Új funkció: Google Cloud Vision API-val OCR szkennelés
+export const processDocumentWithGoogleVision = async (file: File, user: any): Promise<{
+  ocrLogId?: string;
+  ocrText?: string;
+} | null> => {
+  try {
+    if (!user) {
+      throw new Error("Nincs érvényes felhasználói munkamenet");
+    }
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error("Nincs érvényes felhasználói munkamenet");
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    console.log("📡 Küldés a Supabase process-document-with-vision végpontra...");
+    
+    const scanResponse = await fetch(
+      'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-document-with-vision',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: formData,
+        signal: AbortSignal.timeout(120000), // 2 perc időtúllépés
+      }
+    );
+    
+    if (!scanResponse.ok) {
+      const errorText = await scanResponse.text();
+      console.error("Google Vision OCR hiba:", errorText);
+      let errorData;
+      
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (parseError) {
+        errorData = { error: errorText || "Ismeretlen hiba történt" };
+      }
+      
+      throw new Error(errorData.error || "Hiba a dokumentum szkennelése közben");
+    }
+    
+    const scanData = await scanResponse.json();
+    console.log("Google Vision OCR válasz:", scanData);
+    
+    const { ocrLogId, ocrText } = scanData;
+    
+    return { ocrLogId, ocrText };
+  } catch (error) {
+    console.error("Google Vision OCR hiba:", error);
+    throw error;
   }
 };

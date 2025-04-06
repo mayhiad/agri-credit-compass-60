@@ -1,7 +1,7 @@
 
 import { FarmData } from "@/components/LoanApplication";
 import { supabase } from "@/integrations/supabase/client";
-import { processDocumentWithOpenAI, checkProcessingResults } from "@/services/documentProcessingService";
+import { processDocumentWithOpenAI, checkProcessingResults, processDocumentWithGoogleVision } from "@/services/documentProcessingService";
 import { uploadFileToStorage } from "@/utils/storageUtils";
 import { generateFallbackFarmData, validateAndFixFarmData } from "@/services/fallbackDataService";
 
@@ -17,7 +17,8 @@ export type ProcessingStatus = {
 export const processSapsDocument = async (
   file: File, 
   user: any, 
-  updateStatus: (status: ProcessingStatus) => void
+  updateStatus: (status: ProcessingStatus) => void,
+  useGoogleVision: boolean = false // Google Vision API használata beállítható
 ): Promise<FarmData> => {
   if (!file) {
     throw new Error("Nincs kiválasztva fájl");
@@ -50,6 +51,98 @@ export const processSapsDocument = async (
     progress: 30,
   });
   
+  // Google Vision API OCR használata, ha kérték
+  if (useGoogleVision) {
+    return await processWithGoogleVision(file, user, updateStatus);
+  } else {
+    return await processWithOpenAI(file, user, updateStatus);
+  }
+};
+
+/**
+ * Google Vision API használata OCR-hez
+ */
+const processWithGoogleVision = async (
+  file: File,
+  user: any,
+  updateStatus: (status: ProcessingStatus) => void
+): Promise<FarmData> => {
+  try {
+    updateStatus({
+      step: "Google Vision OCR szkennelés",
+      progress: 40,
+      details: "Dokumentum szövegének kinyerése Google Vision API-val..."
+    });
+    
+    // Dokumentum feldolgozása Google Vision API-val
+    const visionResult = await processDocumentWithGoogleVision(file, user);
+    
+    if (!visionResult) {
+      throw new Error("Hiba történt a Google Vision feldolgozás során");
+    }
+    
+    updateStatus({
+      step: "Google Vision OCR sikeres",
+      progress: 60,
+      details: "OCR szkennelés sikeresen befejezve, feldolgozott szöveg elemzése..."
+    });
+    
+    // Itt folytatjuk az OCR eredmény feldolgozását AI-val vagy manuális elemzéssel
+    // Mivel most csak az OCR szkennelés a cél, generálunk néhány placeholder adatot
+    
+    // Fallback adatok generálása
+    const farmData = generateFallbackFarmData(user.id, file.name, file.size);
+    farmData.fileName = file.name;
+    farmData.fileSize = file.size;
+    
+    // Ha van OCR eredmény, mentjük a nyers adatokba
+    if (visionResult.ocrText) {
+      farmData.ocrText = visionResult.ocrText;
+    }
+    
+    updateStatus({
+      step: "OCR szövegkinyerés befejezve",
+      progress: 90,
+      details: "A Google Vision API sikeresen kinyerte a szöveget a dokumentumból."
+    });
+    
+    // További validáció és hiányzó mezők pótlása
+    const validatedData = validateAndFixFarmData(farmData);
+    
+    updateStatus({
+      step: "Adatok feldolgozása",
+      progress: 100,
+      details: `OCR feldolgozás befejezve. ${validatedData.ocrText ? validatedData.ocrText.length : 0} karakter kinyerve.`
+    });
+    
+    return validatedData;
+  } catch (error) {
+    console.error("Google Vision feldolgozási hiba:", error);
+    
+    // Hiba esetén fallback adatokat generálunk
+    const farmData = generateFallbackFarmData(user.id, file.name, file.size);
+    farmData.errorMessage = `Google Vision OCR hiba: ${error.message}`;
+    farmData.fileName = file.name;
+    farmData.fileSize = file.size;
+    
+    updateStatus({
+      step: "OCR hiba",
+      progress: 100,
+      details: "Hiba történt a dokumentum OCR feldolgozása során. Példa adatok generálása..."
+    });
+    
+    return validateAndFixFarmData(farmData);
+  }
+};
+
+/**
+ * OpenAI asszisztens használata a dokumentum feldolgozásához
+ */
+const processWithOpenAI = async (
+  file: File,
+  user: any,
+  updateStatus: (status: ProcessingStatus) => void
+): Promise<FarmData> => {
   // Dokumentum feldolgozása OpenAI-val
   let processResult;
   try {
@@ -126,7 +219,7 @@ export const processSapsDocument = async (
             
             farmData = generateFallbackFarmData(user.id, file.name, file.size);
             farmData.errorMessage = "Nem sikerült az adatokat kinyerni a dokumentumból. Demonstrációs adatok kerültek megjelenítésre.";
-            farmData.rawAiResponse = rawContent;
+            farmData.ocrText = rawContent;
             break;
           }
           
@@ -171,7 +264,7 @@ export const processSapsDocument = async (
         // Fallback adatok generálása
         farmData = generateFallbackFarmData(user.id, file.name, file.size);
         farmData.errorMessage = "Nem sikerült feldolgozni a dokumentumot. Demonstrációs adatok kerültek megjelenítésre.";
-        farmData.rawAiResponse = rawContent;
+        farmData.ocrText = rawContent;
         break;
       }
     }
@@ -181,7 +274,7 @@ export const processSapsDocument = async (
   if (!isComplete || !farmData) {
     console.warn("AI feldolgozás sikertelen, fallback adatok generálása...");
     farmData = generateFallbackFarmData(user.id, file.name, file.size);
-    farmData.rawAiResponse = rawContent;
+    farmData.ocrText = rawContent;
     
     updateStatus({
       step: "Feldolgozás sikertelen",

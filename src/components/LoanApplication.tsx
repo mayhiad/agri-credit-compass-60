@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,32 +24,22 @@ export interface MarketPrice {
 
 export type FarmData = {
   hectares: number;
-  cultures: Array<{ 
-    name: string; 
-    hectares: number; 
+  cultures: {
+    name: string;
+    hectares: number;
     estimatedRevenue: number;
-    yieldPerHectare?: number;
-    pricePerTon?: number;
-  }>;
+  }[];
   totalRevenue: number;
-  region: string;
-  documentId: string;
+  region?: string;
+  documentId?: string;
   applicantName?: string;
-  // New identifier for database ID
-  farmId?: string;
-  // Detailed data
   blockIds?: string[];
-  parcels?: ParcelData[];
-  marketPrices?: MarketPrice[];
-  year?: string; // Year field to store the year
-  // Historical data
-  historicalCrops?: HistoricalCropData[]; // Historical crop data
-  documentDate?: string; // Document date
-  // File metadata for diagnostics
+  farmId?: string;
   fileName?: string;
   fileSize?: number;
-  // Error message
   errorMessage?: string;
+  marketPrices?: any[];
+  ocrText?: string;
 };
 
 export type UserData = {
@@ -83,21 +72,17 @@ export const LoanApplication = () => {
   const [loanTerms, setLoanTerms] = useState<LoanSettings | null>(null);
 
   useEffect(() => {
-    // Check if there's a step query parameter and farm data in localStorage
     const urlStep = searchParams.get("step");
     const storedFarmData = localStorage.getItem("farmData");
     
     if (urlStep === "loan-terms" && storedFarmData) {
       try {
-        // Parse stored farm data
         const parsedFarmData = JSON.parse(storedFarmData);
         setFarmData(parsedFarmData);
         
-        // Calculate credit limit
         const calculatedCreditLimit = Math.round(parsedFarmData.totalRevenue * 0.4);
         setCreditLimit(calculatedCreditLimit);
         
-        // Skip directly to loan terms
         setStep("loan-terms");
         
         toast({
@@ -155,7 +140,6 @@ export const LoanApplication = () => {
       title: "Szerződés aláírva",
       description: "A kölcsön folyósítása folyamatban van.",
     });
-    // Clear the stored farm data after completing the process
     localStorage.removeItem("farmData");
   };
 

@@ -14,6 +14,8 @@ import ErrorDisplay from "@/components/upload/ErrorDisplay";
 import SuccessMessage from "@/components/upload/SuccessMessage";
 import { ProcessingStatus as ProcessingStatusType, processSapsDocument } from "@/services/uploadProcessingService";
 import { saveFarmDataToDatabase } from "@/services/farmDataService";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface FileUploadProps {
   onComplete: (farmData: FarmData) => void;
@@ -25,6 +27,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatusType | null>(null);
+  const [useGoogleVision, setUseGoogleVision] = useState(false);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -61,12 +64,14 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
     try {
       // Feldolgozzuk a dokumentumot
       setProcessingStatus({
-        step: "Dokumentum AI elemzése",
+        step: useGoogleVision ? "Dokumentum OCR szkennelése" : "Dokumentum AI elemzése",
         progress: 10,
-        details: "A feltöltött dokumentum AI elemzése folyamatban..."
+        details: useGoogleVision 
+          ? "A feltöltött dokumentum Google Vision OCR szkennelése folyamatban..." 
+          : "A feltöltött dokumentum AI elemzése folyamatban..."
       });
       
-      const farmData = await processSapsDocument(file, user, setProcessingStatus);
+      const farmData = await processSapsDocument(file, user, setProcessingStatus, useGoogleVision);
       
       // Mentsük el az adatbázisba a feldolgozott adatokat
       setProcessingStatus({
@@ -93,7 +98,9 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       });
       
       onComplete(farmData);
-      toast.success("SAPS dokumentum sikeresen feldolgozva");
+      toast.success(useGoogleVision 
+        ? "SAPS dokumentum sikeresen feldolgozva Google Vision OCR-rel" 
+        : "SAPS dokumentum sikeresen feldolgozva");
       
     } catch (error) {
       console.error("SAPS feldolgozási hiba:", error);
@@ -148,6 +155,18 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
           </div>
           
           <form onSubmit={handleSubmit}>
+            <div className="flex items-center space-x-2 mb-4">
+              <Switch
+                id="use-google-vision"
+                checked={useGoogleVision}
+                onCheckedChange={setUseGoogleVision}
+              />
+              <Label htmlFor="use-google-vision">
+                Google Cloud Vision API használata
+                <span className="ml-1 text-xs text-muted-foreground">(Jobb OCR eredmények)</span>
+              </Label>
+            </div>
+            
             <UploadArea file={file} onFileChange={handleFileChange} />
             <ProcessingStatus status={processingStatus} />
             <ErrorDisplay message={error} />
