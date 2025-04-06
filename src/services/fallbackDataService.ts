@@ -3,33 +3,34 @@ import { FarmData } from "@/components/LoanApplication";
 
 /**
  * Generates fallback farm data when AI processing fails
- * FIGYELEM: Ez csak demonstrációs célokra szolgál, és csak akkor használjuk,
- * ha az AI feldolgozás teljesen sikertelen. A valós alkalmazásban mindig
- * a dokumentumból kinyert adatokat kell használni.
+ * ATTENTION: This is for demonstration purposes only and should only be used
+ * when AI processing completely fails. In a real application, always
+ * use data extracted from the document.
  */
 export const generateFallbackFarmData = (
   userId: string, 
   fileName?: string, 
   fileSize?: number
 ): FarmData => {
-  console.error("FIGYELEM: Fallback adatok generálása történik. Ez csak vészhelyzeti eset lehet!");
+  console.error("WARNING: Generating fallback data. This should only be an emergency case!");
   
-  // Jelenlegi év meghatározása
+  // Determine current year
   const currentYear = new Date().getFullYear().toString();
   
-  // Üres adatstruktúra létrehozása - NEM tartalmazhat random adatokat!
+  // Create empty data structure - it MUST NOT contain random data!
   return {
     hectares: 0,
     cultures: [],
     totalRevenue: 0,
-    region: "Adatok kinyerése sikertelen",
+    region: "Data extraction failed",
     documentId: `SAPS-${currentYear}-ERR`,
-    applicantName: "Sikertelen feldolgozás",
+    applicantName: "Processing failed",
     blockIds: [],
     year: currentYear,
     fileName,
     fileSize,
-    error: "A dokumentum feldolgozása sikertelen volt. Kérjük, ellenőrizze a feltöltött fájlt és próbálja újra."
+    // Use proper error handling as defined in FarmData type
+    errorMessage: "Document processing failed. Please check the uploaded file and try again."
   };
 };
 
@@ -45,7 +46,7 @@ export const validateAndFixFarmData = (farmData: FarmData): FarmData => {
   }
   
   if (typeof result.totalRevenue !== 'number' || isNaN(result.totalRevenue)) {
-    // Számítsuk ki a bevételt a kultúrák alapján, ha azok rendelkezésre állnak
+    // Calculate revenue based on cultures if available
     if (result.cultures && result.cultures.length > 0) {
       result.totalRevenue = result.cultures.reduce((sum, culture) => 
         sum + (typeof culture.estimatedRevenue === 'number' ? culture.estimatedRevenue : 0), 0);
@@ -55,14 +56,14 @@ export const validateAndFixFarmData = (farmData: FarmData): FarmData => {
   }
   
   if (!result.region) {
-    result.region = "Ismeretlen régió";
+    result.region = "Unknown region";
   }
   
   if (!result.cultures || !Array.isArray(result.cultures)) {
     result.cultures = [];
   }
   
-  // Ellenőrizzük, hogy minden kultúra rendelkezik-e a szükséges mezőkkel
+  // Check if each culture has the required fields
   result.cultures = result.cultures.map(culture => {
     const fixedCulture = { ...culture };
     
@@ -71,9 +72,12 @@ export const validateAndFixFarmData = (farmData: FarmData): FarmData => {
     }
     
     if (typeof fixedCulture.estimatedRevenue !== 'number' || isNaN(fixedCulture.estimatedRevenue)) {
-      // Számítsuk ki a bevételt a hektár, hozam és ár alapján, ha rendelkezésre állnak
-      if (fixedCulture.hectares && fixedCulture.yieldPerHectare && fixedCulture.pricePerTon) {
-        fixedCulture.estimatedRevenue = fixedCulture.hectares * fixedCulture.yieldPerHectare * fixedCulture.pricePerTon;
+      // Calculate revenue based on hectares, yield and price if available
+      const yieldValue = (fixedCulture as any).yieldPerHectare;
+      const priceValue = (fixedCulture as any).pricePerTon;
+      
+      if (fixedCulture.hectares && yieldValue && priceValue) {
+        fixedCulture.estimatedRevenue = fixedCulture.hectares * yieldValue * priceValue;
       } else {
         fixedCulture.estimatedRevenue = 0;
       }
@@ -82,7 +86,7 @@ export const validateAndFixFarmData = (farmData: FarmData): FarmData => {
     return fixedCulture;
   });
   
-  // Ellenőrizzük a teljes hektárszámot
+  // Check total hectares
   const calculatedHectares = result.cultures.reduce((sum, culture) => sum + culture.hectares, 0);
   if (result.hectares === 0 && calculatedHectares > 0) {
     result.hectares = calculatedHectares;

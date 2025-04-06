@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,24 +25,32 @@ export interface MarketPrice {
 
 export type FarmData = {
   hectares: number;
-  cultures: Array<{ name: string; hectares: number; estimatedRevenue: number }>;
+  cultures: Array<{ 
+    name: string; 
+    hectares: number; 
+    estimatedRevenue: number;
+    yieldPerHectare?: number;
+    pricePerTon?: number;
+  }>;
   totalRevenue: number;
   region: string;
   documentId: string;
   applicantName?: string;
-  // Új azonosító az adatbázis ID-hez
+  // New identifier for database ID
   farmId?: string;
-  // Részletes adatok
+  // Detailed data
   blockIds?: string[];
   parcels?: ParcelData[];
   marketPrices?: MarketPrice[];
-  year?: string; // Év mező az évszám tárolására
-  // Történeti adatok
-  historicalCrops?: HistoricalCropData[]; // Történeti növénytermesztési adatok
-  documentDate?: string; // Dokumentum dátuma
+  year?: string; // Year field to store the year
+  // Historical data
+  historicalCrops?: HistoricalCropData[]; // Historical crop data
+  documentDate?: string; // Document date
   // File metadata for diagnostics
   fileName?: string;
   fileSize?: number;
+  // Error message
+  errorMessage?: string;
 };
 
 export type UserData = {

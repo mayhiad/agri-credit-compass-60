@@ -38,14 +38,14 @@ export interface ExtractionData {
   processedAt?: string;
   fileName?: string;
   fileSize?: number;
-  error?: string; // Hibaüzenet, ha a feldolgozás sikertelen
+  error?: string; // Error message if processing failed
 }
 
 export interface MarketPrice {
   culture: string;
   averageYield: number; // t/ha
   price: number; // Ft/t
-  trend: number; // -1: csökkenő, 0: stabil, 1: növekvő
+  trend: number; // -1: decreasing, 0: stable, 1: increasing
   lastUpdated?: string;
   year?: string;
 }
@@ -56,43 +56,43 @@ export interface ValidationResult {
   errors?: string[];
 }
 
-// Annak ellenőrzésére, hogy a dokumentumból kinyert adatok érvényesek-e
+// To check if the data extracted from the document is valid
 export function validateExtractionData(data: ExtractionData): ValidationResult {
   const errors: string[] = [];
   
-  // Alapadatok ellenőrzése
+  // Check basic data
   if (!data.hectares || data.hectares <= 0) {
-    errors.push("Hiányzó vagy érvénytelen területadat (hektár)");
+    errors.push("Missing or invalid area data (hectares)");
   }
   
   if (!data.cultures || data.cultures.length === 0) {
-    errors.push("Nem található növénykultúra a dokumentumban");
+    errors.push("No crops found in the document");
   } else {
-    // Kultúrák adatainak ellenőrzése
+    // Check crop data
     for (const culture of data.cultures) {
       if (!culture.name) {
-        errors.push("Hiányzó növénykultúra név");
+        errors.push("Missing crop name");
       }
       
       if (!culture.hectares || culture.hectares <= 0) {
-        errors.push(`Hiányzó vagy érvénytelen területadat a(z) ${culture.name || 'ismeretlen'} kultúránál`);
+        errors.push(`Missing or invalid area data for crop ${culture.name || 'unknown'}`);
       }
       
       if (!culture.estimatedRevenue || culture.estimatedRevenue <= 0) {
-        errors.push(`Hiányzó vagy érvénytelen becsült bevétel a(z) ${culture.name || 'ismeretlen'} kultúránál`);
+        errors.push(`Missing or invalid estimated revenue for crop ${culture.name || 'unknown'}`);
       }
     }
   }
   
   if (!data.totalRevenue || data.totalRevenue <= 0) {
-    errors.push("Hiányzó vagy érvénytelen teljes árbevétel");
+    errors.push("Missing or invalid total revenue");
   }
   
   return {
     valid: errors.length === 0,
     message: errors.length > 0 ? 
-      "A dokumentumból nem sikerült minden szükséges adatot kinyerni" : 
-      "Az adatok sikeresen kinyerve",
+      "Not all necessary data could be extracted from the document" : 
+      "Data successfully extracted",
     errors: errors.length > 0 ? errors : undefined
   };
 }
