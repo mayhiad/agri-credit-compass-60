@@ -239,6 +239,45 @@ export type Database = {
           },
         ]
       }
+      market_prices: {
+        Row: {
+          average_yield: number
+          created_at: string
+          culture: string
+          id: string
+          is_forecast: boolean
+          last_updated: string
+          price: number
+          region: string
+          trend: number
+          year: string
+        }
+        Insert: {
+          average_yield: number
+          created_at?: string
+          culture: string
+          id?: string
+          is_forecast?: boolean
+          last_updated?: string
+          price: number
+          region: string
+          trend?: number
+          year: string
+        }
+        Update: {
+          average_yield?: number
+          created_at?: string
+          culture?: string
+          id?: string
+          is_forecast?: boolean
+          last_updated?: string
+          price?: number
+          region?: string
+          trend?: number
+          year?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           address: string | null

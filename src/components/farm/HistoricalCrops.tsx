@@ -3,7 +3,8 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-interface HistoricalCropData {
+// Export the interface to make it available for other components
+export interface HistoricalCropData {
   year: string;
   culture: string;
   averageYield: number;

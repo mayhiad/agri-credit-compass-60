@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -32,7 +31,12 @@ type MarketPriceFormValues = {
   is_forecast: boolean;
 };
 
-const AdminMarketPrices = () => {
+type AdminMarketPricesProps = {
+  isAdmin: boolean;
+  isFinanceOfficer: boolean;
+};
+
+const AdminMarketPrices = ({ isAdmin, isFinanceOfficer }: AdminMarketPricesProps) => {
   const [activeTab, setActiveTab] = useState<'historical' | 'forecast'>('historical');
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -63,7 +67,6 @@ const AdminMarketPrices = () => {
   const handleSubmit = async (values: MarketPriceFormValues) => {
     try {
       if (editingId) {
-        // Update existing price
         const { error } = await supabase
           .from('market_prices')
           .update({
@@ -80,7 +83,6 @@ const AdminMarketPrices = () => {
         if (error) throw error;
         toast.success("Az árfolyam adatok frissítve");
       } else {
-        // Create new price
         const { error } = await supabase
           .from('market_prices')
           .insert({
@@ -98,7 +100,6 @@ const AdminMarketPrices = () => {
         toast.success("Új árfolyam adat létrehozva");
       }
       
-      // Reset form and refetch data
       form.reset();
       setEditingId(null);
       refetch();

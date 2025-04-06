@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -59,7 +58,10 @@ const AdminDashboard = ({ isAdmin, isFinanceOfficer }: AdminDashboardProps) => {
         </TabsContent>
 
         <TabsContent value="market-prices" className="space-y-4">
-          <AdminMarketPrices />
+          <AdminMarketPrices 
+            isAdmin={isAdmin} 
+            isFinanceOfficer={isFinanceOfficer} 
+          />
         </TabsContent>
 
         <TabsContent value="database" className="space-y-4">
