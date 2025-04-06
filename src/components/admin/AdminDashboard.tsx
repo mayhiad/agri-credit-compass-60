@@ -1,10 +1,11 @@
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { supabase } from "@/integrations/supabase/client";
-import { formatCurrency } from "@/lib/utils";
-import { Loader2, Users, FileText, AlertCircle, CheckCircle, BanknoteIcon } from "lucide-react";
+import React, { useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import AdminCustomerList from "./AdminCustomerList";
+import AdminLoanList from "./AdminLoanList";
+import AdminMarketPrices from "./AdminMarketPrices";
+import { Database, Users, CreditCard, BarChart } from "lucide-react";
 
 interface AdminDashboardProps {
   isAdmin: boolean;
@@ -12,163 +13,66 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard = ({ isAdmin, isFinanceOfficer }: AdminDashboardProps) => {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalCustomers: 0,
-    totalLoans: 0,
-    pendingApproval: 0,
-    pendingTransfer: 0,
-    activeLoans: 0,
-    totalLoanAmount: 0
-  });
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        // Get customer count
-        const { count: customerCount } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true });
-
-        // Get total loans
-        const { count: loanCount } = await supabase
-          .from('loans')
-          .select('*', { count: 'exact', head: true });
-        
-        // Get pending approval loans
-        const { count: pendingApprovalCount } = await supabase
-          .from('loans')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending');
-        
-        // Get pending transfer loans
-        const { count: pendingTransferCount } = await supabase
-          .from('loans')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'kiutalásra vár');
-        
-        // Get active loans
-        const { count: activeLoansCount } = await supabase
-          .from('loans')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'kihelyezett hitelösszeg');
-        
-        // Get total loan amount
-        const { data: loanData } = await supabase
-          .from('loans')
-          .select('amount')
-          .not('status', 'eq', 'closed');
-
-        const totalLoanAmount = loanData?.reduce((sum, loan) => sum + Number(loan.amount), 0) || 0;
-        
-        setStats({
-          totalCustomers: customerCount || 0,
-          totalLoans: loanCount || 0,
-          pendingApproval: pendingApprovalCount || 0,
-          pendingTransfer: pendingTransferCount || 0,
-          activeLoans: activeLoansCount || 0,
-          totalLoanAmount
-        });
-      } catch (error) {
-        console.error('Error fetching admin stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center p-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const [activeTab, setActiveTab] = useState("customers");
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Összes ügyfél</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalCustomers}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Összes szerződés</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalLoans}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Aktív hitelösszeg</CardTitle>
-            <BanknoteIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalLoanAmount)}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Szerződések státusza</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Státusz</TableHead>
-                <TableHead>Darabszám</TableHead>
-                <TableHead>Állapot</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow>
-                <TableCell className="font-medium">Jóváhagyásra vár</TableCell>
-                <TableCell>{stats.pendingApproval}</TableCell>
-                <TableCell>
-                  <div className="flex items-center">
-                    <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
-                    <span>Adminisztrátori ellenőrzés szükséges</span>
-                  </div>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Kiutalásra vár</TableCell>
-                <TableCell>{stats.pendingTransfer}</TableCell>
-                <TableCell>
-                  <div className="flex items-center">
-                    <AlertCircle className="h-4 w-4 mr-2 text-blue-500" />
-                    <span>Pénzügyi jóváhagyás szükséges</span>
-                  </div>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Aktív szerződés</TableCell>
-                <TableCell>{stats.activeLoans}</TableCell>
-                <TableCell>
-                  <div className="flex items-center">
-                    <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
-                    <span>Folyósított hitel</span>
-                  </div>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <Card className="mb-4">
+        <CardContent className="p-6">
+          <h1 className="text-2xl font-bold mb-2">Admin Irányítópult</h1>
+          <p className="text-muted-foreground">
+            {isAdmin ? "Adminisztrátori" : "Pénzügyi ügyintézői"} jogosultsággal rendelkezik
+          </p>
         </CardContent>
       </Card>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <TabsTrigger value="customers" className="flex items-center">
+            <Users className="mr-2 h-4 w-4" />
+            <span className="hidden md:inline">Ügyfelek</span>
+            <span className="md:hidden">Ügyfelek</span>
+          </TabsTrigger>
+          <TabsTrigger value="loans" className="flex items-center">
+            <CreditCard className="mr-2 h-4 w-4" />
+            <span className="hidden md:inline">Hitelek</span>
+            <span className="md:hidden">Hitelek</span>
+          </TabsTrigger>
+          <TabsTrigger value="market-prices" className="flex items-center">
+            <BarChart className="mr-2 h-4 w-4" />
+            <span className="hidden md:inline">Piaci árak</span>
+            <span className="md:hidden">Árak</span>
+          </TabsTrigger>
+          <TabsTrigger value="database" className="flex items-center">
+            <Database className="mr-2 h-4 w-4" />
+            <span className="hidden md:inline">Adatbázis</span>
+            <span className="md:hidden">Adatok</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="customers" className="space-y-4">
+          <AdminCustomerList isAdmin={isAdmin} />
+        </TabsContent>
+
+        <TabsContent value="loans" className="space-y-4">
+          <AdminLoanList isAdmin={isAdmin} />
+        </TabsContent>
+
+        <TabsContent value="market-prices" className="space-y-4">
+          <AdminMarketPrices />
+        </TabsContent>
+
+        <TabsContent value="database" className="space-y-4">
+          <Card>
+            <CardContent className="pt-6">
+              <h2 className="text-xl font-semibold mb-4">Adatbázis műveletek</h2>
+              <p>
+                Ezen a felületen különböző adatbázis műveleteket végezhet majd, amint implementálva lesznek.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
