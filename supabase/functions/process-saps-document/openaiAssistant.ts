@@ -92,20 +92,33 @@ export async function startRun(threadId, assistantId, fileId) {
   const runStart = Date.now();
   
   try {
-    // Adjuk hozzá a fájlt a threadhez
-    console.log(`📎 Fájl hozzáadása (${fileId}) az üzenethez a threadben (${threadId})...`);
-    const messageWithFile = await openai.beta.threads.messages.create(threadId, {
-      role: "user",
-      content: "Kérlek, olvasd ki a gazdálkodó nevét a dokumentumból!",
-      file_ids: [fileId]
-    });
-    console.log(`✅ Üzenet létrehozva fájllal: ${messageWithFile.id}, Fájl ID-k: ${JSON.stringify(messageWithFile.file_ids)}`);
+    // A legfrissebb OpenAI API-ban a file_ids paramétert nem a messages.create-nél, 
+    // hanem a thread.runs.create-nél kell használni a tool_resources objektumban
+    console.log(`🚀 Futtatás indítása módosított struktúrával...`);
     
-    // Indítsuk el a futtatást, de ne adjunk meg külön file_ids-t itt
-    console.log(`🚀 Futtatás indítása a threaden (${threadId}) az asszisztenssel (${assistantId})...`);
+    // Ellenőrizzük, hogy a fileId formátuma megfelelő-e
+    if (!fileId.startsWith('file-')) {
+      console.warn(`⚠️ FIGYELEM: Nem szabványos fájl ID formátum: ${fileId}`);
+    }
+    
+    // Először hozzáadunk egy egyszerű üzenetet a threadhez (fájl nélkül)
+    console.log(`📩 Üzenet hozzáadása a threadhez fájl nélkül...`);
+    const messageWithoutFile = await openai.beta.threads.messages.create(threadId, {
+      role: "user",
+      content: "Kérlek, olvasd ki a gazdálkodó nevét a dokumentumból!"
+    });
+    console.log(`✅ Üzenet létrehozva fájl nélkül: ${messageWithoutFile.id}`);
+    
+    // Majd elindítjuk a futtatást az assistantId-val és a fileId-val a tool_resources-ban
+    console.log(`🚀 Futtatás indítása a threaden (${threadId}) az asszisztenssel (${assistantId}) és a file_search eszközzel...`);
     const run = await openai.beta.threads.runs.create(threadId, {
       assistant_id: assistantId,
-      instructions: "Olvasd ki a gazdálkodó nevét a dokumentumból JSON formátumban."
+      instructions: "Olvasd ki a gazdálkodó nevét a dokumentumból JSON formátumban.",
+      tool_resources: {
+        file_search: {
+          file_ids: [fileId]
+        }
+      }
     });
     
     const runTime = Date.now() - runStart;
