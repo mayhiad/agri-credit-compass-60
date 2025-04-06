@@ -84,12 +84,7 @@ export async function startRun(threadId, assistantId, fileId) {
     const run = await openai.beta.threads.runs.create(threadId, {
       assistant_id: assistantId,
       additional_instructions: "Olvasd ki a gazdálkodó nevét a dokumentumból.",
-      tools: [
-        {
-          type: "file_search",
-          file_ids: [fileId]
-        }
-      ]
+      file_ids: [fileId]
     });
     const runTime = Date.now() - runStart;
     console.log(`✅ Feldolgozás elindítva (${runTime}ms). Run ID: ${run.id}`);
