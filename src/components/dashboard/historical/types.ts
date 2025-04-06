@@ -24,6 +24,12 @@ export interface ExtractionData {
   documentId?: string;
   applicantName?: string;
   blockIds?: string[];
-  marketPrices?: any[];
+  marketPrices?: Array<{
+    culture: string;
+    averageYield: number;
+    price: number;
+    trend: number;
+    lastUpdated?: string;
+  }>;
   processedAt?: string;
 }
