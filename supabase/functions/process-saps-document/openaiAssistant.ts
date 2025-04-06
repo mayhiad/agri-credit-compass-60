@@ -123,12 +123,11 @@ export async function startRun(threadId, assistantId, fileId) {
 
     const run = await openai.beta.threads.runs.create(threadId, {
       assistant_id: assistantId,
-      attachments: [
-        {
-          file_id: fileId,
-          tools: ["file_search"]
+      tool_resources: {
+        file_search: {
+          file_ids: [fileId]
         }
-      ]
+      }
     });
 
     const runTime = Date.now() - runStart;
