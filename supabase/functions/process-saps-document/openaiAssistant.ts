@@ -1,3 +1,4 @@
+
 import OpenAI from "https://esm.sh/openai@4.38.0";
 import { getErrorDetails } from "./openaiClient.ts";
 
@@ -17,7 +18,10 @@ export async function createAssistant() {
     const assistant = await openai.beta.assistants.create({
       name: "SAPS Dokumentum Elemző",
       model: "gpt-4o-mini",
-      tools: [{ type: "file_search" }],
+      tools: [
+        { type: "file_search" },
+        { type: "code_interpreter" }
+      ],
       instructions: `
 Kérlek olvasd ki a dokumentumból a gazdálkodó nevét. Ez általában a dokumentum elején, a fejlécben vagy az űrlap első oldalán található.
 
