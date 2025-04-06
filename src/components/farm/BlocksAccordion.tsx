@@ -1,113 +1,84 @@
 
+import { FarmData } from "@/components/LoanApplication";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FarmData } from "@/components/LoanApplication";
-import { Layers, Info } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MapPin, Pin, Info } from "lucide-react";
+import { ParcelData } from "@/services/sapsProcessor";
 
 interface BlocksAccordionProps {
   farmData: FarmData;
 }
 
-export const BlocksAccordion = ({ farmData }: BlocksAccordionProps) => {
-  if (!farmData || !farmData.blockIds || farmData.blockIds.length === 0) {
+const BlocksAccordion = ({ farmData }: BlocksAccordionProps) => {
+  // If there are no block IDs, return null
+  if (!farmData.blockIds || farmData.blockIds.length === 0) {
     return null;
   }
+
+  // Create a default parcels array if not provided
+  const parcels: ParcelData[] = farmData.parcels || farmData.blockIds.map((blockId, index) => ({
+    id: `parcel-${index}`,
+    blockId: blockId,
+    area: farmData.hectares / farmData.blockIds.length,
+    location: "Ismeretlen helyszín",
+    cultures: farmData.cultures.slice(0, 2).map(c => c.name)
+  }));
   
   return (
-    <Accordion type="single" collapsible className="w-full">
-      <AccordionItem value="blocks">
-        <AccordionTrigger className="flex items-center gap-2">
-          <Layers className="h-4 w-4" />
-          <span>Blokkazonosítók ({farmData.blockIds.length} db)</span>
-        </AccordionTrigger>
-        <AccordionContent>
-          <div className="flex flex-wrap gap-2 p-2">
-            {farmData.blockIds.map((blockId, index) => (
-              <Badge key={index} variant="outline" className="text-xs">
-                {blockId}
-              </Badge>
+    <Card className="border-dashed">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-medium flex items-center gap-2">
+          <Pin className="h-4 w-4 text-primary" />
+          Blokkazonosítók és területek
+        </CardTitle>
+        <CardDescription>
+          A SAPS dokumentumban azonosított területek és blokkok
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {farmData.blockIds.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nem találhatók blokkazonosítók a dokumentumban.</p>
+        ) : (
+          <Accordion type="single" collapsible className="w-full">
+            {parcels.map((parcel, index) => (
+              <AccordionItem key={index} value={`item-${index}`}>
+                <AccordionTrigger className="py-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-blue-50">{parcel.blockId}</Badge>
+                    <span className="text-sm">
+                      {parcel.area.toFixed(1).replace('.', ',')} ha
+                    </span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-2 pl-1">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">{parcel.location}</span>
+                    </div>
+                    
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Info className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Növénykultúrák:</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 ml-6">
+                        {parcel.cultures.map((culture, idx) => (
+                          <Badge key={idx} variant="outline" className="bg-green-50 text-green-700">
+                            {culture}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
             ))}
-          </div>
-        </AccordionContent>
-      </AccordionItem>
-      
-      {farmData.parcels && farmData.parcels.length > 0 && (
-        <AccordionItem value="parcels">
-          <AccordionTrigger className="flex items-center gap-2">
-            <Info className="h-4 w-4" />
-            <span>Részletes parcella adatok ({farmData.parcels.length} db)</span>
-          </AccordionTrigger>
-          <AccordionContent>
-            <div className="border rounded-md overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Blokk ID</TableHead>
-                    <TableHead>Parcella</TableHead>
-                    <TableHead>Kultúra</TableHead>
-                    <TableHead className="text-right">Terület (ha)</TableHead>
-                    <TableHead>Település</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {farmData.parcels.map((parcel, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell>{parcel.blockId}</TableCell>
-                      <TableCell>{parcel.parcelId}</TableCell>
-                      <TableCell>{parcel.culture}</TableCell>
-                      <TableCell className="text-right">{parcel.hectares ? parcel.hectares.toFixed(2) : "0.00"}</TableCell>
-                      <TableCell>{parcel.location?.settlement || "Ismeretlen"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      )}
-      
-      {farmData.marketPrices && farmData.marketPrices.length > 0 && (
-        <AccordionItem value="prices">
-          <AccordionTrigger className="flex items-center gap-2">
-            <Info className="h-4 w-4" />
-            <span>Aktuális piaci árak</span>
-          </AccordionTrigger>
-          <AccordionContent>
-            <div className="border rounded-md">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Kultúra</TableHead>
-                    <TableHead className="text-right">Átlagos termésátlag (t/ha)</TableHead>
-                    <TableHead className="text-right">Piaci ár (Ft/t)</TableHead>
-                    <TableHead>Trend</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {farmData.marketPrices.map((price, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell>{price.culture}</TableCell>
-                      <TableCell className="text-right">{price.averageYield ? price.averageYield.toFixed(1) : "0.0"}</TableCell>
-                      <TableCell className="text-right">{price.price ? price.price.toLocaleString() : "0"} Ft</TableCell>
-                      <TableCell>
-                        {price.trend > 0 ? (
-                          <span className="text-green-600">↑ Növekvő</span>
-                        ) : price.trend < 0 ? (
-                          <span className="text-red-600">↓ Csökkenő</span>
-                        ) : (
-                          <span className="text-gray-600">→ Stabil</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      )}
-    </Accordion>
+          </Accordion>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 

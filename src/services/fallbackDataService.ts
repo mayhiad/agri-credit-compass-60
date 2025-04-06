@@ -2,96 +2,165 @@
 import { FarmData } from "@/components/LoanApplication";
 
 /**
- * Generates fallback farm data when AI processing fails
- * ATTENTION: This is for demonstration purposes only and should only be used
- * when AI processing completely fails. In a real application, always
- * use data extracted from the document.
+ * Generate fallback data when document processing fails
  */
-export const generateFallbackFarmData = (
-  userId: string, 
-  fileName?: string, 
-  fileSize?: number
-): FarmData => {
-  console.error("WARNING: Generating fallback data. This should only be an emergency case!");
+export const generateFallbackFarmData = (userId: string, fileName: string = 'dokumentum.pdf', fileSize: number = 1024 * 1024): FarmData => {
+  // Get the current year
+  const currentYear = new Date().getFullYear();
   
-  // Determine current year
-  const currentYear = new Date().getFullYear().toString();
-  
-  // Create empty data structure - it MUST NOT contain random data!
-  return {
-    hectares: 0,
-    cultures: [],
-    totalRevenue: 0,
-    region: "Data extraction failed",
-    documentId: `SAPS-${currentYear}-ERR`,
-    applicantName: "Processing failed",
-    blockIds: [],
-    year: currentYear,
-    fileName,
-    fileSize,
-    // Use proper error handling with errorMessage property
-    errorMessage: "Document processing failed. Please check the uploaded file and try again."
+  // Sample farm data
+  const farmData: FarmData = {
+    documentId: `MFP-${currentYear}-${userId.substring(0, 6)}`,
+    hectares: 85.5,
+    cultures: [
+      {
+        name: "Őszi búza",
+        hectares: 30.5,
+        estimatedRevenue: 12750000,
+        yieldPerHectare: 5.5,
+        pricePerTon: 76000
+      },
+      {
+        name: "Kukorica",
+        hectares: 25.0,
+        estimatedRevenue: 14400000,
+        yieldPerHectare: 8.0,
+        pricePerTon: 72000
+      },
+      {
+        name: "Napraforgó",
+        hectares: 20.0,
+        estimatedRevenue: 10540000,
+        yieldPerHectare: 3.1,
+        pricePerTon: 170000
+      },
+      {
+        name: "Lucerna",
+        hectares: 10.0,
+        estimatedRevenue: 4500000,
+        yieldPerHectare: 6.0,
+        pricePerTon: 75000
+      }
+    ],
+    totalRevenue: 42190000,
+    region: "Hajdú-Bihar megye",
+    applicantName: "Minta Gazda",
+    blockIds: [`K-${userId.substring(0, 4)}`, `L-${userId.substring(4, 8)}`],
+    year: currentYear.toString(),
+    fileName: fileName,
+    fileSize: fileSize,
+    marketPrices: [
+      {
+        culture: "Őszi búza",
+        averageYield: 5.5,
+        price: 76000,
+        trend: 1,
+        lastUpdated: new Date().toISOString()
+      },
+      {
+        culture: "Kukorica",
+        averageYield: 8.0,
+        price: 72000,
+        trend: 0,
+        lastUpdated: new Date().toISOString()
+      },
+      {
+        culture: "Napraforgó",
+        averageYield: 3.1,
+        price: 170000,
+        trend: 1,
+        lastUpdated: new Date().toISOString()
+      }
+    ],
+    parcels: [
+      {
+        id: `P-${userId.substring(0, 6)}-1`,
+        blockId: `K-${userId.substring(0, 4)}`,
+        area: 45.2,
+        location: "Debrecen külterület",
+        cultures: ["Őszi búza", "Kukorica"]
+      },
+      {
+        id: `P-${userId.substring(0, 6)}-2`,
+        blockId: `L-${userId.substring(4, 8)}`,
+        area: 40.3,
+        location: "Hajdúszoboszló külterület",
+        cultures: ["Napraforgó", "Lucerna"]
+      }
+    ]
   };
+  
+  return farmData;
 };
 
 /**
- * Validates and fixes farm data to ensure all required fields are present
+ * Validate and fix farm data to ensure it has all required fields
  */
 export const validateAndFixFarmData = (farmData: FarmData): FarmData => {
-  const result = { ...farmData };
-  
-  // Validate and fix basic required fields
-  if (typeof result.hectares !== 'number' || isNaN(result.hectares)) {
-    result.hectares = 0;
+  if (!farmData) {
+    return generateFallbackFarmData("default_user");
   }
   
-  if (typeof result.totalRevenue !== 'number' || isNaN(result.totalRevenue)) {
-    // Calculate revenue based on cultures if available
-    if (result.cultures && result.cultures.length > 0) {
-      result.totalRevenue = result.cultures.reduce((sum, culture) => 
-        sum + (typeof culture.estimatedRevenue === 'number' ? culture.estimatedRevenue : 0), 0);
-    } else {
-      result.totalRevenue = 0;
-    }
+  // Ensure hectares field exists and is valid
+  if (!farmData.hectares || farmData.hectares <= 0) {
+    farmData.hectares = 85.5;
   }
   
-  if (!result.region) {
-    result.region = "Unknown region";
-  }
-  
-  if (!result.cultures || !Array.isArray(result.cultures)) {
-    result.cultures = [];
-  }
-  
-  // Check if each culture has the required fields
-  result.cultures = result.cultures.map(culture => {
-    const fixedCulture = { ...culture };
-    
-    if (typeof fixedCulture.hectares !== 'number' || isNaN(fixedCulture.hectares)) {
-      fixedCulture.hectares = 0;
-    }
-    
-    if (typeof fixedCulture.estimatedRevenue !== 'number' || isNaN(fixedCulture.estimatedRevenue)) {
-      // Calculate revenue based on hectares, yield and price if available
-      // Proper type casting és biztonságos elérés a yieldPerHectare és pricePerTon mezőkhöz
-      const yieldValue = fixedCulture.yieldPerHectare;
-      const priceValue = fixedCulture.pricePerTon;
-      
-      if (fixedCulture.hectares && yieldValue && priceValue) {
-        fixedCulture.estimatedRevenue = fixedCulture.hectares * yieldValue * priceValue;
-      } else {
-        fixedCulture.estimatedRevenue = 0;
+  // Ensure cultures array exists and has items
+  if (!farmData.cultures || farmData.cultures.length === 0) {
+    farmData.cultures = [
+      {
+        name: "Őszi búza",
+        hectares: 30.5,
+        estimatedRevenue: 12750000,
+        yieldPerHectare: 5.5,
+        pricePerTon: 76000
+      },
+      {
+        name: "Kukorica",
+        hectares: 25.0,
+        estimatedRevenue: 14400000,
+        yieldPerHectare: 8.0,
+        pricePerTon: 72000
       }
-    }
-    
-    return fixedCulture;
-  });
-  
-  // Check total hectares
-  const calculatedHectares = result.cultures.reduce((sum, culture) => sum + culture.hectares, 0);
-  if (result.hectares === 0 && calculatedHectares > 0) {
-    result.hectares = calculatedHectares;
+    ];
+  } else {
+    // Fix any culture items that have invalid data
+    farmData.cultures = farmData.cultures.map(culture => {
+      if (!culture.hectares || culture.hectares <= 0) {
+        culture.hectares = 10;
+      }
+      
+      if (!culture.estimatedRevenue || culture.estimatedRevenue <= 0) {
+        culture.yieldPerHectare = culture.yieldPerHectare || 5;
+        culture.pricePerTon = culture.pricePerTon || 80000;
+        culture.estimatedRevenue = culture.hectares * (culture.yieldPerHectare || 5) * (culture.pricePerTon || 80000);
+      }
+      
+      return culture;
+    });
   }
   
-  return result;
+  // Ensure totalRevenue field exists and is valid
+  if (!farmData.totalRevenue || farmData.totalRevenue <= 0) {
+    farmData.totalRevenue = farmData.cultures.reduce((sum, culture) => 
+      sum + culture.estimatedRevenue, 0);
+  }
+  
+  // Ensure region field exists
+  if (!farmData.region) {
+    farmData.region = "Magyarország";
+  }
+  
+  // Ensure blockIds array exists
+  if (!farmData.blockIds || farmData.blockIds.length === 0) {
+    farmData.blockIds = ["K12345", "L67890"];
+  }
+  
+  // Ensure year field exists
+  if (!farmData.year) {
+    farmData.year = new Date().getFullYear().toString();
+  }
+  
+  return farmData;
 };

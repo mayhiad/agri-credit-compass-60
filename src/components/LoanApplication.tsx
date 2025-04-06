@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +29,8 @@ export type FarmData = {
     name: string;
     hectares: number;
     estimatedRevenue: number;
+    yieldPerHectare?: number;
+    pricePerTon?: number;
   }[];
   totalRevenue: number;
   region?: string;
@@ -40,6 +43,9 @@ export type FarmData = {
   errorMessage?: string;
   marketPrices?: any[];
   ocrText?: string;
+  year?: string;
+  documentDate?: string;
+  parcels?: ParcelData[];
 };
 
 export type UserData = {

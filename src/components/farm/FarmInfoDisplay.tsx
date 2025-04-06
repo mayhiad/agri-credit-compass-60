@@ -55,7 +55,7 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoDisplayProps) 
         <DocumentInfo 
           documentId={farmData.documentId} 
           applicantName={farmData.applicantName} 
-          documentDate={farmData.documentDate}
+          documentDate={farmData.documentDate || farmData.year}
         />
       </CardContent>
       <CardFooter>

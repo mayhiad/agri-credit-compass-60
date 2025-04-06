@@ -41,6 +41,9 @@ const DashboardCrops = ({ farmData }: DashboardCropsProps) => {
     typeof c.hectares === 'number' && 
     typeof c.estimatedRevenue === 'number');
   
+  // Current year if not specified
+  const displayYear = farmData.year || new Date().getFullYear().toString();
+  
   return (
     <Card>
       <CardHeader>
@@ -53,12 +56,10 @@ const DashboardCrops = ({ farmData }: DashboardCropsProps) => {
                 : `SAPS dokumentum alapján rögzített növénykultúrák - ${farmData.documentId || ""}`}
             </CardDescription>
           </div>
-          {farmData.year && (
-            <Badge variant="outline" className="flex items-center gap-1 bg-amber-50 text-amber-700">
-              <Calendar className="h-3.5 w-3.5" />
-              {farmData.year}. évi adatok
-            </Badge>
-          )}
+          <Badge variant="outline" className="flex items-center gap-1 bg-amber-50 text-amber-700">
+            <Calendar className="h-3.5 w-3.5" />
+            {displayYear}. évi adatok
+          </Badge>
         </div>
       </CardHeader>
       <CardContent>

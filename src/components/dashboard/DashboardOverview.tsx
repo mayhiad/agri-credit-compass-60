@@ -1,175 +1,146 @@
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatCurrency } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 import { FarmData } from "@/components/LoanApplication";
-import { useNavigate } from "react-router-dom";
-import { FileText, Map, BarChart3, AlertTriangle, Calendar } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Calendar, Tractor, CircleDollarSign, FileSpreadsheet, MapPin } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 
 interface DashboardOverviewProps {
   farmData: FarmData;
 }
 
 const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
-  const navigate = useNavigate();
-  
-  const handleStartLoanApplication = () => {
-    // Store farmData in localStorage to access it in the LoanApplication component
-    localStorage.setItem('farmData', JSON.stringify(farmData));
-    
-    // Navigate to the homepage with a query parameter to indicate we should skip to loan terms
-    navigate("/?step=loan-terms");
-  };
-  
-  // Ellenőrizzük, hogy rendelkezünk-e érvényes árbevétel adatokkal
-  const hasValidRevenue = typeof farmData.totalRevenue === 'number' && farmData.totalRevenue > 0;
-  // Kiszámoljuk a hitelkeretet az árbevétel 40%-aként
-  const creditLimit = hasValidRevenue ? Math.round(farmData.totalRevenue * 0.4) : 0;
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+  // Ellenőrizzük, hogy van-e érvényes adat
+  if (!farmData || !farmData.cultures || farmData.cultures.length === 0) {
+    return (
       <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Gazdaságom adatai
-              </CardTitle>
-              <CardDescription>
-                SAPS dokumentum alapján
-              </CardDescription>
-            </div>
-            {farmData.year && (
-              <Badge variant="outline" className="flex items-center gap-1 bg-amber-50 text-amber-700">
-                <Calendar className="h-3.5 w-3.5" />
-                {farmData.year}. évi adatok
-              </Badge>
-            )}
-          </div>
+        <CardHeader>
+          <CardTitle>Gazdaság áttekintése</CardTitle>
+          <CardDescription>Hiányzó vagy érvénytelen adatok</CardDescription>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableBody>
-              <TableRow>
-                <TableCell className="font-medium">Dokumentum azonosító</TableCell>
-                <TableCell>{farmData.documentId}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Régió</TableCell>
-                <TableCell>{farmData.region}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Gazdálkodó</TableCell>
-                <TableCell>{farmData.applicantName || "Nincs megadva"}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Összes terület</TableCell>
-                <TableCell>{farmData.hectares} ha</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Éves árbevétel</TableCell>
-                <TableCell className="font-bold text-green-700">{formatCurrency(farmData.totalRevenue)}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Blokkazonosítók</TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {farmData.blockIds?.map((id, index) => (
-                      <Badge key={index} variant="outline" className="bg-blue-50">
-                        {id}
-                      </Badge>
-                    )) || "Nincs adat"}
-                  </div>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+        <CardContent className="py-10 text-center">
+          <p>Nincs elegendő adat a gazdaság megjelenítéséhez.</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Kérjük, töltsön fel egy SAPS dokumentumot az adatok frissítéséhez.
+          </p>
         </CardContent>
       </Card>
-      
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-primary" />
-            Hitelkeret információ
+    );
+  }
+  
+  // Current year if not specified
+  const displayYear = farmData.year || new Date().getFullYear().toString();
+  
+  // Gazdálkodási adatok számítása
+  const totalHectares = farmData.hectares;
+  const totalRevenue = farmData.totalRevenue;
+  const avgRevenuePerHectare = totalHectares > 0 ? totalRevenue / totalHectares : 0;
+  
+  // Get top 3 most valuable cultures
+  const topCultures = [...farmData.cultures]
+    .sort((a, b) => b.estimatedRevenue - a.estimatedRevenue)
+    .slice(0, 3);
+  
+  // Calculate proportion of each culture
+  const largestCulture = farmData.cultures.reduce((prev, current) => 
+    (prev.hectares > current.hectares) ? prev : current);
+  
+  return (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {/* Card 1: Basic Info */}
+      <Card className="md:col-span-2 lg:col-span-1">
+        <CardHeader>
+          <CardTitle className="text-xl flex items-center gap-2">
+            <FileSpreadsheet className="h-5 w-5 text-primary" />
+            Alap információk
           </CardTitle>
           <CardDescription>
-            A SAPS adatok alapján kalkulált hitelkeret
+            {farmData.documentId || "SAPS igénylés adatok"}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {hasValidRevenue ? (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-              <div className="font-semibold text-lg mb-1">Elérhető hitelkeret:</div>
-              <div className="text-3xl font-bold text-green-700 mb-2">
-                {formatCurrency(creditLimit)}
-              </div>
-              <div className="text-sm text-green-600">
-                A szerződéskötéstől számított 48 órán belül folyósítunk.
+          <div className="space-y-4">
+            <div className="flex justify-between">
+              <div className="text-sm text-muted-foreground">Év</div>
+              <div className="font-medium flex items-center gap-1">
+                <Calendar className="h-4 w-4 text-primary" />
+                {displayYear}
               </div>
             </div>
-          ) : (
-            <Alert className="bg-amber-50 border-amber-200">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-800">
-                A hitelkeret számításához érvényes árbevétel adatok szükségesek. Kérjük, ellenőrizze a feltöltött SAPS dokumentumot.
-              </AlertDescription>
-            </Alert>
-          )}
+            <div className="flex justify-between">
+              <div className="text-sm text-muted-foreground">Régió</div>
+              <div className="font-medium flex items-center gap-1">
+                <MapPin className="h-4 w-4 text-primary" />
+                {farmData.region || "Ismeretlen régió"}
+              </div>
+            </div>
+            <div className="flex justify-between">
+              <div className="text-sm text-muted-foreground">Igénylő</div>
+              <div className="font-medium">
+                {farmData.applicantName || "Ismeretlen igénylő"}
+              </div>
+            </div>
+            <div className="flex justify-between">
+              <div className="text-sm text-muted-foreground">Blokkazonosítók száma</div>
+              <div className="font-medium">
+                {farmData.blockIds?.length || 0} db
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* Card 2: Area */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-xl flex items-center gap-2">
+            <Tractor className="h-5 w-5 text-primary" />
+            Földterület
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold mb-4">
+            {totalHectares.toFixed(1).replace(".", ",")} hektár
+          </div>
           
-          {farmData.marketPrices && farmData.marketPrices.length > 0 ? (
-            <div className="mt-4">
-              <h4 className="text-sm font-medium mb-2">Aktuális piaci árak és várható hozamok:</h4>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[100px]">Növény</TableHead>
-                      <TableHead className="text-right">Átlagos hozam</TableHead>
-                      <TableHead className="text-right">Ár</TableHead>
-                      <TableHead className="text-right">Trend</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {farmData.marketPrices.map((price, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="font-medium">{price.culture}</TableCell>
-                        <TableCell className="text-right">{price.averageYield} t/ha</TableCell>
-                        <TableCell className="text-right">{formatCurrency(price.price)}/t</TableCell>
-                        <TableCell className="text-right">
-                          <Badge 
-                            variant={price.trend > 0 ? "default" : price.trend < 0 ? "destructive" : "outline"}
-                            className={price.trend > 0 ? "bg-green-100 text-green-800 hover:bg-green-200" : undefined}
-                          >
-                            {price.trend > 0 ? "+" : ""}{price.trend}%
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+          <div className="space-y-4">
+            {topCultures.map((culture, index) => (
+              <div key={index}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span>{culture.name}</span>
+                  <span className="font-medium">{culture.hectares.toFixed(1).replace(".", ",")} ha</span>
+                </div>
+                <Progress value={(culture.hectares / totalHectares) * 100} className="h-2" />
               </div>
-            </div>
-          ) : (
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-              <p className="text-sm text-blue-700">
-                Az aktuális piaci árak megjelenítéséhez kérjük, töltsön fel naprakész SAPS dokumentumot.
-              </p>
-            </div>
-          )}
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* Card 3: Revenue */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-xl flex items-center gap-2">
+            <CircleDollarSign className="h-5 w-5 text-primary" />
+            Bevétel
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold mb-2">
+            {formatCurrency(totalRevenue)}
+          </div>
+          <div className="text-sm text-muted-foreground mb-6">
+            {formatCurrency(avgRevenuePerHectare)} / hektár
+          </div>
           
-          <div className="mt-4">
-            <Button 
-              className="w-full" 
-              onClick={handleStartLoanApplication}
-              disabled={!hasValidRevenue}
-            >
-              {hasValidRevenue ? "Hiteligénylés indítása" : "Árbevétel adat szükséges a hiteligényléshez"}
-            </Button>
+          <div className="space-y-3">
+            {topCultures.map((culture, index) => (
+              <div key={index} className="flex justify-between items-center">
+                <span className="text-sm">{culture.name}</span>
+                <span className="font-medium">{formatCurrency(culture.estimatedRevenue)}</span>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
