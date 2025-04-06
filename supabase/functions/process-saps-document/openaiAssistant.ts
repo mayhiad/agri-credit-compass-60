@@ -81,16 +81,14 @@ export async function startRun(threadId, assistantId, fileId) {
   console.log(`🏃 Feldolgozás indítása asszisztens ID-val: ${assistantId} és fájl ID-val: ${fileId}`);
   const runStart = Date.now();
   try {
-    // Eltávolítjuk a felesleges rendszerüzenetet, mivel már küldtünk egy üzenetet az addMessageToThread-ben
-    // Helyes használat: tool_resources helyett file_ids a file_search alatt
+    // Helyes formátum a file_search fileId-k átadásához
     const run = await openai.beta.threads.runs.create(threadId, {
       assistant_id: assistantId,
-      tools: [
-        {
-          type: "file_search",
+      tool_resources: {
+        file_search: {
           file_ids: [fileId]
         }
-      ]
+      }
     });
 
     const runTime = Date.now() - runStart;
