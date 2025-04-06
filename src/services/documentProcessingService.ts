@@ -5,6 +5,7 @@ import { FarmData } from "@/components/LoanApplication";
 export const processDocumentWithOpenAI = async (file: File, user: any): Promise<{
   threadId: string;
   runId: string;
+  ocrLogId?: string;
 } | null> => {
   try {
     if (!user) {
@@ -50,20 +51,20 @@ export const processDocumentWithOpenAI = async (file: File, user: any): Promise<
     const scanData = await scanResponse.json();
     console.log("OpenAI scan válasz:", scanData);
     
-    const { threadId, runId } = scanData;
+    const { threadId, runId, ocrLogId } = scanData;
     
     if (!threadId || !runId) {
       throw new Error("Hiányzó thread vagy run azonosító");
     }
     
-    return { threadId, runId };
+    return { threadId, runId, ocrLogId };
   } catch (error) {
     console.error("Dokumentum feldolgozási hiba:", error);
     throw error;
   }
 };
 
-export const checkProcessingResults = async (threadId: string, runId: string): Promise<{ 
+export const checkProcessingResults = async (threadId: string, runId: string, ocrLogId?: string): Promise<{ 
   completed: boolean;
   status: string;
   data?: FarmData;
@@ -84,7 +85,7 @@ export const checkProcessingResults = async (threadId: string, runId: string): P
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ threadId, runId }),
+        body: JSON.stringify({ threadId, runId, ocrLogId }),
         signal: AbortSignal.timeout(30000) // 30 másodperces időtúllépés az ellenőrzéshez
       }
     );
@@ -119,5 +120,44 @@ export const checkProcessingResults = async (threadId: string, runId: string): P
   } catch (error) {
     console.error("Eredmény ellenőrzési hiba:", error);
     return { completed: false, status: 'error' };
+  }
+};
+
+export const getDocumentOcrLogs = async (): Promise<any[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('document_ocr_logs')
+      .select('*')
+      .order('created_at', { ascending: false });
+      
+    if (error) {
+      console.error("Hiba az OCR naplók lekérésekor:", error);
+      return [];
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error("Váratlan hiba az OCR naplók lekérésekor:", error);
+    return [];
+  }
+};
+
+export const getExtractionResultById = async (logId: string): Promise<any | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('document_extraction_results')
+      .select('*')
+      .eq('ocr_log_id', logId)
+      .single();
+      
+    if (error) {
+      console.error("Hiba a feldolgozási eredmény lekérésekor:", error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error("Váratlan hiba a feldolgozási eredmény lekérésekor:", error);
+    return null;
   }
 };

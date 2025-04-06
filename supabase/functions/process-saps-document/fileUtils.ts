@@ -1,3 +1,4 @@
+
 import { supabase, getErrorDetails } from "./openaiClient.ts";
 
 // Egyszerű PDF és Excel dokumentum szöveg kinyerése
@@ -86,6 +87,44 @@ export async function extractTextFromDocument(fileBuffer: ArrayBuffer, fileName:
   }
 }
 
+// Dokumentum OCR eredmény mentése az adatbázisba
+export async function logOcrResult(userId: string, fileName: string, fileSize: number, fileType: string, 
+                                   storagePath: string | null, ocrContent: string): Promise<string | null> {
+  try {
+    console.log(`📝 OCR eredmények mentése az adatbázisba: ${fileName}`);
+    
+    // Validáljuk a Supabase kliens állapotát
+    if (!supabase) {
+      console.error("❌ Supabase kliens nem elérhető vagy nincs inicializálva");
+      return null;
+    }
+    
+    // Mentsük az OCR eredményt az adatbázisba
+    const { data, error } = await supabase.from('document_ocr_logs')
+      .insert({
+        user_id: userId,
+        file_name: fileName,
+        file_size: fileSize,
+        file_type: fileType,
+        storage_path: storagePath,
+        ocr_content: ocrContent
+      })
+      .select('id')
+      .single();
+    
+    if (error) {
+      console.error(`❌ Hiba az OCR eredmények mentésekor: ${error.message}`, error);
+      return null;
+    }
+    
+    console.log(`✅ OCR eredmények sikeresen mentve. Log ID: ${data.id}`);
+    return data.id;
+  } catch (error) {
+    console.error(`❌ Váratlan hiba az OCR eredmények mentése során: ${getErrorDetails(error)}`);
+    return null;
+  }
+}
+
 // Dokumentum mentése a Supabase tárolóba
 export async function saveDocumentToStorage(fileBuffer: ArrayBuffer, fileName: string, userId: string) {
   try {
@@ -131,6 +170,46 @@ export async function saveDocumentToStorage(fileBuffer: ArrayBuffer, fileName: s
     console.error("❌ Váratlan hiba a dokumentum tárolása során:", getErrorDetails(storageError));
     console.error("❌ Teljes hiba: ", JSON.stringify(storageError, null, 2));
     // Folytatjuk a feldolgozást annak ellenére, hogy nem sikerült tárolni
+    return null;
+  }
+}
+
+// AI feldolgozási eredmény mentése az adatbázisba
+export async function logExtractionResult(ocrLogId: string, userId: string, extractedData: any, 
+                                          processingStatus: string, processingTime: number,
+                                          threadId?: string, runId?: string): Promise<string | null> {
+  try {
+    console.log(`📊 AI feldolgozási eredmények mentése az adatbázisba. OCR Log ID: ${ocrLogId}`);
+    
+    // Validáljuk a Supabase kliens állapotát
+    if (!supabase) {
+      console.error("❌ Supabase kliens nem elérhető vagy nincs inicializálva");
+      return null;
+    }
+    
+    // Mentsük az AI feldolgozási eredményt az adatbázisba
+    const { data, error } = await supabase.from('document_extraction_results')
+      .insert({
+        ocr_log_id: ocrLogId,
+        user_id: userId,
+        extracted_data: extractedData,
+        processing_status: processingStatus,
+        processing_time: processingTime,
+        thread_id: threadId,
+        run_id: runId
+      })
+      .select('id')
+      .single();
+    
+    if (error) {
+      console.error(`❌ Hiba az AI feldolgozási eredmények mentésekor: ${error.message}`, error);
+      return null;
+    }
+    
+    console.log(`✅ AI feldolgozási eredmények sikeresen mentve. Result ID: ${data.id}`);
+    return data.id;
+  } catch (error) {
+    console.error(`❌ Váratlan hiba az AI feldolgozási eredmények mentése során: ${getErrorDetails(error)}`);
     return null;
   }
 }

@@ -1,235 +1,215 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import OpenAI from 'https://esm.sh/openai@4.38.0';
+import OpenAI from "https://esm.sh/openai@4.38.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
+// Környezeti változók
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const supabaseUrl = Deno.env.get('SUPABASE_URL');
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+// Inicializáljuk az OpenAI és Supabase klienseket
+const openai = new OpenAI({ apiKey: openAIApiKey, defaultHeaders: { 'OpenAI-Beta': 'assistants=v2' } });
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// CORS fejlécek
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// API kérési timeout ms-ben (30 másodperc)
-const API_TIMEOUT = 30000;
+// JSON keresése a szövegben
+function extractJsonFromContent(content: string): any {
+  try {
+    // Keressünk JSON-t a válaszban - gyakran code block-ban van
+    const codeBlockMatches = content.match(/```(?:json)?\s*({[\s\S]*?})\s*```/);
+    if (codeBlockMatches && codeBlockMatches[1]) {
+      console.log("🔍 Found JSON in code block\n");
+      const jsonText = codeBlockMatches[1];
+      return JSON.parse(jsonText);
+    }
+    
+    // Ha nem találtunk code block-ban, keressünk kapcsos zárójelek között
+    const jsonMatches = content.match(/{[\s\S]*?}/);
+    if (jsonMatches && jsonMatches[0]) {
+      console.log("🔍 Found JSON between curly braces\n");
+      return JSON.parse(jsonMatches[0]);
+    }
+    
+    // Még egy próba - keresünk bármit, ami JSON-nek tűnhet
+    const possibleJson = content.match(/({[\s\S]*})/);
+    if (possibleJson && possibleJson[1]) {
+      try {
+        const parsed = JSON.parse(possibleJson[1]);
+        console.log("🔍 Found possible JSON structure\n");
+        return parsed;
+      } catch (e) {
+        console.log("❌ Failed to parse possible JSON\n");
+      }
+    }
+    
+    console.log("❌ No JSON found in content\n");
+    return null;
+  } catch (error) {
+    console.error("❌ Error extracting JSON:", error);
+    return null;
+  }
+}
 
-// Timeout-os fetch implementáció
-const fetchWithTimeout = async (url: string, options: RequestInit, timeout: number) => {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
+// Eredmények elkérése és mentése
+serve(async (req) => {
+  console.log("🚀 Get Thread Results Function Started\n");
+  
+  // CORS kezelése
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: corsHeaders
+    });
+  }
   
   try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
-    clearTimeout(id);
-    return response;
-  } catch (error) {
-    clearTimeout(id);
-    if (error.name === 'AbortError') {
-      throw new Error('API request timed out');
-    }
-    throw error;
-  }
-};
-
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    console.log('🚀 Get Thread Results Function Started');
-    
-    // Get OpenAI API key from environment
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    
-    if (!openaiApiKey) {
-      console.error('❌ OpenAI API Key is missing');
-      return new Response(JSON.stringify({ error: 'OpenAI API Key is not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Initialize OpenAI client with v2 API header
-    const openai = new OpenAI({
-      apiKey: openaiApiKey,
-      defaultHeaders: { 'OpenAI-Beta': 'assistants=v2' }
-    });
-
-    // Parse request body for thread and run IDs
+    // Kérés adatainak kinyerése
     const requestData = await req.json();
-    console.log('Request data:', requestData);
+    console.log("Request data:", JSON.stringify(requestData, null, 2));
+
+    const { threadId, runId, ocrLogId } = requestData;
     
-    const { threadId, runId } = requestData;
-    
-    // Ellenőrizzük, hogy a threadId és runId értékek meg vannak-e adva
-    if (!threadId) {
-      console.error('❌ Thread ID hiányzik');
-      return new Response(JSON.stringify({ 
-        error: 'Thread ID kötelező', 
-        completed: false,
-        timestamp: new Date().toISOString()
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    if (!threadId || !runId) {
+      throw new Error("A thread ID és run ID kötelező paraméterek");
     }
-
-    console.log(`📄 Checking status for Thread ID: ${threadId}, Run ID: ${runId || 'Not provided'}`);
-
-    try {
-      // Ha a runId meg van adva, ellenőrizzük az állapotát
-      if (runId) {
-        const run = await openai.beta.threads.runs.retrieve(threadId, runId);
-        
-        console.log(`🏃 Run status: ${run.status}`);
-        
-        // Külön kezeljük a hiba állapotot
-        if (run.status === 'failed') {
-          return new Response(JSON.stringify({ 
-            status: 'failed',
-            completed: false,
-            error: run.last_error?.message || 'Ismeretlen hiba történt a futtatás során',
-            code: run.last_error?.code,
-            timestamp: new Date().toISOString()
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
-        
-        // Ha a run még folyamatban van, visszaadjuk az állapotát
-        if (run.status !== 'completed') {
-          return new Response(JSON.stringify({ 
-            status: run.status,
-            completed: false,
-            timestamp: new Date().toISOString()
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
-      }
-      
-      // Lekérjük az üzeneteket a thread-ből
-      const messages = await openai.beta.threads.messages.list(threadId);
-      
-      console.log(`📩 Retrieved ${messages.data.length} messages from thread`);
-      
-      // Szűrjük az asszisztens üzenetekre
-      const assistantMessages = messages.data.filter(msg => msg.role === 'assistant');
-      console.log(`🤖 Found ${assistantMessages.length} assistant messages`);
-      
-      if (assistantMessages.length === 0) {
-        return new Response(JSON.stringify({ 
-          error: 'No assistant responses found in thread',
-          completed: false,
-          timestamp: new Date().toISOString()
-        }), {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-      
-      // A legfrissebb asszisztens üzenet tartalmának kinyerése
-      const latestMessage = assistantMessages[0];
-      let content = '';
-      
-      if (latestMessage.content && latestMessage.content.length > 0 && latestMessage.content[0].type === 'text') {
-        content = latestMessage.content[0].text.value;
-        console.log(`📝 Message content: ${content.substring(0, 100)}...`);
-      }
-      
-      // Próbáljunk meg JSON adatot kinyerni az üzenet tartalmából
-      let jsonData = {};
-      let dataFormat = 'unknown';
-      
+    
+    // Run status ellenőrzése
+    console.log(`📄 Checking status for Thread ID: ${threadId}, Run ID: ${runId}\n`);
+    const run = await openai.beta.threads.runs.retrieve(threadId, runId);
+    console.log(`🏃 Run status: ${run.status}\n`);
+    
+    // Felhasználói azonosító kinyerése a JWT tokenből
+    let userId = 'system';
+    
+    const authHeader = req.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
       try {
-        // JSON kód blokk keresése különböző formátumokra
-        const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
-        const yamlMatch = content.match(/```ya?ml\s*([\s\S]*?)\s*```/);
-        const xmlMatch = content.match(/```xml\s*([\s\S]*?)\s*```/);
+        // JWT token feldolgozása a userId kinyeréséhez
+        const token = authHeader.split(' ')[1];
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
         
-        if (jsonMatch) {
-          console.log(`🔍 Found JSON in code block`);
-          jsonData = JSON.parse(jsonMatch[1]);
-          dataFormat = 'json';
-        } else if (yamlMatch) {
-          console.log(`🔍 Found YAML in code block`);
-          // YAML parsing helyettesítő (valós implementációhoz YAML parser szükséges)
-          jsonData = { rawYAML: yamlMatch[1] };
-          dataFormat = 'yaml';
-        } else if (xmlMatch) {
-          console.log(`🔍 Found XML in code block`);
-          // XML parsing helyettesítő (valós implementációhoz XML parser szükséges)
-          jsonData = { rawXML: xmlMatch[1] };
-          dataFormat = 'xml';
-        } else {
-          // Próbáljuk meg az egész tartalmat JSON-ként értelmezni
-          console.log(`🔍 Attempting to parse entire content as JSON`);
-          jsonData = JSON.parse(content);
-          dataFormat = 'json';
+        const payload = JSON.parse(jsonPayload);
+        if (payload.sub) {
+          userId = payload.sub;
         }
-        
-        console.log(`✅ Successfully parsed ${dataFormat} data`);
-      } catch (e) {
-        console.warn('⚠️ Could not parse structured data from message content:', e);
-        // Ha a parsing sikertelen, visszaadjuk a nyers tartalmat
-        jsonData = { rawContent: content };
-        dataFormat = 'raw';
+      } catch (jwtError) {
+        console.warn("⚠️ Nem sikerült a JWT tokent feldolgozni:", jwtError);
       }
-      
-      return new Response(JSON.stringify({
-        status: 'completed',
-        completed: true,
-        data: jsonData,
-        dataFormat: dataFormat,
-        rawContent: content,
-        message_id: latestMessage.id,
-        thread_id: threadId,
-        timestamp: new Date().toISOString()
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-
-    } catch (error) {
-      console.error('❌ Error retrieving thread results:', error);
-      
-      // Részletesebb hibaüzenetek a különböző hibatípusokra
-      let errorMessage = 'Failed to retrieve thread results';
-      let errorStatus = 500;
-      
-      if (error.status === 404) {
-        errorMessage = `Resource not found: ${error.message || 'thread or run was not found'}`;
-        errorStatus = 404;
-      } else if (error.message.includes('timed out')) {
-        errorMessage = 'Request timed out while retrieving results';
-        errorStatus = 408;
-      } else if (error.status === 401 || error.status === 403) {
-        errorMessage = 'Authorization error: ' + (error.message || 'invalid API key or permissions');
-        errorStatus = error.status;
-      }
-      
-      return new Response(JSON.stringify({ 
-        error: errorMessage, 
-        details: error.message,
-        completed: false,
-        timestamp: new Date().toISOString()
-      }), {
-        status: errorStatus,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
     }
-
+    
+    // Alapértelmezett válasz
+    let response = {
+      completed: false,
+      status: run.status,
+      data: null,
+      rawContent: null
+    };
+    
+    // Ha befejeződött a futás, nézzük meg az eredményt
+    if (run.status === 'completed') {
+      // Üzenetek lekérése a thread-ből
+      const messages = await openai.beta.threads.messages.list(threadId);
+      console.log(`📩 Retrieved ${messages.data.length} messages from thread\n`);
+      
+      // Szűrés az asszisztens üzeneteire, fordított sorrendben (legújabb először)
+      const assistantMessages = messages.data.filter(msg => msg.role === 'assistant');
+      console.log(`🤖 Found ${assistantMessages.length} assistant messages\n`);
+      
+      if (assistantMessages.length > 0) {
+        // Vegyük a legutolsó választ
+        const lastMessage = assistantMessages[0];
+        
+        // Egyszerűség kedvéért csak szöveges tartalmat kezelünk
+        if (lastMessage.content[0].type === 'text') {
+          const content = lastMessage.content[0].text.value;
+          console.log(`📝 Message content: ${content.substring(0, 100)}...\n`);
+          
+          // Próbáljuk meg kinyerni a JSON-t a válaszból
+          const extractedData = extractJsonFromContent(content);
+          
+          if (extractedData) {
+            console.log("✅ Successfully parsed json data\n");
+            response.data = extractedData;
+            response.completed = true;
+          }
+          
+          // A nyers választ is elmentsük
+          response.rawContent = content;
+        }
+      }
+      
+      // Ha van OCR log ID, frissítsük az adatbázist az eredménnyel
+      if (ocrLogId && response.completed) {
+        try {
+          const { error } = await supabase.from('document_extraction_results')
+            .update({
+              extracted_data: response.data || {},
+              processing_status: 'completed',
+              processing_time: Date.now() - new Date(run.created_at).getTime()
+            })
+            .eq('ocr_log_id', ocrLogId)
+            .eq('thread_id', threadId)
+            .eq('run_id', runId);
+            
+          if (error) {
+            console.error("❌ Error updating extraction results in database:", error);
+          } else {
+            console.log("✅ Successfully updated extraction results in database\n");
+          }
+        } catch (dbError) {
+          console.error("❌ Database error:", dbError);
+        }
+      } else if (ocrLogId && run.status === 'failed') {
+        // Ha a futás sikertelen, frissítsük az adatbázist a megfelelő státusszal
+        try {
+          const { error } = await supabase.from('document_extraction_results')
+            .update({
+              extracted_data: { error: "AI processing failed" },
+              processing_status: 'failed',
+              processing_time: Date.now() - new Date(run.created_at).getTime()
+            })
+            .eq('ocr_log_id', ocrLogId)
+            .eq('thread_id', threadId)
+            .eq('run_id', runId);
+            
+          if (error) {
+            console.error("❌ Error updating extraction failure in database:", error);
+          } else {
+            console.log("✅ Successfully updated extraction failure in database\n");
+          }
+        } catch (dbError) {
+          console.error("❌ Database error:", dbError);
+        }
+      }
+    }
+    
+    return new Response(JSON.stringify(response), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
   } catch (error) {
-    console.error('🔥 Unhandled error in Get Thread Results Function:', error);
-    return new Response(JSON.stringify({ 
-      error: 'Internal server error', 
-      details: error.message,
-      timestamp: new Date().toISOString()
+    console.error("❌ Error:", error);
+    
+    return new Response(JSON.stringify({
+      error: error instanceof Error ? error.message : "Unknown error",
+      details: error instanceof Error ? error.stack : JSON.stringify(error)
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
     });
   }
 });

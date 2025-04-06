@@ -74,6 +74,83 @@ export type Database = {
         }
         Relationships: []
       }
+      document_extraction_results: {
+        Row: {
+          created_at: string
+          extracted_data: Json
+          id: string
+          ocr_log_id: string
+          processing_status: string
+          processing_time: number | null
+          run_id: string | null
+          thread_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          extracted_data: Json
+          id?: string
+          ocr_log_id: string
+          processing_status?: string
+          processing_time?: number | null
+          run_id?: string | null
+          thread_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          extracted_data?: Json
+          id?: string
+          ocr_log_id?: string
+          processing_status?: string
+          processing_time?: number | null
+          run_id?: string | null
+          thread_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_extraction_results_ocr_log_id_fkey"
+            columns: ["ocr_log_id"]
+            isOneToOne: false
+            referencedRelation: "document_ocr_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_ocr_logs: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          ocr_content: string | null
+          storage_path: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          ocr_content?: string | null
+          storage_path?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          ocr_content?: string | null
+          storage_path?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       farm_details: {
         Row: {
           created_at: string

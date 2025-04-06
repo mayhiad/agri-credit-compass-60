@@ -63,7 +63,7 @@ export const processSapsDocument = async (
     throw new Error(`Az AI feldolgozás sikertelen volt: ${error.message || "Ismeretlen hiba"}`);
   }
   
-  const { threadId, runId } = processResult;
+  const { threadId, runId, ocrLogId } = processResult;
   
   updateStatus({
     step: "AI feldolgozás folyamatban",
@@ -84,7 +84,7 @@ export const processSapsDocument = async (
     await new Promise(resolve => setTimeout(resolve, waitTimeMs));
     
     try {
-      const resultData = await checkProcessingResults(threadId, runId);
+      const resultData = await checkProcessingResults(threadId, runId, ocrLogId);
       
       let progress = 50 + Math.min(40, Math.floor((attempts / maxAttempts) * 40));
       updateStatus({
