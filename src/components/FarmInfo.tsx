@@ -14,11 +14,14 @@ interface FarmInfoProps {
 }
 
 export const FarmInfo = ({ farmData }: FarmInfoProps) => {
+  // Make sure farmData is properly defined before using its properties
+  if (!farmData) return null;
+  
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-2">
         <MapPin className="h-5 w-5 text-muted-foreground" />
-        <span className="text-muted-foreground">{farmData.region}</span>
+        <span className="text-muted-foreground">{farmData.region || "Ismeretlen régió"}</span>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -27,7 +30,7 @@ export const FarmInfo = ({ farmData }: FarmInfoProps) => {
             <CardTitle className="text-lg">Összes terület</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{farmData.hectares.toFixed(2)} ha</p>
+            <p className="text-3xl font-bold">{farmData.hectares ? farmData.hectares.toFixed(2) : "0.00"} ha</p>
           </CardContent>
         </Card>
         
@@ -36,7 +39,7 @@ export const FarmInfo = ({ farmData }: FarmInfoProps) => {
             <CardTitle className="text-lg">Kultúrák</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{farmData.cultures.length} db</p>
+            <p className="text-3xl font-bold">{farmData.cultures ? farmData.cultures.length : 0} db</p>
           </CardContent>
         </Card>
         
@@ -45,7 +48,7 @@ export const FarmInfo = ({ farmData }: FarmInfoProps) => {
             <CardTitle className="text-lg">Éves árbevétel</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{formatCurrency(farmData.totalRevenue)}</p>
+            <p className="text-3xl font-bold">{formatCurrency(farmData.totalRevenue || 0)}</p>
           </CardContent>
         </Card>
       </div>
@@ -54,6 +57,32 @@ export const FarmInfo = ({ farmData }: FarmInfoProps) => {
 };
 
 export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoProps) => {
+  // Make sure farmData is properly defined before rendering
+  if (!farmData) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Gazdasági adatok</CardTitle>
+          <CardDescription>
+            Hiányzó vagy hibás gazdasági adatok
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="py-8 text-center text-muted-foreground">
+            <p>Nem található érvényes gazdasági adat.</p>
+            <p className="text-sm mt-2">Kérjük, töltse fel újra a SAPS dokumentumot.</p>
+          </div>
+        </CardContent>
+        <CardFooter>
+          <Button onClick={onComplete} className="w-full">
+            Vissza
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
+  
   return (
     <Card className="w-full">
       <CardHeader>
@@ -78,21 +107,21 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoProps) => {
               {farmData.cultures && farmData.cultures.map((culture, idx) => (
                 <TableRow key={idx}>
                   <TableCell>{culture.name}</TableCell>
-                  <TableCell className="text-right">{culture.hectares.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(culture.estimatedRevenue)}</TableCell>
+                  <TableCell className="text-right">{culture.hectares ? culture.hectares.toFixed(2) : "0.00"}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(culture.estimatedRevenue || 0)}</TableCell>
                 </TableRow>
               ))}
               <TableRow>
                 <TableCell className="font-medium">Összesen</TableCell>
-                <TableCell className="text-right font-medium">{farmData.hectares.toFixed(2)} ha</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(farmData.totalRevenue)}</TableCell>
+                <TableCell className="text-right font-medium">{farmData.hectares ? farmData.hectares.toFixed(2) : "0.00"} ha</TableCell>
+                <TableCell className="text-right font-medium">{formatCurrency(farmData.totalRevenue || 0)}</TableCell>
               </TableRow>
             </TableBody>
           </Table>
         </div>
         
         {/* Blokkazonosítók és részletes adatok */}
-        {farmData.blockIds && (
+        {farmData.blockIds && farmData.blockIds.length > 0 && (
           <Accordion type="single" collapsible className="w-full">
             <AccordionItem value="blocks">
               <AccordionTrigger className="flex items-center gap-2">
@@ -110,7 +139,7 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoProps) => {
               </AccordionContent>
             </AccordionItem>
             
-            {farmData.parcels && (
+            {farmData.parcels && farmData.parcels.length > 0 && (
               <AccordionItem value="parcels">
                 <AccordionTrigger className="flex items-center gap-2">
                   <Info className="h-4 w-4" />
@@ -134,8 +163,8 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoProps) => {
                             <TableCell>{parcel.blockId}</TableCell>
                             <TableCell>{parcel.parcelId}</TableCell>
                             <TableCell>{parcel.culture}</TableCell>
-                            <TableCell className="text-right">{parcel.hectares.toFixed(2)}</TableCell>
-                            <TableCell>{parcel.location.settlement}</TableCell>
+                            <TableCell className="text-right">{parcel.hectares ? parcel.hectares.toFixed(2) : "0.00"}</TableCell>
+                            <TableCell>{parcel.location?.settlement || "Ismeretlen"}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -166,8 +195,8 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoProps) => {
                         {farmData.marketPrices.map((price, idx) => (
                           <TableRow key={idx}>
                             <TableCell>{price.culture}</TableCell>
-                            <TableCell className="text-right">{price.averageYield.toFixed(1)}</TableCell>
-                            <TableCell className="text-right">{price.price.toLocaleString()} Ft</TableCell>
+                            <TableCell className="text-right">{price.averageYield ? price.averageYield.toFixed(1) : "0.0"}</TableCell>
+                            <TableCell className="text-right">{price.price ? price.price.toLocaleString() : "0"} Ft</TableCell>
                             <TableCell>
                               {price.trend > 0 ? (
                                 <span className="text-green-600">↑ Növekvő</span>
@@ -191,7 +220,7 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoProps) => {
         <div className="bg-muted p-4 rounded-md space-y-2">
           <div className="flex items-center space-x-2">
             <CheckCircle className="h-5 w-5 text-green-600" />
-            <span>SAPS dokumentum azonosító: <span className="font-medium">{farmData.documentId}</span></span>
+            <span>SAPS dokumentum azonosító: <span className="font-medium">{farmData.documentId || "Ismeretlen"}</span></span>
           </div>
           {farmData.applicantName && (
             <div className="flex items-center space-x-2">
