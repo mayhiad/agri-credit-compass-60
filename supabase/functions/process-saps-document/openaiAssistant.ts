@@ -1,4 +1,3 @@
-
 import OpenAI from "https://esm.sh/openai@4.38.0";
 import { getErrorDetails } from "./openaiClient.ts";
 
@@ -70,7 +69,11 @@ export async function startRun(threadId, assistantId, fileId) {
   console.log(`🏃 Feldolgozás indítása asszisztens ID-val: ${assistantId} és fájl ID-val: ${fileId}`);
   const runStart = Date.now();
   try {
-    // ✅ NE adjunk hozzá fájlt a messages.create()-hez v2-ben!
+    // Rendszerüzenet hozzáadása a threadhez
+    await openai.beta.threads.messages.create(threadId, {
+      role: "user",
+      content: `Rendszerüzenet: Azt szeretném, ha kiolvasnád a gazdálkodó nevét a dokumentumból és visszaadnád JSON formátumban: { "applicantName": "GAZDÁLKODÓ NEVE" }`
+    });
 
     const run = await openai.beta.threads.runs.create(threadId, {
       assistant_id: assistantId,
