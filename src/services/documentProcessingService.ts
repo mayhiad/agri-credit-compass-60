@@ -5,6 +5,7 @@ import { FarmData } from "@/components/LoanApplication";
 export const processDocumentWithOpenAI = async (file: File, user: any): Promise<{
   threadId: string;
   runId: string;
+  assistantId?: string;
   ocrLogId?: string;
 } | null> => {
   try {
@@ -51,13 +52,13 @@ export const processDocumentWithOpenAI = async (file: File, user: any): Promise<
     const scanData = await scanResponse.json();
     console.log("OpenAI scan válasz:", scanData);
     
-    const { threadId, runId, ocrLogId } = scanData;
+    const { threadId, runId, ocrLogId, assistantId } = scanData;
     
     if (!threadId || !runId) {
       throw new Error("Hiányzó thread vagy run azonosító");
     }
     
-    return { threadId, runId, ocrLogId };
+    return { threadId, runId, ocrLogId, assistantId };
   } catch (error) {
     console.error("Dokumentum feldolgozási hiba:", error);
     throw error;
@@ -68,6 +69,7 @@ export const checkProcessingResults = async (threadId: string, runId: string, oc
   completed: boolean;
   status: string;
   data?: FarmData;
+  rawContent?: string;
 }> => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -99,23 +101,12 @@ export const checkProcessingResults = async (threadId: string, runId: string, oc
     const resultData = await resultResponse.json();
     console.log(`Eredmény ellenőrzés válasz:`, resultData);
     
-    // Ha van rawContent, de nincs formázott data, akkor előállítunk egy alap FarmData objektumot
-    // Ez egy fallback, ha az AI nem tudott strukturált adatokat visszaadni
-    if (resultData.completed && resultData.status === 'completed' && !resultData.data) {
-      // Minta adatok használata, ha nincs érvényes válasz az AI-tól
-      console.log("Nincs érvényes strukturált adat, fallback adatok létrehozása");
-      
-      return {
-        completed: true,
-        status: 'completed',
-        data: null // Nem állítunk elő itt adatokat, ezt később a feldolgozó kezelni fogja
-      };
-    }
-    
+    // Visszaadjuk a nyers AI választ is, hogy könnyebben lehessen debugolni
     return {
       completed: resultData.completed,
       status: resultData.status || 'pending',
-      data: resultData.data
+      data: resultData.data,
+      rawContent: resultData.rawContent
     };
   } catch (error) {
     console.error("Eredmény ellenőrzési hiba:", error);
@@ -123,12 +114,12 @@ export const checkProcessingResults = async (threadId: string, runId: string, oc
   }
 };
 
+// Használja a customtól API-t a getDocumentOcrLogs helyett, mivel még nem frissültek a Typescript típusok
 export const getDocumentOcrLogs = async (): Promise<any[]> => {
   try {
+    // Közvetlenül SQL lekérdezést használunk a típushibák elkerülése érdekében
     const { data, error } = await supabase
-      .from('document_ocr_logs')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .rpc('get_ocr_logs');
       
     if (error) {
       console.error("Hiba az OCR naplók lekérésekor:", error);
@@ -142,20 +133,19 @@ export const getDocumentOcrLogs = async (): Promise<any[]> => {
   }
 };
 
+// Használja a custom API-t a getExtractionResultById helyett, mivel még nem frissültek a Typescript típusok
 export const getExtractionResultById = async (logId: string): Promise<any | null> => {
   try {
+    // Közvetlenül SQL lekérdezést használunk a típushibák elkerülése érdekében
     const { data, error } = await supabase
-      .from('document_extraction_results')
-      .select('*')
-      .eq('ocr_log_id', logId)
-      .single();
+      .rpc('get_extraction_result', { log_id: logId });
       
     if (error) {
       console.error("Hiba a feldolgozási eredmény lekérésekor:", error);
       return null;
     }
     
-    return data;
+    return data?.[0] || null;
   } catch (error) {
     console.error("Váratlan hiba a feldolgozási eredmény lekérésekor:", error);
     return null;

@@ -68,13 +68,6 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       
       const farmData = await processSapsDocument(file, user, setProcessingStatus);
       
-      // Ellenőrizzük, hogy az adatok érvényesek-e
-      if (!farmData.cultures || farmData.cultures.length === 0 || 
-          !farmData.hectares || farmData.hectares <= 0 ||
-          !farmData.totalRevenue || farmData.totalRevenue <= 0) {
-        throw new Error("A dokumentumból nem sikerült érvényes mezőgazdasági adatokat kinyerni. Kérjük, ellenőrizze, hogy a feltöltött dokumentum tartalmaz-e növénykultúra és területadatokat.");
-      }
-      
       // Mentsük el az adatbázisba a feldolgozott adatokat
       setProcessingStatus({
         step: "Adatok mentése az adatbázisba",
@@ -126,7 +119,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-blue-500" />
             <AlertDescription className="text-blue-700">
-              A teljes folyamat mindössze <span className="font-bold">10 percet</span> vesz igénybe, és a szerződéskötéstől számított <span className="font-bold">48 órán belül</span> folyósítunk!
+              A teljes folyamat mindössze <span className="font-bold">1-2 percet</span> vesz igénybe, és a szerződéskötéstől számított <span className="font-bold">48 órán belül</span> folyósítunk!
             </AlertDescription>
           </div>
         </Alert>

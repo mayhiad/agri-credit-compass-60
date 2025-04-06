@@ -74,8 +74,9 @@ export const processSapsDocument = async (
   let isComplete = false;
   let farmData: FarmData | null = null;
   let attempts = 0;
-  const maxAttempts = 90; // Növeljük a próbálkozások számát 90-re (~7.5 perc összesen)
+  const maxAttempts = 30; // Csökkentjük a próbálkozások számát az idő rövidítéséhez
   const waitTimeMs = 5000; // 5 másodperc várakozás próbálkozások között
+  let rawContent = "";
   
   // Várjunk az eredményre
   while (!isComplete && attempts < maxAttempts) {
@@ -86,7 +87,18 @@ export const processSapsDocument = async (
     try {
       const resultData = await checkProcessingResults(threadId, runId, ocrLogId);
       
+      // Nyers AI válasz mentése a debuggoláshoz
+      if (resultData.rawContent) {
+        rawContent = resultData.rawContent;
+      }
+      
+      // Ha a feldolgozás status completed, akkor gyorsabban lépünk tovább
       let progress = 50 + Math.min(40, Math.floor((attempts / maxAttempts) * 40));
+      
+      if (resultData.status === 'completed') {
+        progress = 80; // Gyorsabban mutatunk előrehaladást
+      }
+      
       updateStatus({
         step: resultData.status === 'completed' ? "Dokumentum elemzése befejezve" : "AI feldolgozás folyamatban",
         progress: progress,
@@ -97,38 +109,70 @@ export const processSapsDocument = async (
         isComplete = true;
         farmData = resultData.data;
         
-        // Validáljuk az adatokat és győződjünk meg róla, hogy nem nulla értékek
+        // Ha a farm adat üres, akkor generáljunk fallback adatokat
         if (!farmData.hectares || farmData.hectares <= 0 || 
             !farmData.cultures || farmData.cultures.length === 0 ||
             !farmData.totalRevenue || farmData.totalRevenue <= 0) {
           
           console.warn("Az AI által feldolgozott adatok hiányosak vagy nullák:", farmData);
           
-          // Jelezzük a felhasználónak, hogy hiányos adatok vannak
+          // Egyszerűen generáljunk fallback adatokat és menjünk tovább
+          if (attempts >= maxAttempts / 2) {
+            updateStatus({
+              step: "Alapértelmezett adatok generálása",
+              progress: 85,
+              details: "Az AI nem tudott elegendő adatot kinyerni, példa adatok generálása..."
+            });
+            
+            farmData = generateFallbackFarmData(user.id, file.name, file.size);
+            farmData.errorMessage = "Nem sikerült az adatokat kinyerni a dokumentumból. Demonstrációs adatok kerültek megjelenítésre.";
+            farmData.rawAiResponse = rawContent;
+            break;
+          }
+          
+          // Újra próbáljuk a feldolgozást
           updateStatus({
             step: "Hiányos adatok",
             progress: 70,
             details: "Az AI által kinyert adatok hiányosak. Újbóli feldolgozás..."
           });
           
-          // Újra próbáljuk a feldolgozást, ha még van hátralévő próbálkozás
-          if (attempts < maxAttempts - 5) {
+          // Csak pár próbálkozás után generáljunk fallback adatokat
+          if (attempts < maxAttempts / 2) {
             isComplete = false;
             farmData = null;
             continue;
           }
-          
-          throw new Error("A dokumentumból nem sikerült érvényes adatokat kinyerni. Kérjük, ellenőrizze a feltöltött dokumentumot.");
         }
         
         break;
       }
+      
+      // Ha már elég próbálkozást tettünk és még mindig nincs eredmény, generáljunk fallback adatokat
+      if (attempts >= maxAttempts / 2 && !isComplete) {
+        updateStatus({
+          step: "Feldolgozás nehézségekbe ütközik",
+          progress: 75,
+          details: "Az AI feldolgozás nehézségekbe ütközik. Példa adatok előkészítése..."
+        });
+      }
+      
     } catch (checkError) {
       console.error(`Eredmény ellenőrzési hiba (${attempts}. kísérlet):`, checkError);
       
-      // Csak a maximális próbálkozások után dobjunk hibát
-      if (attempts >= maxAttempts) {
-        throw new Error("Nem sikerült feldolgozni a dokumentumot a megadott időn belül. Az eddigi folyamat mentve van, próbálja meg újra később.");
+      // Ha nem sikerült feldolgozni, adjunk fallback adatokat a fél maxAttempts után
+      if (attempts >= maxAttempts / 2) {
+        updateStatus({
+          step: "Alapértelmezett adatok generálása",
+          progress: 85,
+          details: "Az adatkinyerés sikertelen volt, példa adatok generálása..."
+        });
+        
+        // Fallback adatok generálása
+        farmData = generateFallbackFarmData(user.id, file.name, file.size);
+        farmData.errorMessage = "Nem sikerült feldolgozni a dokumentumot. Demonstrációs adatok kerültek megjelenítésre.";
+        farmData.rawAiResponse = rawContent;
+        break;
       }
     }
   }
@@ -137,6 +181,7 @@ export const processSapsDocument = async (
   if (!isComplete || !farmData) {
     console.warn("AI feldolgozás sikertelen, fallback adatok generálása...");
     farmData = generateFallbackFarmData(user.id, file.name, file.size);
+    farmData.rawAiResponse = rawContent;
     
     updateStatus({
       step: "Feldolgozás sikertelen",

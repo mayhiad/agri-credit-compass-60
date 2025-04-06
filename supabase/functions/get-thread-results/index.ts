@@ -1,215 +1,194 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import OpenAI from "https://esm.sh/openai@4.38.0";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
-// Környezeti változók
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-const supabaseUrl = Deno.env.get('SUPABASE_URL');
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-// Inicializáljuk az OpenAI és Supabase klienseket
-const openai = new OpenAI({ apiKey: openAIApiKey, defaultHeaders: { 'OpenAI-Beta': 'assistants=v2' } });
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-// CORS fejlécek
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// JSON keresése a szövegben
-function extractJsonFromContent(content: string): any {
-  try {
-    // Keressünk JSON-t a válaszban - gyakran code block-ban van
-    const codeBlockMatches = content.match(/```(?:json)?\s*({[\s\S]*?})\s*```/);
-    if (codeBlockMatches && codeBlockMatches[1]) {
-      console.log("🔍 Found JSON in code block\n");
-      const jsonText = codeBlockMatches[1];
-      return JSON.parse(jsonText);
-    }
-    
-    // Ha nem találtunk code block-ban, keressünk kapcsos zárójelek között
-    const jsonMatches = content.match(/{[\s\S]*?}/);
-    if (jsonMatches && jsonMatches[0]) {
-      console.log("🔍 Found JSON between curly braces\n");
-      return JSON.parse(jsonMatches[0]);
-    }
-    
-    // Még egy próba - keresünk bármit, ami JSON-nek tűnhet
-    const possibleJson = content.match(/({[\s\S]*})/);
-    if (possibleJson && possibleJson[1]) {
-      try {
-        const parsed = JSON.parse(possibleJson[1]);
-        console.log("🔍 Found possible JSON structure\n");
-        return parsed;
-      } catch (e) {
-        console.log("❌ Failed to parse possible JSON\n");
-      }
-    }
-    
-    console.log("❌ No JSON found in content\n");
-    return null;
-  } catch (error) {
-    console.error("❌ Error extracting JSON:", error);
-    return null;
-  }
-}
+const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+const supabaseUrl = Deno.env.get('SUPABASE_URL');
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-// Eredmények elkérése és mentése
+const openai = new OpenAI({
+  apiKey: openaiApiKey,
+  defaultHeaders: { 'OpenAI-Beta': 'assistants=v2' }
+});
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
 serve(async (req) => {
-  console.log("🚀 Get Thread Results Function Started\n");
-  
-  // CORS kezelése
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: corsHeaders
-    });
+    return new Response(null, { headers: corsHeaders });
   }
-  
+
   try {
-    // Kérés adatainak kinyerése
+    console.log("🚀 Get Thread Results Function Started");
+    
     const requestData = await req.json();
-    console.log("Request data:", JSON.stringify(requestData, null, 2));
+    console.log("Request data:", JSON.stringify(requestData));
 
     const { threadId, runId, ocrLogId } = requestData;
     
     if (!threadId || !runId) {
-      throw new Error("A thread ID és run ID kötelező paraméterek");
+      return new Response(
+        JSON.stringify({ error: "Thread ID és Run ID megadása kötelező" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+
+    console.log(`📄 Checking status for Thread ID: ${threadId}, Run ID: ${runId}`);
     
-    // Run status ellenőrzése
-    console.log(`📄 Checking status for Thread ID: ${threadId}, Run ID: ${runId}\n`);
+    // Ellenőrizzük a futtatás állapotát
     const run = await openai.beta.threads.runs.retrieve(threadId, runId);
-    console.log(`🏃 Run status: ${run.status}\n`);
-    
-    // Felhasználói azonosító kinyerése a JWT tokenből
-    let userId = 'system';
-    
-    const authHeader = req.headers.get('authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        // JWT token feldolgozása a userId kinyeréséhez
-        const token = authHeader.split(' ')[1];
-        const base64Url = token.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-        
-        const payload = JSON.parse(jsonPayload);
-        if (payload.sub) {
-          userId = payload.sub;
-        }
-      } catch (jwtError) {
-        console.warn("⚠️ Nem sikerült a JWT tokent feldolgozni:", jwtError);
-      }
+    console.log(`🏃 Run status: ${run.status}`);
+
+    // Ha a futtatás még nem fejeződött be
+    if (run.status !== 'completed' && run.status !== 'failed' && run.status !== 'cancelled') {
+      return new Response(
+        JSON.stringify({ 
+          completed: false, 
+          status: run.status 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
-    
-    // Alapértelmezett válasz
-    let response = {
-      completed: false,
-      status: run.status,
-      data: null,
-      rawContent: null
-    };
-    
-    // Ha befejeződött a futás, nézzük meg az eredményt
-    if (run.status === 'completed') {
-      // Üzenetek lekérése a thread-ből
-      const messages = await openai.beta.threads.messages.list(threadId);
-      console.log(`📩 Retrieved ${messages.data.length} messages from thread\n`);
+
+    // Ha sikertelen volt a futtatás
+    if (run.status === 'failed' || run.status === 'cancelled') {
+      console.error(`❌ Run failed or cancelled. Status: ${run.status}`);
       
-      // Szűrés az asszisztens üzeneteire, fordított sorrendben (legújabb először)
-      const assistantMessages = messages.data.filter(msg => msg.role === 'assistant');
-      console.log(`🤖 Found ${assistantMessages.length} assistant messages\n`);
-      
-      if (assistantMessages.length > 0) {
-        // Vegyük a legutolsó választ
-        const lastMessage = assistantMessages[0];
-        
-        // Egyszerűség kedvéért csak szöveges tartalmat kezelünk
-        if (lastMessage.content[0].type === 'text') {
-          const content = lastMessage.content[0].text.value;
-          console.log(`📝 Message content: ${content.substring(0, 100)}...\n`);
-          
-          // Próbáljuk meg kinyerni a JSON-t a válaszból
-          const extractedData = extractJsonFromContent(content);
-          
-          if (extractedData) {
-            console.log("✅ Successfully parsed json data\n");
-            response.data = extractedData;
-            response.completed = true;
-          }
-          
-          // A nyers választ is elmentsük
-          response.rawContent = content;
-        }
-      }
-      
-      // Ha van OCR log ID, frissítsük az adatbázist az eredménnyel
-      if (ocrLogId && response.completed) {
+      if (ocrLogId) {
         try {
-          const { error } = await supabase.from('document_extraction_results')
-            .update({
-              extracted_data: response.data || {},
-              processing_status: 'completed',
-              processing_time: Date.now() - new Date(run.created_at).getTime()
-            })
-            .eq('ocr_log_id', ocrLogId)
-            .eq('thread_id', threadId)
-            .eq('run_id', runId);
-            
-          if (error) {
-            console.error("❌ Error updating extraction results in database:", error);
-          } else {
-            console.log("✅ Successfully updated extraction results in database\n");
-          }
-        } catch (dbError) {
-          console.error("❌ Database error:", dbError);
-        }
-      } else if (ocrLogId && run.status === 'failed') {
-        // Ha a futás sikertelen, frissítsük az adatbázist a megfelelő státusszal
-        try {
-          const { error } = await supabase.from('document_extraction_results')
-            .update({
-              extracted_data: { error: "AI processing failed" },
+          // Frissítsük az adatbázist a feldolgozás sikertelenségével
+          const { error } = await supabase
+            .from('document_extraction_results')
+            .update({ 
               processing_status: 'failed',
-              processing_time: Date.now() - new Date(run.created_at).getTime()
+              processing_time: Date.now()
             })
-            .eq('ocr_log_id', ocrLogId)
-            .eq('thread_id', threadId)
-            .eq('run_id', runId);
-            
+            .eq('ocr_log_id', ocrLogId);
+          
           if (error) {
-            console.error("❌ Error updating extraction failure in database:", error);
-          } else {
-            console.log("✅ Successfully updated extraction failure in database\n");
+            console.error("❌ Error updating extraction results:", error);
           }
         } catch (dbError) {
           console.error("❌ Database error:", dbError);
         }
       }
+      
+      return new Response(
+        JSON.stringify({ 
+          completed: true, 
+          status: 'failed',
+          error: run.status === 'failed' ? run.last_error : 'Run was cancelled'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+
+    // Ha sikeresen befejeződött, lekérjük az üzeneteket
+    const messages = await openai.beta.threads.messages.list(threadId);
+    console.log(`📩 Retrieved ${messages.data.length} messages from thread`);
     
-    return new Response(JSON.stringify(response), {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json'
+    // Keressük az asszisztens üzenetét (az első válasz az utolsó üzenet)
+    const assistantMessages = messages.data.filter(msg => msg.role === 'assistant');
+    console.log(`🤖 Found ${assistantMessages.length} assistant messages`);
+    
+    if (assistantMessages.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          completed: true, 
+          status: 'completed',
+          error: 'No assistant messages found'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get the most recent assistant message
+    const latestMessage = assistantMessages[0];
+    const textContent = latestMessage.content.filter(content => content.type === 'text');
+    
+    if (textContent.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          completed: true, 
+          status: 'completed',
+          error: 'No text content in assistant message' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Parse the text content
+    const content = textContent[0].text.value;
+    console.log(`📝 Message content: ${content.substring(0, 100)}...`);
+    
+    // Extract JSON data from the message
+    let extractedData = null;
+    const jsonPattern = /```json\s*([^`]+)\s*```/;
+    const match = content.match(jsonPattern);
+    
+    if (match && match[1]) {
+      console.log(`🔍 Found JSON in code block`);
+      try {
+        extractedData = JSON.parse(match[1].trim());
+        console.log(`✅ Successfully parsed json data`);
+      } catch (jsonError) {
+        console.error("❌ Error parsing JSON:", jsonError);
       }
-    });
+    }
+
+    // Mentsük az eredményeket az adatbázisba, ha van ocrLogId
+    if (ocrLogId) {
+      try {
+        // Frissítsük az adatbázist a feldolgozás eredményével
+        const { error } = await supabase
+          .from('document_extraction_results')
+          .update({ 
+            extracted_data: extractedData || {},
+            processing_status: 'completed',
+            processing_time: Date.now() // Ez INTEGER, nem BIGINT, ezért túlcsordulhat
+          })
+          .eq('ocr_log_id', ocrLogId);
+        
+        if (error) {
+          console.error("❌ Error updating extraction results in database:", error);
+        }
+      } catch (dbError) {
+        console.error("❌ Database error:", dbError);
+      }
+    }
+
+    // Return the final response
+    return new Response(
+      JSON.stringify({ 
+        completed: true, 
+        status: 'completed',
+        data: extractedData,
+        rawContent: content
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
   } catch (error) {
-    console.error("❌ Error:", error);
+    console.error(`❌ Unhandled error in get-thread-results function:`, error);
     
-    return new Response(JSON.stringify({
-      error: error instanceof Error ? error.message : "Unknown error",
-      details: error instanceof Error ? error.stack : JSON.stringify(error)
-    }), {
-      status: 500,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json'
+    return new Response(
+      JSON.stringify({ 
+        completed: false, 
+        status: 'error',
+        error: error.message || 'Unknown error'
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
-    });
+    );
   }
 });
