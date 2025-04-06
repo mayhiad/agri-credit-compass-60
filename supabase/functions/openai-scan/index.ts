@@ -84,12 +84,19 @@ serve(async (req) => {
       console.log(`📤 Creating message with instructions (without file attachment)`);
       
       const messageContent = `
-Elemezd ezt a SAPS dokumentumot és nyerd ki belőle az összes releváns mezőgazdasági információt. 
+Elemezd ezt a SAPS dokumentumot és nyerd ki belőle az összes mezőgazdasági információt. 
+
+FONTOS! A FELDOLGOZÁS CÉLJA EGY HITELIGÉNYLÉSHEZ SZÜKSÉGES ADATOK KINYERÉSE:
+1. A területadatok (hektár) pontos kinyerése növénykultúránként
+2. A növénykultúrák helyes azonosítása (pl. kukorica, búza, napraforgó stb.)
+3. Egy teljes árbevétel kalkuláció, ami a terület × hozam × piaci ár értékekből adódik
+4. Az összesített területméret és árbevétel adatok számítása
+
 Az adatokat a következő JSON formátumban add vissza:
 {
   "applicantName": "A gazdálkodó neve",
   "documentId": "Dokumentum/kérelem azonosító",
-  "region": "Régió neve",
+  "region": "Régió neve (megye)",
   "year": "Az év, amelyre a dokumentum vonatkozik",
   "hectares": 123.45,
   "cultures": [
@@ -112,10 +119,17 @@ Az adatokat a következő JSON formátumban add vissza:
   "totalRevenue": 63291975
 }
 
-Minden kultúrához becsüld meg a termésátlagot és az árakat, ha nem találod a dokumentumban!
-A termésátlag (yieldPerHectare) tonna/hektár értékben, az ár (pricePerTon) Ft/tonna értékben legyen megadva.
-A becsült bevételt (estimatedRevenue) számold ki a kultúra × termésátlag × ár képlettel.
-A teljes bevételt (totalRevenue) számold ki az összes kultúra becsült bevételének összegeként.`;
+FONTOS INSTRUKCIÓK:
+1. Minden kultúrához adj meg valós termésátlagot (tonna/hektár) és piaci árat (Ft/tonna).
+2. A termésátlag (yieldPerHectare) tonna/hektár értékben, reális értékekkel (búza: 5-6 t/ha, kukorica: 7-9 t/ha, napraforgó: 2,5-3,5 t/ha).
+3. A piaci árak (pricePerTon) Ft/tonna értékben legyenek aktuális magyarországi árak (búza: ~80-90ezer Ft/t, kukorica: ~70-75ezer Ft/t, napraforgó: ~160-180ezer Ft/t)
+4. A becsült bevételt (estimatedRevenue) számold ki: terület × termésátlag × ár képlettel.
+5. A teljes bevételt (totalRevenue) számold ki az összes kultúra becsült bevételének összegeként.
+6. Minden esetben számszerű értékekkel dolgozz - a mezőkben sehol se szerepeljen null vagy ismeretlen érték.
+7. Ha egyes értékek hiányoznak a dokumentumból, akkor becsüld meg azokat a piaci átlagok alapján.
+8. Az "year" mezőbe írj egy konkrét évszámot (ne használj "nem található" vagy hasonló kifejezést).
+
+MINDENKÉPPEN ADD MEG A FENTI FORMÁTUMÚ, MINDEN ÉRTÉKET TARTALMAZÓ OBJEKTUMOT!`;
       
       // Create message without file attachment
       const message = await openai.beta.threads.messages.create(thread.id, {

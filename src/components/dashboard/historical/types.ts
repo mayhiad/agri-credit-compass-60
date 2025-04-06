@@ -36,6 +36,8 @@ export interface ExtractionData {
     lastUpdated?: string;
   }>;
   processedAt?: string;
+  fileName?: string;
+  fileSize?: number;
 }
 
 export interface MarketPrice {
