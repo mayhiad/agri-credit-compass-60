@@ -12,9 +12,8 @@ import UploadArea from "@/components/upload/UploadArea";
 import ProcessingStatus from "@/components/upload/ProcessingStatus";
 import ErrorDisplay from "@/components/upload/ErrorDisplay";
 import SuccessMessage from "@/components/upload/SuccessMessage";
-import { uploadFileToStorage } from "@/utils/storageUtils";
-import { processDocumentWithOpenAI, checkProcessingResults } from "@/services/documentProcessingService";
-import { supabase } from "@/integrations/supabase/client";
+import { ProcessingStatus as ProcessingStatusType, processSapsDocument } from "@/services/uploadProcessingService";
+import { saveFarmDataToDatabase } from "@/services/farmDataService";
 
 interface FileUploadProps {
   onComplete: (farmData: FarmData) => void;
@@ -25,11 +24,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [processingStatus, setProcessingStatus] = useState<{
-    step: string;
-    progress: number;
-    details?: string;
-  } | null>(null);
+  const [processingStatus, setProcessingStatus] = useState<ProcessingStatusType | null>(null);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -44,101 +39,6 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         toast.error("Kérjük, PDF vagy Excel formátumú dokumentumot töltsön fel");
         setFile(null);
       }
-    }
-  };
-  
-  const saveFarmDataToDatabase = async (farmData: FarmData) => {
-    if (!user) {
-      console.error("Nincs bejelentkezett felhasználó");
-      return;
-    }
-    
-    // Validate required fields before saving
-    if (typeof farmData.hectares !== 'number' || isNaN(farmData.hectares)) {
-      throw new Error("A hektárszám hiányzik vagy érvénytelen");
-    }
-    
-    if (typeof farmData.totalRevenue !== 'number' || isNaN(farmData.totalRevenue)) {
-      throw new Error("A teljes bevétel hiányzik vagy érvénytelen");
-    }
-    
-    if (!farmData.region) {
-      farmData.region = "Ismeretlen régió";
-    }
-    
-    if (!farmData.documentId) {
-      farmData.documentId = `SAPS-${new Date().getFullYear()}-${Math.floor(Math.random() * 900000) + 100000}`;
-    }
-    
-    try {
-      // Elmentjük a farm adatokat
-      const { data: farmRecord, error: farmError } = await supabase
-        .from('farms')
-        .insert({
-          user_id: user.id,
-          hectares: farmData.hectares,
-          total_revenue: farmData.totalRevenue,
-          region: farmData.region,
-          document_id: farmData.documentId
-        })
-        .select()
-        .single();
-      
-      if (farmError) throw farmError;
-      
-      if (!farmRecord) {
-        throw new Error("Nem sikerült létrehozni a farm rekordot");
-      }
-      
-      // Elmentjük a kultúrákat
-      if (farmData.cultures && farmData.cultures.length > 0) {
-        const culturesData = farmData.cultures.map(culture => ({
-          farm_id: farmRecord.id,
-          name: culture.name,
-          hectares: culture.hectares,
-          estimated_revenue: culture.estimatedRevenue
-        }));
-        
-        const { error: culturesError } = await supabase
-          .from('cultures')
-          .insert(culturesData);
-        
-        if (culturesError) throw culturesError;
-      }
-      
-      // Elmentjük a részletes adatokat
-      if (farmData.marketPrices || farmData.blockIds) {
-        const { error: detailsError } = await supabase
-          .from('farm_details')
-          .insert({
-            farm_id: farmRecord.id,
-            market_prices: farmData.marketPrices ? JSON.stringify(farmData.marketPrices) : null,
-            location_data: farmData.blockIds ? JSON.stringify({ blockIds: farmData.blockIds }) : null
-          });
-        
-        if (detailsError) throw detailsError;
-      }
-      
-      // Rögzítjük a diagnosztikai naplóba a teljes feldolgozást
-      const extractionData = {
-        ...farmData,
-        processedAt: new Date().toISOString(),
-        year: farmData.year || new Date().getFullYear().toString()
-      };
-      
-      await supabase
-        .from('diagnostic_logs')
-        .insert({
-          user_id: user.id,
-          file_name: file?.name,
-          file_size: file?.size,
-          extraction_data: JSON.stringify(extractionData)
-        });
-      
-      return farmRecord.id;
-    } catch (error) {
-      console.error("Hiba az adatok mentése során:", error);
-      throw error;
     }
   };
   
@@ -159,126 +59,8 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
     setError(null);
     
     try {
-      setProcessingStatus({
-        step: "Dokumentum ellenőrzése",
-        progress: 10,
-      });
-      
-      // Először feltöltjük a dokumentumot a Storage-ba
-      const storagePath = await uploadFileToStorage(file, user.id);
-      
-      if (storagePath) {
-        setProcessingStatus({
-          step: "Dokumentum mentve a tárhelyre",
-          progress: 20,
-          details: `Fájl sikeresen mentve: ${storagePath}`
-        });
-      } else {
-        console.warn("A fájl mentése a tárhelyre sikertelen volt, de a feldolgozás folytatódik");
-      }
-      
-      setProcessingStatus({
-        step: "Dokumentum feltöltése",
-        progress: 30,
-      });
-      
-      // Dokumentum feldolgozása OpenAI-val
-      const processResult = await processDocumentWithOpenAI(file, user);
-      
-      if (!processResult) {
-        throw new Error("Hiba történt a dokumentum feldolgozása során");
-      }
-      
-      const { threadId, runId } = processResult;
-      
-      setProcessingStatus({
-        step: "AI feldolgozás folyamatban",
-        progress: 50,
-        details: "Az AI feldolgozza a dokumentumot, ez akár 1-2 percet is igénybe vehet..."
-      });
-      
-      let isComplete = false;
-      let farmData: FarmData | null = null;
-      let attempts = 0;
-      const maxAttempts = 30;
-      
-      while (!isComplete && attempts < maxAttempts) {
-        attempts++;
-        
-        await new Promise(resolve => setTimeout(resolve, 6000));
-        
-        try {
-          const resultData = await checkProcessingResults(threadId, runId);
-          
-          let progress = 50 + Math.min(40, attempts * 2);
-          setProcessingStatus({
-            step: resultData.status === 'completed' ? "Dokumentum elemzése befejezve" : "AI feldolgozás folyamatban",
-            progress: progress,
-            details: `Feldolgozás: ${resultData.status || 'folyamatban'} (${attempts}. ellenőrzés)`
-          });
-          
-          if (resultData.completed && resultData.data) {
-            isComplete = true;
-            farmData = resultData.data;
-            break;
-          }
-        } catch (checkError) {
-          console.error(`Eredmény ellenőrzési hiba (${attempts}. kísérlet):`, checkError);
-        }
-      }
-      
-      if (!isComplete || !farmData) {
-        // Ha nem sikerült feldolgozni az AI-val, használjunk minta adatokat
-        console.log("AI feldolgozás sikertelen, minta adatok használata helyette");
-        
-        // Jelenlegi év meghatározása
-        const currentYear = new Date().getFullYear().toString();
-        
-        // Minta adatok használata 
-        farmData = {
-          hectares: 451.8,
-          cultures: [
-            { name: "Búza", hectares: 200.75, estimatedRevenue: 85000000 },
-            { name: "Kukorica", hectares: 150.75, estimatedRevenue: 84420000 },
-            { name: "Napraforgó", hectares: 100.30, estimatedRevenue: 49647000 }
-          ],
-          totalRevenue: 219067000,
-          region: "Dél-Alföld",
-          documentId: `SAPS-${currentYear}-${Math.floor(Math.random() * 900000) + 100000}`,
-          applicantName: user.email?.split('@')[0] || "Felhasználó",
-          blockIds: ["KDPJ-34", "LHNM-78", "PTVS-92"],
-          year: currentYear
-        };
-        
-        setProcessingStatus({
-          step: "Alapértelmezett adatok feldolgozása",
-          progress: 100,
-          details: `${farmData.blockIds?.length || 0} blokkazonosító, ${farmData.cultures.length} növénykultúra feldolgozva (minta adatok)`
-        });
-      } else {
-        // További validáció és hiányzó mezők pótlása
-        if (typeof farmData.hectares !== 'number' || isNaN(farmData.hectares)) {
-          farmData.hectares = 0;
-        }
-        
-        if (typeof farmData.totalRevenue !== 'number' || isNaN(farmData.totalRevenue)) {
-          farmData.totalRevenue = 0;
-        }
-        
-        if (!farmData.region) {
-          farmData.region = "Ismeretlen régió";
-        }
-        
-        if (!farmData.cultures || !Array.isArray(farmData.cultures)) {
-          farmData.cultures = [];
-        }
-        
-        setProcessingStatus({
-          step: "Adatok feldolgozása",
-          progress: 90,
-          details: `${farmData.blockIds?.length || 0} blokkazonosító, ${farmData.cultures?.length || 0} növénykultúra feldolgozva`
-        });
-      }
+      // Feldolgozzuk a dokumentumot
+      const farmData = await processSapsDocument(file, user, setProcessingStatus);
       
       // Mentsük el az adatbázisba a feldolgozott adatokat
       setProcessingStatus({
@@ -287,7 +69,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         details: "Farm adatok és növénykultúrák rögzítése..."
       });
       
-      const farmId = await saveFarmDataToDatabase(farmData);
+      const farmId = await saveFarmDataToDatabase(farmData, user.id);
       
       if (farmId) {
         // Frissítsük a farm adatait a farmId-vel

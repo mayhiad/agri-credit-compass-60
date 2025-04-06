@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +39,9 @@ export type FarmData = {
   // Történeti adatok
   historicalCrops?: HistoricalCropData[]; // Történeti növénytermesztési adatok
   documentDate?: string; // Dokumentum dátuma
+  // File metadata for diagnostics
+  fileName?: string;
+  fileSize?: number;
 };
 
 export type UserData = {
