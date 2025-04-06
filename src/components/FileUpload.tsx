@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -95,8 +94,8 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
           .from('farm_details')
           .insert({
             farm_id: farmRecord.id,
-            market_prices: farmData.marketPrices ? JSON.parse(JSON.stringify(farmData.marketPrices)) : null,
-            location_data: farmData.blockIds ? { blockIds: farmData.blockIds } : null
+            market_prices: farmData.marketPrices ? JSON.stringify(farmData.marketPrices) : null,
+            location_data: farmData.blockIds ? JSON.stringify({ blockIds: farmData.blockIds }) : null
           });
         
         if (detailsError) throw detailsError;
@@ -115,7 +114,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
           user_id: user.id,
           file_name: file?.name,
           file_size: file?.size,
-          extraction_data: JSON.parse(JSON.stringify(extractionData))
+          extraction_data: JSON.stringify(extractionData)
         });
       
       return farmRecord.id;

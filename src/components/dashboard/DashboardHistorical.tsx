@@ -22,6 +22,23 @@ interface HistoricalFarmData {
   }[];
 }
 
+interface ExtractionData {
+  year?: string;
+  hectares?: number;
+  totalRevenue?: number;
+  cultures?: Array<{
+    name: string;
+    hectares: number;
+    estimatedRevenue: number;
+  }>;
+  region?: string;
+  documentId?: string;
+  applicantName?: string;
+  blockIds?: string[];
+  marketPrices?: any[];
+  processedAt?: string;
+}
+
 const DashboardHistorical = () => {
   const { user } = useAuth();
   const [historicalData, setHistoricalData] = useState<HistoricalFarmData[]>([]);
@@ -96,38 +113,52 @@ const DashboardHistorical = () => {
             // Ne duplikáljuk az adatokat, ha már megvan a farm
             if (!log.extraction_data) continue;
             
-            const extractionData = log.extraction_data;
-            if (typeof extractionData !== 'object') continue;
-            
-            // Ellenőrizzük, hogy az év már szerepel-e
-            const extractionYear = extractionData.year?.toString() || "2022";
-            if (farmData.some(f => f.year === extractionYear)) continue;
-            
-            const euExchangeRate = 380; // Alapértelmezett EUR/HUF árfolyam
-            
-            const totalHectares = typeof extractionData.hectares === 'number' ? extractionData.hectares : 0;
-            const totalRevenue = typeof extractionData.totalRevenue === 'number' ? extractionData.totalRevenue : 0;
-            
-            const logEntry: HistoricalFarmData = {
-              year: extractionYear,
-              totalHectares: totalHectares,
-              totalRevenue: totalRevenue,
-              totalRevenueEUR: totalRevenue / euExchangeRate,
-              cultures: []
-            };
-            
-            // Kultúrák feldolgozása, ha vannak
-            if (Array.isArray(extractionData.cultures)) {
-              logEntry.cultures = extractionData.cultures.map((culture: any) => ({
-                name: culture.name || "Ismeretlen",
-                hectares: culture.hectares || 0,
-                revenue: culture.estimatedRevenue || 0
-              }));
-            }
-            
-            // Csak akkor adjuk hozzá, ha tartalmaz értelmes adatokat
-            if (logEntry.totalHectares > 0) {
-              farmData.push(logEntry);
+            try {
+              // Parse the extraction data if it's a string
+              let extractionData: ExtractionData = {};
+              
+              if (typeof log.extraction_data === 'string') {
+                extractionData = JSON.parse(log.extraction_data);
+              } else if (typeof log.extraction_data === 'object') {
+                extractionData = log.extraction_data as ExtractionData;
+              } else {
+                continue;
+              }
+              
+              // Ellenőrizzük, hogy az év már szerepel-e
+              const extractionYear = extractionData.year?.toString() || "2022";
+              if (farmData.some(f => f.year === extractionYear)) continue;
+              
+              const euExchangeRate = 380; // Alapértelmezett EUR/HUF árfolyam
+              
+              const totalHectares = typeof extractionData.hectares === 'number' ? extractionData.hectares : 0;
+              const totalRevenue = typeof extractionData.totalRevenue === 'number' ? extractionData.totalRevenue : 0;
+              
+              const logEntry: HistoricalFarmData = {
+                year: extractionYear,
+                totalHectares: totalHectares,
+                totalRevenue: totalRevenue,
+                totalRevenueEUR: totalRevenue / euExchangeRate,
+                cultures: []
+              };
+              
+              // Kultúrák feldolgozása, ha vannak
+              if (Array.isArray(extractionData.cultures)) {
+                logEntry.cultures = extractionData.cultures.map(culture => ({
+                  name: culture.name || "Ismeretlen",
+                  hectares: culture.hectares || 0,
+                  revenue: culture.estimatedRevenue || 0
+                }));
+              }
+              
+              // Csak akkor adjuk hozzá, ha tartalmaz értelmes adatokat
+              if (logEntry.totalHectares > 0) {
+                farmData.push(logEntry);
+              }
+            } catch (parseError) {
+              console.error("Error parsing extraction data:", parseError);
+              // Continue with the next log if there's an error
+              continue;
             }
           }
         }
