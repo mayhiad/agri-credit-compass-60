@@ -56,9 +56,10 @@ export async function createThread() {
 // Üzenet hozzáadása egy threadhez
 export async function addMessageToThread(threadId, content = "Kérlek, olvasd ki a gazdálkodó nevét a dokumentumból!") {
   try {
+    // Rendszerüzenet hozzáadása a threadhez (ugyanaz, mint a startRun-ban)
     const message = await openai.beta.threads.messages.create(threadId, {
       role: "user",
-      content
+      content: `Rendszerüzenet: Azt szeretném, ha kiolvasnád a gazdálkodó nevét a dokumentumból és visszaadnád JSON formátumban: { "applicantName": "GAZDÁLKODÓ NEVE" }`
     });
     console.log(`✅ Üzenet létrehozva: ${message.id}`);
     return message;
