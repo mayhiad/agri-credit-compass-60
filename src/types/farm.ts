@@ -38,6 +38,9 @@ export interface FarmData {
   marketPrices?: MarketPrice[];
   documentDate?: string;
   parcels?: any[];
+  batchId?: string;  // Added for batch processing
+  pageCount?: number; // Added to track document pages
+  processingStatus?: string; // Added to track processing status
 }
 
 export interface UserData {
@@ -46,4 +49,13 @@ export interface UserData {
   email?: string;
   phone?: string;
   taxId?: string;
+}
+
+export interface BatchProcessingInfo {
+  batchId: string;
+  pageCount: number;
+  currentBatch: number;
+  totalBatches: number;
+  processedPages: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
 }

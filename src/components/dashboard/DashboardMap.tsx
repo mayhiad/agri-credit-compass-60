@@ -1,22 +1,23 @@
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import React from "react";
 import FarmLocation from "@/components/FarmLocation";
 
 const DashboardMap = () => {
+  // This is just a placeholder handler since we're only displaying the map
+  // in the dashboard context, not using it for navigation
+  const handleComplete = () => {
+    console.log("Map view complete");
+  };
+  
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Földterületek</CardTitle>
-        <CardDescription>
-          A SAPS dokumentum alapján azonosított földterületek térképe
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="h-96 rounded-md overflow-hidden border">
-          <FarmLocation />
-        </div>
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      <h2 className="text-2xl font-bold">Földterületek térképe</h2>
+      <p className="text-muted-foreground mb-4">
+        Az alábbi térkép mutatja a gazdaságához tartozó földterületeket
+      </p>
+      
+      <FarmLocation onComplete={handleComplete} />
+    </div>
   );
 };
 
