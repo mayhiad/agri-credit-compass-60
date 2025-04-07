@@ -96,8 +96,20 @@ serve(async (req) => {
     
     console.log(`📁 ${files.length} images found in storage`);
     
+    // Filter only JPG files (ensure we only use supported formats)
+    const jpgFiles = files.filter(file => 
+      file.name.toLowerCase().endsWith('.jpg') || 
+      file.name.toLowerCase().endsWith('.jpeg')
+    );
+    
+    if (jpgFiles.length === 0) {
+      throw new Error('No JPG images found for this batch. Please ensure PDF was converted to JPGs correctly.');
+    }
+    
+    console.log(`🖼️ ${jpgFiles.length} JPG images found (out of ${files.length} total files)`);
+    
     // Sort files by page number
-    const sortedFiles = files.sort((a, b) => {
+    const sortedFiles = jpgFiles.sort((a, b) => {
       const aNum = parseInt(a.name.split('_')[0]) || 0;
       const bNum = parseInt(b.name.split('_')[0]) || 0;
       return aNum - bNum;
@@ -117,7 +129,7 @@ serve(async (req) => {
       return publicUrl;
     });
     
-    console.log(`🌐 ${imageUrls.length} image URLs generated`);
+    console.log(`🌐 ${imageUrls.length} JPG image URLs generated for Claude AI processing`);
     
     // Process all images with Claude AI
     let result;

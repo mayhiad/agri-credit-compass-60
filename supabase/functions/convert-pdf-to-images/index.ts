@@ -3,7 +3,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { v4 as uuidv4 } from "https://esm.sh/uuid@9.0.0";
-import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1";
 
 // Define CORS headers directly in this file
 const corsHeaders = {
@@ -16,19 +15,13 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// PDF pages to images conversion
+// ConvertAPI key
+const convertApiKey = Deno.env.get('CONVERT_API_KEY') || '';
+
+// PDF to JPG conversion using ConvertAPI
 async function convertPdfToImages(pdfBytes: Uint8Array, userId: string, fileName: string) {
   try {
     console.log(`📄 Starting PDF conversion: ${fileName}, size: ${pdfBytes.length} bytes`);
-    
-    // Load PDF document
-    const pdfDoc = await PDFDocument.load(pdfBytes);
-    const pageCount = pdfDoc.getPageCount();
-    console.log(`📄 PDF page count: ${pageCount}`);
-    
-    if (pageCount === 0) {
-      throw new Error("The PDF document contains no pages");
-    }
     
     // Generate batch ID
     const batchId = uuidv4();
@@ -42,7 +35,7 @@ async function convertPdfToImages(pdfBytes: Uint8Array, userId: string, fileName
           batch_id: batchId,
           user_id: userId,
           document_name: fileName,
-          page_count: pageCount,
+          page_count: 0, // Will update after conversion
           status: 'processing',
           original_storage_path: `saps/${userId}/${batchId}/original.pdf`,
           metadata: {
@@ -80,73 +73,122 @@ async function convertPdfToImages(pdfBytes: Uint8Array, userId: string, fileName
       }
       
       console.log(`💾 Original PDF saved to storage: ${uploadData?.path || 'unknown'}`);
-    } catch (storageError) {
-      console.error("Error during storage operation:", storageError);
-      // Continue processing even if storage save fails
-    }
-    
-    // Create images folder
-    const imagesFolder = `saps/${userId}/${batchId}/images`;
-    
-    // Process and save pages as images
-    console.log(`🖼️ Starting page to image conversion...`);
-    
-    // Process pages
-    for (let i = 0; i < pageCount; i++) {
-      try {
-        // Create new PDF document with single page
-        const singlePagePdf = await PDFDocument.create();
-        const [copiedPage] = await singlePagePdf.copyPages(pdfDoc, [i]);
-        singlePagePdf.addPage(copiedPage);
+      
+      // Get public URL for the uploaded PDF
+      const { data: { publicUrl } } = supabase.storage
+        .from('dokumentumok')
+        .getPublicUrl(`saps/${userId}/${batchId}/original.pdf`);
+      
+      console.log(`🔗 PDF public URL: ${publicUrl}`);
+      
+      // Create images folder
+      const imagesFolder = `saps/${userId}/${batchId}/images`;
+      
+      // Use ConvertAPI to convert PDF to JPG images
+      console.log(`🖼️ Starting ConvertAPI PDF to JPG conversion...`);
+      
+      // Prepare FormData for ConvertAPI
+      const formData = new FormData();
+      formData.append('File', new Blob([pdfBytes], { type: 'application/pdf' }));
+      formData.append('StoreFile', 'true');
+      formData.append('ImageResolutionH', '300');
+      formData.append('ImageResolutionV', '300');
+      formData.append('ImageQuality', '90');
+      
+      // Call ConvertAPI to convert PDF to JPG
+      const convertResponse = await fetch(
+        `https://v2.convertapi.com/convert/pdf/to/jpg?Secret=${convertApiKey}&StoreFile=true`,
+        {
+          method: 'POST',
+          body: formData
+        }
+      );
+      
+      if (!convertResponse.ok) {
+        const errorText = await convertResponse.text();
+        console.error("ConvertAPI error:", errorText);
+        throw new Error(`ConvertAPI error: ${errorText}`);
+      }
+      
+      const convertResult = await convertResponse.json();
+      console.log(`✅ ConvertAPI conversion result:`, JSON.stringify(convertResult, null, 2));
+      
+      // Check if we have files in the result
+      if (!convertResult.Files || !Array.isArray(convertResult.Files) || convertResult.Files.length === 0) {
+        throw new Error("No files returned from ConvertAPI");
+      }
+      
+      // Process and save the converted JPG files
+      const pageCount = convertResult.Files.length;
+      const savedImages = [];
+      
+      for (let i = 0; i < convertResult.Files.length; i++) {
+        const file = convertResult.Files[i];
+        const fileUrl = file.Url;
+        const fileName = `${i + 1}_page.jpg`;
         
-        // Save PDF page
-        const pdfBytes = await singlePagePdf.save();
+        console.log(`📥 Downloading JPG file ${i + 1} from ${fileUrl}`);
         
-        // Save page to storage
-        const pageFileName = `${i + 1}_page.pdf`;
-        const { data: pageData, error: pageError } = await supabase.storage
-          .from('dokumentumok')
-          .upload(`${imagesFolder}/${pageFileName}`, pdfBytes, {
-            contentType: 'application/pdf',
-            upsert: true
-          });
-          
-        if (pageError) {
-          console.error(`Error saving page ${i + 1}:`, pageError);
+        // Download the JPG file from ConvertAPI
+        const fileResponse = await fetch(fileUrl);
+        if (!fileResponse.ok) {
+          console.error(`Error downloading JPG file ${i + 1}:`, await fileResponse.text());
           continue;
         }
         
-        console.log(`✅ Page ${i + 1} saved: ${pageData?.path || 'unknown'}`);
-      } catch (error) {
-        console.error(`Error processing page ${i + 1}:`, error);
-      }
-    }
-    
-    // Update batch status
-    try {
-      const { error: updateError } = await supabase
-        .from('document_batches')
-        .update({ status: 'converted' })
-        .eq('batch_id', batchId);
+        const fileBuffer = await fileResponse.arrayBuffer();
+        const fileBytes = new Uint8Array(fileBuffer);
         
-      if (updateError) {
-        console.error("Error updating batch status:", updateError);
-        console.error("Error details:", JSON.stringify(updateError, null, 2));
-      } else {
-        console.log(`✅ Batch status updated to 'converted'`);
+        // Save JPG file to Supabase storage
+        const { data: savedImage, error: saveError } = await supabase.storage
+          .from('dokumentumok')
+          .upload(`${imagesFolder}/${fileName}`, fileBytes, {
+            contentType: 'image/jpeg',
+            upsert: true
+          });
+          
+        if (saveError) {
+          console.error(`Error saving JPG file ${i + 1}:`, saveError);
+          continue;
+        }
+        
+        console.log(`✅ JPG page ${i + 1} saved: ${savedImage?.path || 'unknown'}`);
+        savedImages.push(savedImage);
       }
-    } catch (updateError) {
-      console.error("Error during status update:", updateError);
-      // Continue even if status update fails
+      
+      // Update batch with page count
+      try {
+        const { error: updateError } = await supabase
+          .from('document_batches')
+          .update({ 
+            status: 'converted',
+            page_count: pageCount
+          })
+          .eq('batch_id', batchId);
+          
+        if (updateError) {
+          console.error("Error updating batch status:", updateError);
+          console.error("Error details:", JSON.stringify(updateError, null, 2));
+        } else {
+          console.log(`✅ Batch status updated to 'converted' with ${pageCount} pages`);
+        }
+      } catch (updateError) {
+        console.error("Error during status update:", updateError);
+        // Continue even if status update fails
+      }
+      
+      console.log(`✅ PDF conversion completed: ${pageCount} JPG images processed`);
+      
+      return {
+        batchId,
+        pageCount,
+        status: 'converted'
+      };
+      
+    } catch (storageError) {
+      console.error("Error during storage operation:", storageError);
+      throw storageError;
     }
-    
-    console.log(`✅ PDF conversion completed: ${pageCount} pages processed`);
-    
-    return {
-      batchId,
-      pageCount,
-      status: 'converted'
-    };
   } catch (error) {
     console.error("Error during PDF conversion:", error);
     throw error;
@@ -161,6 +203,11 @@ serve(async (req) => {
 
   try {
     console.log("📥 Request received: Convert PDF to images");
+    
+    // Check if API key is configured
+    if (!convertApiKey) {
+      throw new Error("CONVERT_API_KEY environment variable not set");
+    }
     
     // Check if request contains a file
     if (req.method !== 'POST') {
@@ -193,7 +240,7 @@ serve(async (req) => {
     // Send response
     return new Response(JSON.stringify({
       success: true,
-      message: "PDF successfully converted to images",
+      message: "PDF successfully converted to JPG images",
       batchId: result.batchId,
       pageCount: result.pageCount,
       status: result.status
