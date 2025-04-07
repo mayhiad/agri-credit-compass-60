@@ -74,13 +74,6 @@ async function convertPdfToImages(pdfBytes: Uint8Array, userId: string, fileName
       
       console.log(`💾 Original PDF saved to storage: ${uploadData?.path || 'unknown'}`);
       
-      // Get public URL for the uploaded PDF
-      const { data: { publicUrl } } = supabase.storage
-        .from('dokumentumok')
-        .getPublicUrl(`saps/${userId}/${batchId}/original.pdf`);
-      
-      console.log(`🔗 PDF public URL: ${publicUrl}`);
-      
       // Create images folder
       const imagesFolder = `saps/${userId}/${batchId}/images`;
       
@@ -96,6 +89,7 @@ async function convertPdfToImages(pdfBytes: Uint8Array, userId: string, fileName
       formData.append('ImageQuality', '90');
       
       // Call ConvertAPI to convert PDF to JPG
+      console.log(`🚀 Sending request to ConvertAPI with API key: ${convertApiKey ? "Key provided" : "NO KEY PROVIDED!"}`);
       const convertResponse = await fetch(
         `https://v2.convertapi.com/convert/pdf/to/jpg?Secret=${convertApiKey}&StoreFile=true`,
         {
@@ -107,6 +101,7 @@ async function convertPdfToImages(pdfBytes: Uint8Array, userId: string, fileName
       if (!convertResponse.ok) {
         const errorText = await convertResponse.text();
         console.error("ConvertAPI error:", errorText);
+        console.error("ConvertAPI status:", convertResponse.status);
         throw new Error(`ConvertAPI error: ${errorText}`);
       }
       
@@ -139,6 +134,8 @@ async function convertPdfToImages(pdfBytes: Uint8Array, userId: string, fileName
         const fileBuffer = await fileResponse.arrayBuffer();
         const fileBytes = new Uint8Array(fileBuffer);
         
+        console.log(`📥 Successfully downloaded JPG file ${i + 1}, size: ${fileBytes.length} bytes`);
+        
         // Save JPG file to Supabase storage
         const { data: savedImage, error: saveError } = await supabase.storage
           .from('dokumentumok')
@@ -154,6 +151,13 @@ async function convertPdfToImages(pdfBytes: Uint8Array, userId: string, fileName
         
         console.log(`✅ JPG page ${i + 1} saved: ${savedImage?.path || 'unknown'}`);
         savedImages.push(savedImage);
+        
+        // Get public URL for verification
+        const { data: { publicUrl } } = supabase.storage
+          .from('dokumentumok')
+          .getPublicUrl(`${imagesFolder}/${fileName}`);
+          
+        console.log(`🔗 JPG page ${i + 1} public URL: ${publicUrl}`);
       }
       
       // Update batch with page count

@@ -1,3 +1,4 @@
+
 // Claude API processor for document extraction
 import { encode as base64Encode } from "https://deno.land/std@0.82.0/encoding/base64.ts";
 import { supabase } from "./openaiClient.ts";
@@ -87,10 +88,9 @@ export async function processImageBatchWithClaude(
           continue;
         }
         
-        // Detailed logging of each image URL
-        console.log(`📸 Image URL ${i + 1}: ${imageUrl}`);
-        console.log(`   - Format: ${imageUrl.split('.').pop()}`);
-        console.log(`   - Full path: ${imageUrl}`);
+        // Log file extension for debugging
+        const fileExtension = imageUrl.split('.').pop() || '';
+        console.log(`📸 Image URL ${i + 1}: ${imageUrl.substring(0, 100)}... (format: ${fileExtension.toLowerCase()})`);
         
         // Use the URL format that Claude accepts
         messageContent.push({
@@ -108,26 +108,17 @@ export async function processImageBatchWithClaude(
       }
     }
     
-    // Log the full content structure being sent to Claude API
-    console.log(`🔍 Content structure being sent to Claude API:`);
-    console.log(JSON.stringify(messageContent.map(item => {
-      if (item.type === 'image') {
-        return {
-          type: 'image',
-          source: {
-            type: item.source.type,
-            url: item.source.url.substring(0, 100) + '...' // Truncated for readability
-          }
-        };
-      }
-      return item;
-    }), null, 2));
+    // Log summary of image processing
+    console.log(`🔍 Summary of image processing:`);
+    console.log(`- Valid images: ${validImageUrls.length}`);
+    console.log(`- Invalid URLs: ${invalidImageUrls.length}`);
+    console.log(`- Unsupported formats: ${unsupportedFormatUrls.length}`);
     
     if (validImageUrls.length === 0) {
       throw new Error(`No valid images found in the batch. All ${images.length} images were invalid or in unsupported formats.`);
     }
     
-    console.log(`✅ Processed ${validImageUrls.length} valid images, skipped ${invalidImageUrls.length} invalid URLs and ${unsupportedFormatUrls.length} unsupported formats`);
+    console.log(`✅ Proceeding with ${validImageUrls.length} valid images for Claude API processing`);
     
     // Construct Claude API request
     const payload = {
@@ -146,12 +137,7 @@ export async function processImageBatchWithClaude(
     console.log(`🚀 Sending Claude API request: ${CLAUDE_API_URL}, model: ${CLAUDE_MODEL}, with ${validImageUrls.length} images`);
     
     // Log a sample of the request for debugging
-    console.log(`Request sample: ${JSON.stringify({
-      model: payload.model,
-      message_count: payload.messages.length,
-      content_items: payload.messages[0].content.length,
-      system_prompt_length: payload.system.length
-    })}`);
+    console.log(`Request summary: model=${payload.model}, images=${validImageUrls.length}, prompt size=${payload.messages[0].content[0].text.length} chars`);
     
     const response = await fetch(CLAUDE_API_URL, {
       method: "POST",
@@ -178,7 +164,7 @@ export async function processImageBatchWithClaude(
     }
     
     const result = await response.json();
-    console.log(`✅ Claude API response received:`, result);
+    console.log(`✅ Claude API response received. Content type: ${result.content?.[0]?.type}, length: ${result.content?.[0]?.text?.length || 0} chars`);
     
     // Extract the JSON response from Claude's text output
     let extractedData = {};
@@ -193,7 +179,7 @@ export async function processImageBatchWithClaude(
         const jsonMatch = rawText.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           extractedData = JSON.parse(jsonMatch[0]);
-          console.log(`✅ Data extracted: ${JSON.stringify(extractedData)}`);
+          console.log(`✅ Data extracted: ${JSON.stringify(extractedData, null, 2)}`);
         } else {
           console.warn(`⚠️ Could not extract JSON data from the response`);
         }
@@ -278,6 +264,10 @@ export async function processAllImageBatches(
   });
   
   console.log(`✅ After filtering: ${supportedUrls.length} valid and supported images out of ${imageUrls.length} total`);
+  console.log(`📄 First few image URLs for verification:`);
+  supportedUrls.slice(0, 3).forEach((url, i) => {
+    console.log(`   ${i+1}: ${url}`);
+  });
   
   if (supportedUrls.length === 0) {
     throw new Error("No valid and supported image URLs found to process");

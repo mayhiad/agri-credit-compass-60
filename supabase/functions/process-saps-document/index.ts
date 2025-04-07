@@ -94,19 +94,22 @@ serve(async (req) => {
       throw new Error('No images found for this batch');
     }
     
-    console.log(`📁 ${files.length} images found in storage`);
+    console.log(`📁 ${files.length} total files found in storage`);
     
     // Filter only JPG files (ensure we only use supported formats)
-    const jpgFiles = files.filter(file => 
-      file.name.toLowerCase().endsWith('.jpg') || 
-      file.name.toLowerCase().endsWith('.jpeg')
-    );
+    const jpgFiles = files.filter(file => {
+      const isJpg = file.name.toLowerCase().endsWith('.jpg') || file.name.toLowerCase().endsWith('.jpeg');
+      if (!isJpg) {
+        console.log(`⚠️ Skipping non-JPG file: ${file.name}`);
+      }
+      return isJpg;
+    });
+    
+    console.log(`🖼️ ${jpgFiles.length} JPG images found (out of ${files.length} total files)`);
     
     if (jpgFiles.length === 0) {
       throw new Error('No JPG images found for this batch. Please ensure PDF was converted to JPGs correctly.');
     }
-    
-    console.log(`🖼️ ${jpgFiles.length} JPG images found (out of ${files.length} total files)`);
     
     // Sort files by page number
     const sortedFiles = jpgFiles.sort((a, b) => {
@@ -115,18 +118,24 @@ serve(async (req) => {
       return aNum - bNum;
     });
     
+    console.log(`📋 Sorted JPG files: First few examples:`);
+    sortedFiles.slice(0, 3).forEach((file, idx) => {
+      console.log(`   ${idx + 1}: ${file.name}`);
+    });
+    
     // Generate public URLs for the images
     const imageUrls = sortedFiles.map(file => {
       const publicUrl = supabase.storage
         .from('dokumentumok')
         .getPublicUrl(`saps/${userId}/${batchId}/images/${file.name}`).data.publicUrl;
       
-      // Log the first few URLs for debugging
-      if (sortedFiles.indexOf(file) < 5) {
-        console.log(`Example image URL ${sortedFiles.indexOf(file)}: ${publicUrl}`);
-      }
-      
       return publicUrl;
+    });
+    
+    // Log the first few URLs for debugging
+    console.log(`🌐 Generated image URLs (first few examples):`);
+    imageUrls.slice(0, 3).forEach((url, idx) => {
+      console.log(`   ${idx + 1}: ${url}`);
     });
     
     console.log(`🌐 ${imageUrls.length} JPG image URLs generated for Claude AI processing`);
