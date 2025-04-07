@@ -12,33 +12,29 @@ export const fetchFarmData = async (userId: string): Promise<{
       .from('farms')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .order('created_at', { ascending: false })  // Get the most recent farm
+      .limit(1);  // Only get one result
 
     if (farmError) {
       console.error("Hiba a farm adatok lekérésekor:", farmError);
-      if (farmError.code === 'PGRST116') {
-        // This error code means no match found - no farm data yet
-        // We don't throw an error here as this can be a normal case
-        return { data: null, error: null };
-      } else {
-        // For other errors, display an error message
-        return { 
-          data: null, 
-          error: "Adatbázis hiba történt. Kérjük próbálja újra később." 
-        };
-      }
+      return { 
+        data: null, 
+        error: "Adatbázis hiba történt. Kérjük próbálja újra később." 
+      };
     }
 
     // If no farm data, return
-    if (!farms) {
+    if (!farms || farms.length === 0) {
       return { data: null, error: null };
     }
+
+    const farm = farms[0]; // Get the first (most recent) farm
 
     // Fetch detailed market prices
     const { data: farmDetails, error: marketPricesError } = await supabase
       .from('farm_details')
       .select('market_prices')
-      .eq('farm_id', farms.id)
+      .eq('farm_id', farm.id)
       .single();
 
     if (marketPricesError && marketPricesError.code !== 'PGRST116') {
@@ -49,7 +45,7 @@ export const fetchFarmData = async (userId: string): Promise<{
     const { data: cultures, error: culturesError } = await supabase
       .from('cultures')
       .select('*')
-      .eq('farm_id', farms.id);
+      .eq('farm_id', farm.id);
 
     if (culturesError) {
       console.error("Hiba a kultúrák lekérésekor:", culturesError);
@@ -68,15 +64,15 @@ export const fetchFarmData = async (userId: string): Promise<{
     
     // Build farm data
     const farmData: FarmData = {
-      hectares: farms.hectares,
+      hectares: farm.hectares,
       cultures: cultures?.map(culture => ({
         name: culture.name,
         hectares: culture.hectares,
         estimatedRevenue: culture.estimated_revenue
       })) || [],
-      totalRevenue: farms.total_revenue,
-      region: farms.region || "Ismeretlen régió",
-      documentId: farms.document_id || `SAPS-2023-${userId.substring(0, 6)}`,
+      totalRevenue: farm.total_revenue,
+      region: farm.region || "Ismeretlen régió",
+      documentId: farm.document_id || `SAPS-2023-${userId.substring(0, 6)}`,
       applicantName: userId.split('@')[0] || "Ismeretlen felhasználó",
       blockIds: [`K-${userId.substring(0, 4)}`, `L-${userId.substring(4, 8)}`],
       marketPrices: marketPriceData as MarketPrice[]

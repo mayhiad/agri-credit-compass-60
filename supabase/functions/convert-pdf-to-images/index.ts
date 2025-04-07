@@ -1,200 +1,191 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { v4 as uuidv4 } from "https://esm.sh/uuid@9.0.0";
+import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1";
 
-// Define corsHeaders directly in this file instead of importing
+// Define CORS headers directly in this file
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-import { supabase } from "../process-saps-document/openaiClient.ts";
+// Supabase kliens inicializálása
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Maximum allowed document pages
-const MAX_ALLOWED_PAGES = 99;
-
-serve(async (req) => {
-  // Handle CORS
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
+// PDF oldalak képekké konvertálása
+async function convertPdfToImages(pdfBytes: Uint8Array, userId: string, fileName: string) {
   try {
-    // Get the ConvertAPI key from environment variables
-    const convertApiKey = Deno.env.get('CONVERT_API_KEY');
+    console.log(`📄 PDF konvertálás kezdése: ${fileName}, méret: ${pdfBytes.length} bájt`);
     
-    if (!convertApiKey) {
-      throw new Error("CONVERT_API_KEY környezeti változó nincs beállítva");
-    }
-
-    // Get file from request
-    const formData = await req.formData();
-    const file = formData.get('file') as File;
-    const userId = formData.get('userId') as string;
+    // PDF dokumentum betöltése
+    const pdfDoc = await PDFDocument.load(pdfBytes);
+    const pageCount = pdfDoc.getPageCount();
+    console.log(`📄 PDF oldalak száma: ${pageCount}`);
     
-    if (!file) {
-      throw new Error("Nincs fájl a kérésben");
-    }
-    
-    if (!userId) {
-      throw new Error("Hiányzó felhasználói azonosító");
-    }
-
-    console.log(`📄 Fájl fogadva: ${file.name}, méret: ${file.size}, felhasználó: ${userId}`);
-    
-    // Generate a unique batch ID for this conversion job
-    const batchId = crypto.randomUUID();
-    
-    // Upload the original PDF to storage for record keeping
-    const fileBuffer = await file.arrayBuffer();
-    const pdfStoragePath = `saps/${userId}/${batchId}/${file.name}`;
-    
-    await supabase.storage
-      .from('dokumentumok')
-      .upload(pdfStoragePath, fileBuffer, {
-        contentType: 'application/pdf',
-        upsert: false
-      });
-    
-    // Get page count using ConvertAPI
-    console.log("⏳ PDF oldalszám ellenőrzése ConvertAPI segítségével...");
-    
-    // First, use the info endpoint to get metadata and page count
-    const infoResponse = await fetch(`https://v2.convertapi.com/info?Secret=${convertApiKey}`, {
-      method: 'POST',
-      body: fileBuffer,
-      headers: {
-        'Content-Type': 'application/pdf'
-      }
-    });
-    
-    if (!infoResponse.ok) {
-      throw new Error(`ConvertAPI info error: ${infoResponse.status} - ${await infoResponse.text()}`);
-    }
-    
-    const infoData = await infoResponse.json();
-    const pageCount = infoData.PageCount || 0;
-    
-    console.log(`📊 PDF oldalszám: ${pageCount}`);
-    
-    // Check if document exceeds maximum page limit
-    if (pageCount > MAX_ALLOWED_PAGES) {
-      return new Response(JSON.stringify({
-        error: `A feltöltött dokumentum túl nagy (${pageCount} oldal). A maximális megengedett oldalszám: ${MAX_ALLOWED_PAGES}.`
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-    
-    // If no pages, return error
     if (pageCount === 0) {
-      return new Response(JSON.stringify({
-        error: "A feltöltött PDF dokumentum üres vagy nem olvasható."
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      throw new Error("A PDF dokumentum nem tartalmaz oldalakat");
     }
     
-    // Convert PDF to JPG images using ConvertAPI
-    console.log("⏳ PDF konvertálása képekké ConvertAPI segítségével...");
+    // Batch azonosító generálása
+    const batchId = uuidv4();
+    console.log(`🆔 Batch azonosító: ${batchId}`);
     
-    // Prepare FormData for the conversion request
-    const convertFormData = new FormData();
-    convertFormData.append('File', new Blob([fileBuffer], { type: 'application/pdf' }));
-    convertFormData.append('StoreFile', 'true');
-    
-    const convertResponse = await fetch(`https://v2.convertapi.com/convert/pdf/to/jpg?Secret=${convertApiKey}&ImageResolutionH=1200&ImageResolutionV=1200&ScaleImage=true&ScaleProportions=true`, {
-      method: 'POST',
-      body: convertFormData
-    });
-    
-    if (!convertResponse.ok) {
-      throw new Error(`ConvertAPI conversion error: ${convertResponse.status} - ${await convertResponse.text()}`);
-    }
-    
-    const convertData = await convertResponse.json();
-    console.log("✅ PDF konvertálás kész, letöltési linkek:", convertData.Files.length);
-    
-    // Download each JPG and store it in Supabase storage
-    const storedImages = [];
-    
-    for (let i = 0; i < convertData.Files.length; i++) {
-      const fileUrl = convertData.Files[i].Url;
-      const fileName = convertData.Files[i].FileName;
-      const pageNumber = i + 1;
-      
-      console.log(`⏳ ${pageNumber}/${convertData.Files.length}. oldal letöltése: ${fileName}`);
-      
-      // Download the image from ConvertAPI
-      const imageResponse = await fetch(fileUrl);
-      const imageBuffer = await imageResponse.arrayBuffer();
-      
-      // Upload to Supabase storage
-      const jpgStoragePath = `saps/${userId}/${batchId}/images/${pageNumber.toString().padStart(3, '0')}_${fileName}`;
-      const { data, error } = await supabase.storage
-        .from('dokumentumok')
-        .upload(jpgStoragePath, imageBuffer, {
-          contentType: 'image/jpeg',
-          upsert: false
-        });
-      
-      if (error) {
-        console.error(`❌ Hiba a ${pageNumber}. kép feltöltésekor:`, error);
-      } else {
-        // Get public URL for the image
-        const publicUrl = supabase.storage
-          .from('dokumentumok')
-          .getPublicUrl(jpgStoragePath).data.publicUrl;
-        
-        storedImages.push({
-          pageNumber,
-          storagePath: jpgStoragePath,
-          url: publicUrl
-        });
-        
-        console.log(`✅ ${pageNumber}. oldal sikeresen tárolva`);
-      }
-    }
-    
-    // Save batch information to database for later reference
+    // Batch információk mentése az adatbázisba
     const { data: batchData, error: batchError } = await supabase
       .from('document_batches')
       .insert({
         batch_id: batchId,
         user_id: userId,
-        document_name: file.name,
+        document_name: fileName,
         page_count: pageCount,
-        original_storage_path: pdfStoragePath,
-        status: 'converted',
+        status: 'processing',
+        original_storage_path: `saps/${userId}/${batchId}/original.pdf`,
         metadata: {
-          fileSize: file.size,
-          timestamp: new Date().toISOString(),
-          imageCount: storedImages.length
+          fileSize: pdfBytes.length,
+          fileName: fileName,
+          mimeType: 'application/pdf'
         }
       })
-      .select('id')
+      .select()
       .single();
-    
+      
     if (batchError) {
-      console.error("❌ Hiba a batch információk mentésekor:", batchError);
+      console.error("Hiba a batch információk mentése során:", batchError);
+      throw new Error(`Nem sikerült menteni a batch információkat: ${batchError.message}`);
     }
     
-    // Return batch information and stored images
-    return new Response(JSON.stringify({
+    console.log(`💾 Batch információk mentve az adatbázisba: ${batchData.id}`);
+    
+    // Eredeti PDF mentése a tárolóba
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('dokumentumok')
+      .upload(`saps/${userId}/${batchId}/original.pdf`, pdfBytes, {
+        contentType: 'application/pdf',
+        upsert: true
+      });
+      
+    if (uploadError) {
+      console.error("Hiba az eredeti PDF mentése során:", uploadError);
+      throw new Error(`Nem sikerült menteni az eredeti PDF-et: ${uploadError.message}`);
+    }
+    
+    console.log(`💾 Eredeti PDF mentve a tárolóba: ${uploadData.path}`);
+    
+    // Képek mappájának létrehozása
+    const imagesFolder = `saps/${userId}/${batchId}/images`;
+    
+    // Oldalak feldolgozása és mentése képként
+    console.log(`🖼️ Oldalak képekké konvertálása kezdődik...`);
+    
+    // Oldalak feldolgozása
+    for (let i = 0; i < pageCount; i++) {
+      try {
+        // Új PDF dokumentum létrehozása egy oldallal
+        const singlePagePdf = await PDFDocument.create();
+        const [copiedPage] = await singlePagePdf.copyPages(pdfDoc, [i]);
+        singlePagePdf.addPage(copiedPage);
+        
+        // PDF oldal mentése
+        const pdfBytes = await singlePagePdf.save();
+        
+        // Oldal mentése a tárolóba
+        const pageFileName = `${i + 1}_page.pdf`;
+        const { data: pageData, error: pageError } = await supabase.storage
+          .from('dokumentumok')
+          .upload(`${imagesFolder}/${pageFileName}`, pdfBytes, {
+            contentType: 'application/pdf',
+            upsert: true
+          });
+          
+        if (pageError) {
+          console.error(`Hiba a(z) ${i + 1}. oldal mentése során:`, pageError);
+          continue;
+        }
+        
+        console.log(`✅ ${i + 1}. oldal mentve: ${pageData.path}`);
+      } catch (error) {
+        console.error(`Hiba a(z) ${i + 1}. oldal feldolgozása során:`, error);
+      }
+    }
+    
+    // Batch státusz frissítése
+    const { error: updateError } = await supabase
+      .from('document_batches')
+      .update({ status: 'converted' })
+      .eq('batch_id', batchId);
+      
+    if (updateError) {
+      console.error("Hiba a batch státusz frissítése során:", updateError);
+    }
+    
+    console.log(`✅ PDF konvertálás befejezve: ${pageCount} oldal feldolgozva`);
+    
+    return {
       batchId,
       pageCount,
-      storedImages,
-      batchDbId: batchData?.id || null
+      status: 'converted'
+    };
+  } catch (error) {
+    console.error("Hiba a PDF konvertálása során:", error);
+    throw error;
+  }
+}
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    console.log("📥 Kérés érkezett: PDF konvertálása képekké");
+    
+    // Ellenőrizzük, hogy a kérés tartalmaz-e fájlt
+    if (req.method !== 'POST') {
+      throw new Error("Csak POST kérések támogatottak");
+    }
+    
+    // Kérés adatainak kinyerése
+    const formData = await req.formData();
+    const file = formData.get('file');
+    const userId = formData.get('userId');
+    
+    if (!file || !(file instanceof File)) {
+      throw new Error("Nincs fájl a kérésben");
+    }
+    
+    if (!userId || typeof userId !== 'string') {
+      throw new Error("Hiányzik a felhasználó azonosító");
+    }
+    
+    console.log(`📄 Fájl neve: ${file.name}, mérete: ${file.size} bájt`);
+    console.log(`👤 Felhasználó: ${userId}`);
+    
+    // Fájl tartalmának beolvasása
+    const fileBuffer = await file.arrayBuffer();
+    const fileBytes = new Uint8Array(fileBuffer);
+    
+    // PDF konvertálása képekké
+    const result = await convertPdfToImages(fileBytes, userId, file.name);
+    
+    // Válasz küldése
+    return new Response(JSON.stringify({
+      success: true,
+      message: "PDF sikeresen konvertálva képekké",
+      batchId: result.batchId,
+      pageCount: result.pageCount,
+      status: result.status
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
-    
   } catch (error) {
-    console.error("🔥 Hiba a PDF konvertálása során:", error);
+    console.error("Hiba a PDF konvertálása során:", error);
     
-    return new Response(JSON.stringify({
-      error: error.message || "Ismeretlen hiba történt a PDF konvertálása során"
+    return new Response(JSON.stringify({ 
+      error: error.message || "Ismeretlen hiba történt a PDF konvertálása során" 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

@@ -39,6 +39,12 @@ export const processSapsDocument = async (
   convertFormData.append('file', file);
   convertFormData.append('userId', user.id);
   
+  // Get the authentication token
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error("Nincs érvényes felhasználói munkamenet");
+  }
+  
   // Call our Supabase Edge Function to convert PDF to images
   try {
     const convertResponse = await fetch(
@@ -46,7 +52,7 @@ export const processSapsDocument = async (
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${supabase.auth.getSession().then(res => res.data.session?.access_token)}`,
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: convertFormData,
         signal: AbortSignal.timeout(300000), // 5 minute timeout for large files
@@ -116,7 +122,7 @@ export const processSapsDocument = async (
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${supabase.auth.getSession().then(res => res.data.session?.access_token)}`,
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload),
