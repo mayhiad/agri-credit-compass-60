@@ -8,5 +8,10 @@ export type ProcessingStatus = {
   progress: number;
   details?: string;
   wordDocumentUrl?: string;
+  batchProgress?: {
+    currentBatch: number;
+    totalBatches: number;
+    pagesProcessed: number;
+    totalPages: number;
+  };
 };
-

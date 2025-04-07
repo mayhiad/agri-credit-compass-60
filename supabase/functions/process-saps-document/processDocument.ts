@@ -62,7 +62,8 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
     return {
       ocrLogId: ocrLogId,
       data: result.data,
-      status: 'completed'
+      status: 'completed',
+      batchInfo: result.batchInfo
     };
 
   } catch (error) {

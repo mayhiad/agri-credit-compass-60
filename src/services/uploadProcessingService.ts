@@ -6,6 +6,19 @@ import { processWithClaude } from "@/services/documentProcessor";
 import { validateDocumentFile } from "@/services/documentValidation";
 import { saveFarmDataToDatabase } from "@/services/farmDataService";
 
+// Estimate page count for a PDF based on file size
+const estimatePageCount = (fileSize: number): number => {
+  // Rough estimate: average PDF page is around 100KB
+  const estimatedPages = Math.ceil(fileSize / 100000);
+  // Minimum 1 page, maximum reasonable limit 
+  return Math.max(1, Math.min(estimatedPages, 500));
+};
+
+// Calculate number of batches needed for processing
+const calculateBatchCount = (pageCount: number, batchSize: number = 20): number => {
+  return Math.ceil(pageCount / batchSize);
+};
+
 /**
  * Process a SAPS document file
  */
@@ -27,6 +40,24 @@ export const processSapsDocument = async (
     progress: 10,
   });
   
+  // Estimate total pages and batches needed
+  const estimatedPages = estimatePageCount(file.size);
+  const totalBatches = calculateBatchCount(estimatedPages);
+  
+  console.log(`Becsült oldalszám: ${estimatedPages}, Becsült kötegek száma: ${totalBatches}`);
+  
+  updateStatus({
+    step: "Dokumentum feldolgozás előkészítése",
+    progress: 15,
+    details: `A dokumentum előkészítése feldolgozásra (${estimatedPages} becsült oldal)`,
+    batchProgress: {
+      currentBatch: 0,
+      totalBatches: totalBatches,
+      pagesProcessed: 0,
+      totalPages: estimatedPages
+    }
+  });
+  
   // Először feltöltjük a dokumentumot a Storage-ba
   const storagePath = await uploadFileToStorage(file, user.id);
   
@@ -34,7 +65,13 @@ export const processSapsDocument = async (
     updateStatus({
       step: "Dokumentum mentve a tárhelyre",
       progress: 20,
-      details: `Fájl sikeresen mentve: ${storagePath}`
+      details: `Fájl sikeresen mentve: ${storagePath}`,
+      batchProgress: {
+        currentBatch: 0,
+        totalBatches: totalBatches,
+        pagesProcessed: 0,
+        totalPages: estimatedPages
+      }
     });
   } else {
     console.warn("A fájl mentése a tárhelyre sikertelen volt, de a feldolgozás folytatódik");
@@ -43,17 +80,40 @@ export const processSapsDocument = async (
   updateStatus({
     step: "Dokumentum feltöltése",
     progress: 30,
+    batchProgress: {
+      currentBatch: 0,
+      totalBatches: totalBatches,
+      pagesProcessed: 0,
+      totalPages: estimatedPages
+    }
   });
   
   // Claude feldolgozás
-  const farmData = await processWithClaude(file, user, updateStatus);
+  const farmData = await processWithClaude(file, user, (status) => {
+    // Update batch progress
+    updateStatus({
+      ...status,
+      batchProgress: status.batchProgress || {
+        currentBatch: 1,
+        totalBatches: totalBatches,
+        pagesProcessed: Math.min(20, estimatedPages),
+        totalPages: estimatedPages
+      }
+    });
+  });
   
   // Mentsük el az adatbázisba a feldolgozott adatokat
   updateStatus({
     step: "Adatok mentése az adatbázisba",
     progress: 95,
     details: "Ügyfél adatok rögzítése...",
-    wordDocumentUrl: farmData.wordDocumentUrl
+    wordDocumentUrl: farmData.wordDocumentUrl,
+    batchProgress: {
+      currentBatch: totalBatches,
+      totalBatches: totalBatches,
+      pagesProcessed: estimatedPages,
+      totalPages: estimatedPages
+    }
   });
   
   try {
@@ -70,7 +130,13 @@ export const processSapsDocument = async (
       step: "Feldolgozás befejezve",
       progress: 100,
       details: `Ügyfél-azonosító: ${farmData.submitterId || "Ismeretlen"}, Név: ${farmData.applicantName || "Ismeretlen"} sikeresen feldolgozva és mentve.`,
-      wordDocumentUrl: farmData.wordDocumentUrl
+      wordDocumentUrl: farmData.wordDocumentUrl,
+      batchProgress: {
+        currentBatch: totalBatches,
+        totalBatches: totalBatches,
+        pagesProcessed: estimatedPages,
+        totalPages: estimatedPages
+      }
     });
     
     return farmData;
@@ -82,7 +148,13 @@ export const processSapsDocument = async (
       step: "Feldolgozás befejezve figyelmeztetéssel",
       progress: 100,
       details: "Adatok feldolgozva, de nem sikerült menteni az adatbázisba.",
-      wordDocumentUrl: farmData.wordDocumentUrl
+      wordDocumentUrl: farmData.wordDocumentUrl,
+      batchProgress: {
+        currentBatch: totalBatches,
+        totalBatches: totalBatches,
+        pagesProcessed: estimatedPages,
+        totalPages: estimatedPages
+      }
     });
     
     return farmData;

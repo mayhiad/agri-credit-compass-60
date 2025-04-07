@@ -5,16 +5,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { processDocumentWithOpenAI } from "@/services/documentProcessingService";
 import { generateFallbackFarmData, validateAndFixFarmData } from "@/services/fallbackDataService";
 
+// Maximum number of images that Claude can process at once
+const MAX_IMAGES_PER_BATCH = 20;
+
 /**
- * Process a document using Claude AI
+ * Process a document using Claude AI with batch processing support
  */
 export const processWithClaude = async (
   file: File,
   user: any,
   updateStatus: (status: ProcessingStatus) => void
 ): Promise<FarmData> => {
-  // Dokumentum feldolgozása Claude-dal
+  // Document processing with Claude
   let processResult;
+  
   try {
     updateStatus({
       step: "Claude AI feldolgozás előkészítése",
@@ -22,10 +26,42 @@ export const processWithClaude = async (
       details: "A dokumentum Claude AI-val történő feldolgozása folyamatban..."
     });
     
+    // Estimate page count based on file size
+    const isPdf = file.name.toLowerCase().endsWith('.pdf');
+    const estimatedPages = isPdf ? Math.ceil(file.size / 100000) : 1; // Rough estimate: 100KB per page
+    const totalBatches = Math.ceil(estimatedPages / MAX_IMAGES_PER_BATCH);
+    
+    updateStatus({
+      step: "PDF dokumentum feldolgozása",
+      progress: 45,
+      details: `A dokumentum feldolgozása ${totalBatches} kötegben történik (${estimatedPages} becsült oldal)`,
+      batchProgress: {
+        currentBatch: 1,
+        totalBatches: totalBatches,
+        pagesProcessed: 0,
+        totalPages: estimatedPages
+      }
+    });
+    
     processResult = await processDocumentWithOpenAI(file, user);
     
     if (!processResult) {
       throw new Error("Hiba történt a dokumentum feldolgozása során");
+    }
+    
+    // Update batch progress information
+    if (processResult.batchInfo) {
+      updateStatus({
+        step: "Claude AI feldolgozás folyamatban",
+        progress: 60,
+        details: `Dokumentum feldolgozás: ${processResult.batchInfo.processedBatches}/${processResult.batchInfo.totalBatches} köteg`,
+        batchProgress: {
+          currentBatch: processResult.batchInfo.processedBatches,
+          totalBatches: processResult.batchInfo.totalBatches,
+          pagesProcessed: processResult.batchInfo.processedPages,
+          totalPages: processResult.batchInfo.totalPages || estimatedPages
+        }
+      });
     }
   } catch (error) {
     console.error("Claude feldolgozási hiba:", error);

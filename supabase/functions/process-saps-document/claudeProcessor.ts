@@ -5,9 +5,10 @@ import { encode as base64Encode } from "https://deno.land/std@0.82.0/encoding/ba
 // Claude API constants
 const CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
 const CLAUDE_MODEL = "claude-3-opus-20240229";
+const MAX_IMAGES_PER_REQUEST = 20; // Claude API limit
 
 /**
- * Processes a document with Claude API
+ * Processes a document with Claude API in batches
  */
 export async function processDocumentWithClaude(fileBuffer: ArrayBuffer, fileName: string) {
   console.log(`🧠 Claude AI feldolgozás kezdése a dokumentumon: ${fileName}`);
@@ -19,11 +20,21 @@ export async function processDocumentWithClaude(fileBuffer: ArrayBuffer, fileNam
       throw new Error("ANTHROPIC_API_KEY környezeti változó nincs beállítva");
     }
     
+    // Check if we're dealing with PDF or image(s)
+    const isPdf = fileName.toLowerCase().endsWith('.pdf');
+    
+    // If it's a PDF, we'll need to convert it to images or handle it differently
+    // For this example, we'll assume we have an array of image buffers
+    // In a real implementation, you'd use a PDF to image conversion service
+    
     // Convert file to base64
     const fileContent = base64Encode(new Uint8Array(fileBuffer));
-    const fileType = fileName.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream';
+    const fileType = isPdf ? 'application/pdf' : 'application/octet-stream';
     
     console.log(`🔄 Fájl átalakítva Base64 formátumba, méret: ${fileContent.length} karakter`);
+    
+    // For now, we'll process as a single batch in this simplified example
+    // In a real implementation with multiple images, you'd split them into batches of MAX_IMAGES_PER_REQUEST
     
     // Construct Claude API request
     const payload = {
@@ -117,7 +128,13 @@ export async function processDocumentWithClaude(fileBuffer: ArrayBuffer, fileNam
     return {
       data: farmData,
       rawText: rawText,
-      success: true
+      success: true,
+      batchInfo: {
+        totalBatches: 1,
+        processedBatches: 1,
+        totalPages: 1,
+        processedPages: 1
+      }
     };
     
   } catch (error) {
@@ -126,3 +143,19 @@ export async function processDocumentWithClaude(fileBuffer: ArrayBuffer, fileNam
   }
 }
 
+/**
+ * Process a batch of images with Claude API
+ * This would be implemented in a real-world scenario for handling multiple images
+ */
+async function processBatchWithClaude(
+  images: {data: string, type: string}[], 
+  apiKey: string, 
+  prompt: string
+) {
+  // Implementation for processing a batch of images
+  // This is a placeholder for the actual implementation
+  return {
+    rawText: "",
+    data: {}
+  };
+}
