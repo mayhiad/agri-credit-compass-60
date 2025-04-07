@@ -1,4 +1,3 @@
-
 // Claude API processor for document extraction
 import { encode as base64Encode } from "https://deno.land/std@0.82.0/encoding/base64.ts";
 import { supabase } from "./openaiClient.ts";
@@ -49,27 +48,100 @@ export async function processImageBatchWithClaude(
     const messageContent = [
       {
         type: "text",
-        text: "This is an agricultural area-based support document (SAPS). Please extract all the following information in JSON format:\n" +
-              "1. submitterName: the name of the submitter\n" +
-              "2. submitterId: the submitter's client ID number, a numeric value\n" +
-              "3. applicantId: the applicant's client ID number (may be the same as submitter)\n" +
-              "4. submissionDate: the exact date and time when the document was submitted\n" +
-              "5. blockIds: an array of block identifiers (format like XXXNNNNN or similar, usually prefixed with 'BLOKK:')\n" +
-              "6. currentYearCrops: array of crops for the current year with hectares\n" +
-              "7. historicalData: array of previous 5 years data with this structure:\n" +
-              "   {\n" +
-              "     year: 'YYYY',\n" +
-              "     totalHectares: number,\n" +
-              "     crops: [\n" +
-              "       {\n" +
-              "         name: 'crop name',\n" +
-              "         hectares: number,\n" +
-              "         yield: number (tons per hectare),\n" +
-              "         totalYield: number (total tons)\n" +
-              "       }\n" +
-              "     ]\n" +
-              "   }\n" +
-              "\nOnly return the extracted data in this JSON format."
+        text: `FONTOS! OLVASD VÉGIG ÉS KÖVESD PONTOSAN AZ UTASÍTÁSOKAT!
+
+FELADAT:
+Egy SAPS típusú támogatási kérelem PDF dokumentumból kell strukturált adatokat kinyerned. Az adatok elhelyezkedése a dokumentum _számozott részeiben_ található.
+
+🔍 KERESENDŐ ADATOK:
+
+1. **A gazdálkodó neve**
+   - A dokumentum 2. részében ("2 Beadó adatai") található
+   - Magyar névformátum: vezetéknév + keresztnév
+   - Általában az első oldalon szerepel
+
+2. **A dokumentum azonosítója (irányítószám vagy „Iratazonosító")**
+   - Az 1. részben ("1 Adminisztrációs adatok") keresd
+   - Formátum: 10 számjegyű szám
+
+3. **A régió (megye) neve**
+   - Ha megtalálható, a címekből vagy területi adatokból következtethető (elhagyható, ha nincs)
+
+4. **Egységes kérelem beadásának időpontja**
+   - Pontosan szerepel az 1. részben ("1 Adminisztrációs adatok")
+   - Formátum: ÉÉÉÉ-HH-NN HH:mm
+
+5. **Blokkszámok**
+   - A dokumentumban "Blokk:" vagy "Blokk azonosító:" előtaggal szerepelnek
+   - Ezeket listában gyűjtsd ki
+
+6. **Aktuális évi kultúrák és területük**
+   - A 14. részben ("14 Területek összesítése hasznosítási adatok szerint") található
+   - Csak bevételtermelő kultúrákat vegyél figyelembe (ne szerepeljen legelő, pihentetés, stb.)
+   - Kultúra megnevezése + terület hektárban
+
+7. **Teljes igényelt terület az adott évre**
+   - A 13. részben ("13 Területek összesítése támogatási jogcímek és AKG célprogramok szerint") szerepel
+   - Ez az év összes hektárja
+
+8. **Histórikus gazdálkodási adatok az elmúlt 5 évből**
+   - A 11. rész ("11 Kárenyhítés / Biztosítási díjtámogatás") tartalmazza
+   - Külön gyűjtsd ki minden évre:
+     - Kultúrák neve
+     - Terület hektárban
+     - Termésátlag (ha szerepel)
+     - Ár (aktuális magyar piaci ár alapján, pl. búza 80–100 ezer Ft/t)
+     - Árbevétel = hektár × termésátlag × ár
+
+📌 KÖVETELMÉNYEK:
+- Minden számértéknek pozitívnak kell lennie
+- Ha valamit nem találsz meg egyértelműen, hagyd ki vagy adj vissza üres struktúrát
+- Ne találj ki vagy generálj adatot!
+- Az árak és termésátlagok reálisan becsülhetők, de csak akkor, ha van hozzá alap
+
+📦 VÁLASZ FORMÁTUMA: JSON
+{
+  "applicantName": "...",
+  "documentId": "...",
+  "submissionDateTime": "2021-05-11 09:01",
+  "region": "",
+  "blockIds": ["BLOKK:...", "BLOKK:..."],
+  "currentYear": {
+    "year": "2021",
+    "totalHectares": 123.45,
+    "cultures": [
+      {
+        "name": "Kukorica",
+        "hectares": 45.6,
+        "yieldPerHectare": 8.2,
+        "pricePerTon": 72000,
+        "estimatedRevenue": 26913600
+      }
+    ],
+    "totalRevenue": 63291975
+  },
+  "historicalData": [
+    {
+      "year": "2020",
+      "totalHectares": 200.5,
+      "crops": [
+        {
+          "name": "Búza",
+          "hectares": 77.85,
+          "yield": 5.5,
+          "pricePerTon": 85000,
+          "revenue": 36378375
+        }
+      ],
+      "totalRevenue": 200000
+    }
+    // stb.
+  ]
+}
+
+⚠️ FIGYELEM:
+- TILOS kitalált adatokat használni!
+- Ha valami nem elérhető: "dataUnavailable": true legyen a visszatérésben.`
       }
     ];
     
@@ -141,7 +213,7 @@ export async function processImageBatchWithClaude(
       model: CLAUDE_MODEL,
       max_tokens: 4000,
       temperature: 0,
-      system: "You are an assistant specialized in analyzing agricultural documents. Read the SAPS documents accurately to extract all requested information. If a field cannot be found, leave it as null. Be meticulous in identifying block IDs which are 8-digit codes often containing letters and numbers, usually prefixed with 'BLOKK:'. For historical crop data, calculate average market prices in EUR/ton for each crop type to estimate annual revenue. Current year supported crops should include estimated market prices as well.",
+      system: "You are an assistant specialized in analyzing agricultural SAPS documents. Read the provided documents carefully to extract specific information from the numbered sections as instructed. Be meticulous in identifying block IDs which are often prefixed with 'BLOKK:'. If certain information cannot be found, explicitly indicate this by setting the relevant field to null or by including a 'dataUnavailable' flag. Follow the instructions carefully regarding the specific sections where different types of information can be found.",
       messages: [
         {
           role: "user",
@@ -204,7 +276,7 @@ export async function processImageBatchWithClaude(
       }
     }
     
-    // Add estimated EUR prices to historical crops
+    // Add estimated EUR prices to historical crops if they don't already exist
     if (extractedData.historicalData && Array.isArray(extractedData.historicalData)) {
       extractedData.historicalData = extractedData.historicalData.map(yearData => {
         if (yearData.crops && Array.isArray(yearData.crops)) {
@@ -223,48 +295,54 @@ export async function processImageBatchWithClaude(
           // Default price for unknown crops
           const defaultPrice = 200;
           
-          // Calculate revenue for each crop
+          // Calculate revenue for each crop if not already present
           yearData.crops = yearData.crops.map(crop => {
-            const cropName = crop.name;
-            const estimatedPriceEUR = estimatedPrices[cropName] || defaultPrice;
-            const totalYield = crop.totalYield || (crop.yield * crop.hectares);
-            const revenueEUR = totalYield * estimatedPriceEUR;
-            
-            return {
-              ...crop,
-              priceEUR: estimatedPriceEUR,
-              revenueEUR: revenueEUR
-            };
+            // Only add price and revenue if they don't already exist
+            if (!crop.pricePerTon && !crop.revenue) {
+              const cropName = crop.name;
+              const estimatedPriceEUR = estimatedPrices[cropName] || defaultPrice;
+              const totalYield = crop.totalYield || (crop.yield * crop.hectares);
+              const revenueEUR = totalYield * estimatedPriceEUR;
+              
+              return {
+                ...crop,
+                pricePerTon: estimatedPriceEUR * 390, // Convert EUR to HUF
+                revenue: revenueEUR * 390 // Convert EUR to HUF
+              };
+            }
+            return crop;
           });
           
-          // Calculate total revenue for the year
-          const totalRevenueEUR = yearData.crops.reduce((sum, crop) => sum + (crop.revenueEUR || 0), 0);
-          
-          return {
-            ...yearData,
-            totalRevenueEUR: totalRevenueEUR
-          };
+          // Calculate total revenue for the year if not already present
+          if (!yearData.totalRevenue) {
+            const totalRevenue = yearData.crops.reduce((sum, crop) => sum + (crop.revenue || 0), 0);
+            return {
+              ...yearData,
+              totalRevenue: totalRevenue
+            };
+          }
         }
         return yearData;
       });
     }
     
-    // Add estimated market prices to current year crops
-    if (extractedData.currentYearCrops && Array.isArray(extractedData.currentYearCrops)) {
-      // Estimate current market prices (EUR/ton) for each crop - these are example values
+    // Add estimated market prices to current year crops if not already present
+    if (extractedData.currentYear && extractedData.currentYear.cultures && 
+        Array.isArray(extractedData.currentYear.cultures)) {
+      // Estimate current market prices (HUF/ton) for each crop
       const currentPrices = {
-        'Kukorica': 195, // Corn
-        'Búza': 235,     // Wheat
-        'Napraforgó': 420, // Sunflower
-        'Repce': 440,    // Rapeseed
-        'Árpa': 200,     // Barley
-        'Szója': 400,    // Soy
-        'Zab': 220,      // Oats
-        'Rozs': 190      // Rye
+        'Kukorica': 76000, // Corn
+        'Búza': 92000,     // Wheat
+        'Napraforgó': 164000, // Sunflower
+        'Repce': 172000,    // Rapeseed
+        'Árpa': 78000,     // Barley
+        'Szója': 156000,    // Soy
+        'Zab': 86000,      // Oats
+        'Rozs': 74000      // Rye
       };
       
       // Default price for unknown crops
-      const defaultPrice = 220;
+      const defaultPrice = 85000;
       
       // Average yields per hectare for different crops (tons/hectare)
       const averageYields = {
@@ -281,28 +359,32 @@ export async function processImageBatchWithClaude(
       // Default yield for unknown crops
       const defaultYield = 4.0;
       
-      // Calculate revenue for each crop
-      extractedData.currentYearCrops = extractedData.currentYearCrops.map(crop => {
-        const cropName = crop.name;
-        const priceEUR = currentPrices[cropName] || defaultPrice;
-        const yieldPerHectare = averageYields[cropName] || defaultYield;
-        const totalYield = yieldPerHectare * crop.hectares;
-        const revenueEUR = totalYield * priceEUR;
-        
-        return {
-          ...crop,
-          yieldPerHectare,
-          priceEUR,
-          totalYield,
-          revenueEUR
-        };
+      // Calculate revenue for each crop if not already present
+      extractedData.currentYear.cultures = extractedData.currentYear.cultures.map(crop => {
+        // Only add yield, price and revenue if they don't already exist
+        if (!crop.yieldPerHectare || !crop.pricePerTon || !crop.estimatedRevenue) {
+          const cropName = crop.name;
+          const pricePerTon = currentPrices[cropName] || defaultPrice;
+          const yieldPerHectare = averageYields[cropName] || defaultYield;
+          const estimatedRevenue = yieldPerHectare * crop.hectares * pricePerTon;
+          
+          return {
+            ...crop,
+            yieldPerHectare: crop.yieldPerHectare || yieldPerHectare,
+            pricePerTon: crop.pricePerTon || pricePerTon,
+            estimatedRevenue: crop.estimatedRevenue || estimatedRevenue
+          };
+        }
+        return crop;
       });
       
-      // Calculate total revenue for current year
-      extractedData.currentYearTotalRevenueEUR = extractedData.currentYearCrops.reduce(
-        (sum, crop) => sum + (crop.revenueEUR || 0), 
-        0
-      );
+      // Calculate total revenue for current year if not already present
+      if (!extractedData.currentYear.totalRevenue) {
+        extractedData.currentYear.totalRevenue = extractedData.currentYear.cultures.reduce(
+          (sum, crop) => sum + (crop.estimatedRevenue || 0), 
+          0
+        );
+      }
     }
     
     // Log batch processing results
@@ -335,7 +417,9 @@ export async function processImageBatchWithClaude(
     
     // Check if we found any useful data
     const hasUsefulData = extractedData && 
-                         (extractedData.submitterName || extractedData.submitterId || extractedData.applicantId);
+                         (extractedData.applicantName || extractedData.documentId || 
+                          (extractedData.currentYear && extractedData.currentYear.cultures && 
+                           extractedData.currentYear.cultures.length > 0));
     
     return {
       extractedData,
@@ -474,25 +558,26 @@ export async function processAllImageBatches(
   
   // Create farm data structure from the extracted data
   const farmData = {
-    applicantName: allExtractedData.submitterName || null,
-    submitterId: allExtractedData.submitterId || null,
-    applicantId: allExtractedData.applicantId || null,
-    documentId: allExtractedData.submitterId || null,
-    submissionDate: allExtractedData.submissionDate || null,
-    region: null,
-    year: new Date().getFullYear().toString(),
-    hectares: allExtractedData.currentYearCrops?.reduce((sum, crop) => sum + (crop.hectares || 0), 0) || 0,
-    cultures: allExtractedData.currentYearCrops?.map(crop => ({
+    applicantName: allExtractedData.applicantName || null,
+    submitterId: allExtractedData.documentId || null,
+    applicantId: allExtractedData.documentId || null,
+    documentId: allExtractedData.documentId || null,
+    submissionDate: allExtractedData.submissionDateTime || null,
+    region: allExtractedData.region || null,
+    year: allExtractedData.currentYear?.year || new Date().getFullYear().toString(),
+    hectares: allExtractedData.currentYear?.totalHectares || 0,
+    cultures: allExtractedData.currentYear?.cultures?.map(crop => ({
       name: crop.name,
       hectares: crop.hectares,
       yieldPerHectare: crop.yieldPerHectare,
-      pricePerTon: crop.priceEUR * 390, // Convert EUR to HUF with approximate exchange rate
-      estimatedRevenue: crop.revenueEUR * 390 // Convert EUR to HUF
+      pricePerTon: crop.pricePerTon,
+      estimatedRevenue: crop.estimatedRevenue
     })) || [],
     blockIds: allExtractedData.blockIds || [],
-    totalRevenue: (allExtractedData.currentYearTotalRevenueEUR || 0) * 390, // Convert EUR to HUF
+    totalRevenue: allExtractedData.currentYear?.totalRevenue || 0,
     historicalData: allExtractedData.historicalData || [],
-    rawText: JSON.stringify(allExtractedData)
+    rawText: JSON.stringify(allExtractedData),
+    dataUnavailable: allExtractedData.dataUnavailable || false
   };
   
   return {
