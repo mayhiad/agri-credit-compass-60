@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 import { Document, Packer, Paragraph, TextRun } from "docx";
@@ -48,12 +47,15 @@ export const generateStorageUrl = (filePath: string): string => {
 };
 
 /**
- * Converts the first page of a PDF to an image.
+ * Converts a PDF file to images, processing all pages.
  * @param file The PDF file to convert.
- * @returns A Promise resolving to a Blob containing the image, or null if conversion fails.
+ * @param maxPages Maximum number of pages to convert (default: 5)
+ * @returns A Promise resolving to an array of image data objects.
  */
-export const convertPdfToImage = async (file: File): Promise<{ blob: Blob, base64: string } | null> => {
+export const convertPdfToImages = async (file: File, maxPages: number = 5): Promise<Array<{blob: Blob, base64: string}> | null> => {
   try {
+    console.log(`🔍 PDF konvertálása képekké kezdődik, max ${maxPages} oldal...`);
+    
     // Load the PDF.js library
     const pdfjsLib = await import('pdfjs-dist');
     // @ts-ignore
@@ -67,56 +69,111 @@ export const convertPdfToImage = async (file: File): Promise<{ blob: Blob, base6
     const loadingTask = pdfjsLib.getDocument(typedArray);
     const pdf = await loadingTask.promise;
     
-    // Get the first page
-    const page = await pdf.getPage(1);
+    // Determine how many pages to process
+    const pageCount = pdf.numPages;
+    const pagesToProcess = Math.min(pageCount, maxPages);
     
-    // Set the scale for rendering
-    const viewport = page.getViewport({ scale: 1.5 });
+    console.log(`📄 PDF oldalak száma: ${pageCount}, feldolgozandó: ${pagesToProcess}`);
     
-    // Create a canvas element to render the page
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
+    // Array to store the results
+    const result: Array<{blob: Blob, base64: string}> = [];
     
-    if (!context) {
-      throw new Error('Nem sikerült a canvas kontextus létrehozása');
+    // Process each page
+    for (let pageNum = 1; pageNum <= pagesToProcess; pageNum++) {
+      console.log(`⏳ ${pageNum}. oldal feldolgozása...`);
+      
+      // Get the page
+      const page = await pdf.getPage(pageNum);
+      
+      // Set the scale for rendering (adjust DPI here)
+      const viewport = page.getViewport({ scale: 1.5 });
+      
+      // Create a canvas element to render the page
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      
+      if (!context) {
+        console.error(`❌ Nem sikerült a canvas kontextus létrehozása az oldalhoz: ${pageNum}`);
+        continue;
+      }
+      
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      
+      // Render the page onto the canvas
+      const renderContext = {
+        canvasContext: context,
+        viewport: viewport
+      };
+      
+      await page.render(renderContext).promise;
+      
+      // Convert the canvas to a Blob (JPEG format)
+      const blob = await new Promise<Blob>((resolve) => {
+        let quality = 0.92;  // Start with high quality
+        
+        const convertWithQuality = (q: number) => {
+          canvas.toBlob((b) => {
+            if (b && b.size > 10 * 1024 * 1024) {  // If larger than 10MB
+              if (q > 0.5) {  // Don't go below 0.5 quality
+                console.log(`⚠️ Kép túl nagy (${(b.size/1024/1024).toFixed(2)}MB), minőség csökkentése: ${q} -> ${q-0.1}`);
+                convertWithQuality(q - 0.1);
+              } else {
+                console.log(`🔍 Minőség limit elérve (${q}), eredmény: ${(b.size/1024/1024).toFixed(2)}MB`);
+                resolve(b);
+              }
+            } else if (b) {
+              console.log(`✅ Kép optimalizálva: ${(b.size/1024/1024).toFixed(2)}MB, minőség: ${q}`);
+              resolve(b);
+            } else {
+              console.error(`❌ Blob konvertálás sikertelen`);
+              // Return an empty blob if conversion fails
+              resolve(new Blob([], { type: 'image/jpeg' }));
+            }
+          }, 'image/jpeg', q);
+        };
+        
+        convertWithQuality(quality);
+      });
+      
+      // Convert to base64 for API
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64String = reader.result as string;
+          // Remove the data URL prefix (e.g., 'data:image/jpeg;base64,')
+          const base64Data = base64String.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.readAsDataURL(blob);
+      });
+      
+      result.push({ blob, base64 });
+      console.log(`✅ ${pageNum}. oldal sikeresen feldolgozva`);
     }
     
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
+    console.log(`🎉 PDF konvertálás befejezve, ${result.length} oldal feldolgozva`);
+    return result;
+  } catch (error) {
+    console.error("❌ Hiba a PDF képekké konvertálása során:", error);
+    return null;
+  }
+};
+
+/**
+ * Converts the first page of a PDF to an image.
+ * @param file The PDF file to convert.
+ * @returns A Promise resolving to a Blob containing the image, or null if conversion fails.
+ */
+export const convertPdfFirstPageToImage = async (file: File): Promise<{ blob: Blob, base64: string } | null> => {
+  try {
+    const imageResults = await convertPdfToImages(file, 1);
     
-    // Render the page onto the canvas
-    const renderContext = {
-      canvasContext: context,
-      viewport: viewport
-    };
+    if (imageResults && imageResults.length > 0) {
+      return imageResults[0];
+    }
     
-    await page.render(renderContext).promise;
-    
-    // Convert the canvas to a Blob (PNG format)
-    const blob = await new Promise<Blob>((resolve) => {
-      canvas.toBlob((blob) => {
-        if (blob) {
-          resolve(blob);
-        } else {
-          throw new Error('Nem sikerült a canvas Blob-bá konvertálása');
-        }
-      }, 'image/png', 0.95);
-    });
-    
-    // Convert to base64 for API
-    const base64 = await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        // Remove the data URL prefix (e.g., 'data:image/png;base64,')
-        const base64Data = base64String.split(',')[1];
-        resolve(base64Data);
-      };
-      reader.readAsDataURL(blob);
-    });
-    
-    console.log("PDF sikeresen konvertálva képpé");
-    return { blob, base64 };
+    return null;
   } catch (error) {
     console.error("Hiba a PDF kép konvertálása során:", error);
     return null;

@@ -2,7 +2,7 @@
 import { FarmData } from "@/types/farm";
 import { supabase } from "@/integrations/supabase/client";
 import { processDocumentWithOpenAI, checkProcessingResults } from "@/services/documentProcessingService";
-import { uploadFileToStorage, convertPdfToImage } from "@/utils/storageUtils";
+import { uploadFileToStorage, convertPdfToImages, convertPdfFirstPageToImage } from "@/utils/storageUtils";
 import { generateFallbackFarmData, validateAndFixFarmData } from "@/services/fallbackDataService";
 import { extractFarmDataFromOcrText } from "@/services/sapsProcessor";
 
@@ -47,25 +47,41 @@ export const processSapsDocument = async (
     console.warn("A fájl mentése a tárhelyre sikertelen volt, de a feldolgozás folytatódik");
   }
   
-  // PDF fájl esetén konvertáljuk képpé az első oldalt
-  let pdfImage = null;
+  // PDF fájl esetén konvertáljuk képpé
+  let pdfImages = null;
   const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
   
   if (isPdf) {
     updateStatus({
       step: "PDF feldolgozása",
       progress: 25,
-      details: "PDF első oldalának képpé konvertálása..."
+      details: "PDF oldalak képpé konvertálása..."
     });
     
     try {
-      pdfImage = await convertPdfToImage(file);
-      if (pdfImage) {
+      // Első oldal konvertálása a gyors eredményhez
+      const firstPageImage = await convertPdfFirstPageToImage(file);
+      
+      if (firstPageImage) {
         updateStatus({
           step: "PDF konvertálva",
           progress: 30,
           details: "PDF első oldala sikeresen képpé konvertálva"
         });
+        
+        // Háttérben elindítjuk a többi oldal konvertálását
+        const allPagesPromise = convertPdfToImages(file, 5);
+        
+        // A háttérfolyamatot nem várjuk meg, csak az első oldallal folytatunk
+        allPagesPromise.then(images => {
+          if (images && images.length > 1) {
+            console.log(`✅ Összes PDF oldal konvertálva: ${images.length} oldal`);
+          }
+        }).catch(error => {
+          console.error("Hiba az összes PDF oldal konvertálása során:", error);
+        });
+        
+        pdfImages = [firstPageImage];
       } else {
         updateStatus({
           step: "PDF konvertálás sikertelen",
@@ -93,11 +109,14 @@ export const processSapsDocument = async (
   formData.append('file', file);
   
   // Ha van PDF kép, azt is elküldjük base64 formátumban
-  if (pdfImage && pdfImage.base64) {
-    const base64Header = document.createElement('input');
-    base64Header.name = 'pdfImageBase64';
-    base64Header.value = pdfImage.base64;
-    formData.append('pdfImageBase64', pdfImage.base64);
+  if (pdfImages && pdfImages.length > 0 && pdfImages[0].base64) {
+    formData.append('pdfImageBase64', pdfImages[0].base64);
+    
+    // Több oldal esetén tömbként is elküldjük
+    if (pdfImages.length > 1) {
+      const pdfImagesBase64 = pdfImages.map(img => img.base64);
+      formData.append('pdfImagesBase64', JSON.stringify(pdfImagesBase64));
+    }
   }
   
   // Claude feldolgozás

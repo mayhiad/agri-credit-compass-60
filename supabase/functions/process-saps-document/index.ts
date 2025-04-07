@@ -28,8 +28,23 @@ serve(async (req) => {
       console.log("🖼️ PDF kép adat fogadva a klienstől:", pdfImageBase64.substring(0, 50) + "...");
     }
     
+    // Ellenőrizzük, hogy van-e többoldalas PDF adat
+    let pdfImagesBase64: string[] = [];
+    const pdfImagesBase64Json = formData.get('pdfImagesBase64') as string;
+    if (pdfImagesBase64Json) {
+      try {
+        pdfImagesBase64 = JSON.parse(pdfImagesBase64Json);
+        console.log(`🖼️ Többoldalas PDF adat fogadva: ${pdfImagesBase64.length} oldal`);
+      } catch (e) {
+        console.error("❌ Hiba a többoldalas PDF adatok feldolgozása során:", e);
+      }
+    }
+    
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     console.log("🔑 OpenAI API kulcs állapota:", openaiApiKey ? "beállítva (" + openaiApiKey.substring(0, 5) + "...)" : "hiányzik");
+    
+    const claudeApiKey = Deno.env.get('ANTHROPIC_API_KEY');
+    console.log("🔑 Claude API kulcs állapota:", claudeApiKey ? "beállítva (" + claudeApiKey.substring(0, 5) + "...)" : "hiányzik");
 
     // Felhasználói azonosító kinyerése a JWT tokenből vagy alapértelmezett használata
     let userId = 'debug_user';
@@ -57,7 +72,7 @@ serve(async (req) => {
     }
 
     const fileBuffer = await file.arrayBuffer();
-    const processResult = await processDocumentWithOpenAI(fileBuffer, file.name, userId);
+    const processResult = await processDocumentWithOpenAI(fileBuffer, file.name, userId, pdfImageBase64);
 
     return new Response(JSON.stringify(processResult), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
