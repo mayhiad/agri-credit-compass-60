@@ -1,10 +1,8 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { FarmData } from "@/types/farm";
-import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import Header from "@/components/Header";
 import { useAuth } from "@/App";
@@ -14,6 +12,7 @@ import DashboardContent from "@/components/dashboard/DashboardContent";
 import DebuggingInfo from "@/components/dashboard/DebuggingInfo";
 import { Button } from "@/components/ui/button";
 import FileUpload from "@/components/FileUpload";
+import { fetchFarmData } from "@/services/dashboardService";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -24,98 +23,25 @@ const Dashboard = () => {
   const [showUploadForm, setShowUploadForm] = useState(false);
   
   useEffect(() => {
-    const checkAuth = async () => {
+    const loadDashboardData = async () => {
       try {
-        // Ha nem vagyunk hitelesítve és nem folyik a betöltés, irányítsuk át a bejelentkezési oldalra
+        // If not authenticated and not loading, redirect to login page
         if (!authLoading && !user) {
           navigate("/auth");
           return;
         }
         
-        // Csak akkor folytassuk, ha érvényes felhasználónk van
+        // Only continue if we have a valid user
         if (user) {
           console.log("Adatok lekérése a felhasználó részére:", user.id);
           
-          // Lekérjük a felhasználó specifikus farm adatait a Supabase-ből
-          const { data: farms, error: farmError } = await supabase
-            .from('farms')
-            .select('*')
-            .eq('user_id', user.id)
-            .single();
-
-          if (farmError) {
-            console.error("Hiba a farm adatok lekérésekor:", farmError);
-            if (farmError.code === 'PGRST116') {
-              // Ez a hiba kód azt jelenti hogy nincs találat - tehát nincs még farm adat
-              // Itt nem dobunk hibát, mert ez egy normális eset is lehet
-              setFarmData(null);
-              setError(null);
-              setLoading(false);
-              return;
-            } else {
-              // Egyéb hiba esetén hibaüzenetet jelenítünk meg
-              setError("Adatbázis hiba történt. Kérjük próbálja újra később.");
-              setLoading(false);
-              return;
-            }
-          }
-
-          // Ha nincs farm adat, térjünk vissza
-          if (!farms) {
-            setFarmData(null);
-            setLoading(false);
-            return;
-          }
-
-          // Részletes piaci árak lekérése
-          const { data: farmDetails, error: marketPricesError } = await supabase
-            .from('farm_details')
-            .select('market_prices')
-            .eq('farm_id', farms.id)
-            .single();
-
-          if (marketPricesError && marketPricesError.code !== 'PGRST116') {
-            console.error("Hiba a piaci árak lekérésekor:", marketPricesError);
-          }
-
-          // Kultúrák lekérése
-          const { data: cultures, error: culturesError } = await supabase
-            .from('cultures')
-            .select('*')
-            .eq('farm_id', farms.id);
-
-          if (culturesError) {
-            console.error("Hiba a kultúrák lekérésekor:", culturesError);
-          }
-
-          // Farm adatok összeállítása
-          const marketPriceData = farmDetails?.market_prices && 
-            Array.isArray(farmDetails.market_prices) ? 
-            farmDetails.market_prices.map((price: any) => ({
-              culture: price.culture,
-              averageYield: price.averageYield,
-              price: price.price,
-              trend: price.trend,
-              lastUpdated: new Date(price.lastUpdated || new Date().toISOString())
-            })) : [];
+          const { data: farmData, error } = await fetchFarmData(user.id);
           
-          // Farm adatok összeállítása
-          const farmData: FarmData = {
-            hectares: farms.hectares,
-            cultures: cultures?.map(culture => ({
-              name: culture.name,
-              hectares: culture.hectares,
-              estimatedRevenue: culture.estimated_revenue
-            })) || [],
-            totalRevenue: farms.total_revenue,
-            region: farms.region || "Ismeretlen régió",
-            documentId: farms.document_id || `SAPS-2023-${user.id.substring(0, 6)}`,
-            applicantName: user.email?.split('@')[0] || "Ismeretlen felhasználó",
-            blockIds: [`K-${user.id.substring(0, 4)}`, `L-${user.id.substring(4, 8)}`],
-            marketPrices: marketPriceData
-          };
-          
-          setFarmData(farmData);
+          if (error) {
+            setError(error);
+          } else {
+            setFarmData(farmData);
+          }
         }
       } catch (error) {
         console.error("Hiba az adatok betöltése során:", error);
@@ -125,7 +51,7 @@ const Dashboard = () => {
       }
     };
     
-    checkAuth();
+    loadDashboardData();
   }, [navigate, user, authLoading]);
   
   const handleSapsUploadComplete = (data: FarmData) => {
@@ -164,36 +90,17 @@ const Dashboard = () => {
         </div>
         
         {error ? (
-          <div className="space-y-4">
-            <DashboardError message={error} />
-            <div className="flex justify-center gap-4 mt-4">
-              <Button onClick={handleRetry} variant="outline">Újrapróbálkozás</Button>
-              <Button onClick={handleAddFarmData}>SAPS dokumentum feltöltése</Button>
-            </div>
-          </div>
+          <DashboardErrorView 
+            error={error} 
+            onRetry={handleRetry} 
+            onAddFarmData={handleAddFarmData} 
+          />
         ) : farmData ? (
           <DashboardContent farmData={farmData} onFarmDataUpdate={setFarmData} />
         ) : showUploadForm ? (
           <FileUpload onComplete={handleSapsUploadComplete} />
         ) : (
-          <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6 text-center">
-            <div className="mb-6">
-              <img 
-                src="/placeholder.svg" 
-                alt="SAPS dokumentum" 
-                className="mx-auto w-32 h-32 opacity-70"
-              />
-            </div>
-            
-            <h2 className="text-2xl font-semibold mb-2">Nincsenek még gazdasági adatok</h2>
-            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Adja hozzá gazdaságának adatait egyszerűen, töltse fel SAPS dokumentumát a hiteligénylési folyamat megkezdéséhez.
-            </p>
-            
-            <Button onClick={() => setShowUploadForm(true)} size="lg" className="mt-2">
-              SAPS dokumentum feltöltése
-            </Button>
-          </div>
+          <DashboardEmptyState onShowUploadForm={() => setShowUploadForm(true)} />
         )}
         
         {user && <DebuggingInfo userId={user.id} />}

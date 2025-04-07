@@ -9,58 +9,15 @@ import PersonalIdentification from "@/components/PersonalIdentification";
 import FarmLocation from "@/components/FarmLocation";
 import ContractSigning from "@/components/ContractSigning";
 import LoanComplete from "@/components/LoanComplete";
+import { FarmData, UserData } from "@/types/farm";
 
-export interface Culture {
-  name: string;
-  hectares: number;
-  yieldPerHectare?: number;
-  pricePerTon?: number;
-  estimatedRevenue?: number;
-}
-
-export interface MarketPrice {
-  culture: string;
-  averageYield: number;
-  price: number;
-  trend: number;
-  lastUpdated: string | Date;
-}
-
-export interface FarmData {
-  farmId?: string;
-  fileName?: string;
-  fileSize?: number;
-  applicantName?: string;
-  documentId?: string;
-  region?: string;
-  year?: string;
-  hectares: number;
-  cultures: Culture[];
-  blockIds?: string[];
-  totalRevenue: number;
-  errorMessage?: string;
-  ocrText?: string;
-  wordDocumentUrl?: string;
-  submitterId?: string;
-  applicantId?: string;
-  rawText?: string;
-  marketPrices?: MarketPrice[];
-  documentDate?: string;
-  parcels?: any[];
-}
-
-export interface UserData {
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  phone?: string;
-  taxId?: string;
-}
-
+// Use types from centralized types file rather than redefining them here
 const LoanApplication = () => {
   const [step, setStep] = useState(1);
   const [farmData, setFarmData] = useState<FarmData | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [loanAmount, setLoanAmount] = useState(0);
+  const [paymentFrequency, setPaymentFrequency] = useState("monthly");
   
   const handleFileUploadComplete = (data: FarmData) => {
     setFarmData(data);
@@ -88,9 +45,19 @@ const LoanApplication = () => {
           onNext={handleNextStep} 
         />;
       case 5:
-        return <CreditScore onComplete={handleNextStep} />;
+        return <CreditScore 
+          farmData={farmData}
+          creditLimit={0}
+          onComplete={handleNextStep} 
+        />;
       case 6:
-        return <LoanTerms onComplete={handleNextStep} />;
+        return <LoanTerms 
+          loanAmount={loanAmount}
+          setLoanAmount={setLoanAmount}
+          paymentFrequency={paymentFrequency}
+          setPaymentFrequency={setPaymentFrequency}
+          onComplete={handleNextStep} 
+        />;
       case 7:
         return <ContractSigning 
           userData={userData}
@@ -99,8 +66,8 @@ const LoanApplication = () => {
       case 8:
         return <LoanComplete 
           userData={userData}
-          loanAmount={0}
-          paymentFrequency="monthly"
+          loanAmount={loanAmount}
+          paymentFrequency={paymentFrequency}
         />;
       default:
         return <FileUpload onComplete={handleFileUploadComplete} />;

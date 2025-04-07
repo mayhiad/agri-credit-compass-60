@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutDashboard, Map, Tractor, Upload, History, Euro, FileText, Database } from "lucide-react";
@@ -25,12 +24,10 @@ const DashboardContent = ({ farmData, onFarmDataUpdate }: DashboardContentProps)
   const [farmId, setFarmId] = useState<string | null>(null);
   
   useEffect(() => {
-    // Ha van farmData, akkor próbáljuk meg lekérni a farm azonosítóját
     const fetchFarmId = async () => {
       if (!user) return;
       
       try {
-        // Megnézzük, hogy van-e már a farmnak rekordja az adatbázisban a dokumentum azonosító alapján
         if (farmData.documentId) {
           const { data, error } = await supabase
             .from('farms')
@@ -45,7 +42,6 @@ const DashboardContent = ({ farmData, onFarmDataUpdate }: DashboardContentProps)
           }
         }
         
-        // Ha nincs, akkor a legutolsó farmot vesszük alapul
         const { data, error } = await supabase
           .from('farms')
           .select('id')
@@ -73,9 +69,14 @@ const DashboardContent = ({ farmData, onFarmDataUpdate }: DashboardContentProps)
   };
   
   const handleFarmDeleted = () => {
-    // Frissítsük az oldalt, hogy a felhasználó lássa a változást
     window.location.reload();
   };
+
+  const preparedCultures = farmData.cultures?.map(culture => ({
+    name: culture.name,
+    hectares: culture.hectares,
+    estimatedRevenue: culture.estimatedRevenue || 0
+  })) || [];
 
   return (
     <div className="space-y-4">
@@ -131,7 +132,7 @@ const DashboardContent = ({ farmData, onFarmDataUpdate }: DashboardContentProps)
         
         <TabsContent value="currentYear">
           <CurrentYearRevenue
-            cultures={farmData.cultures || []}
+            cultures={preparedCultures}
             totalRevenue={farmData.totalRevenue || 0}
           />
         </TabsContent>
