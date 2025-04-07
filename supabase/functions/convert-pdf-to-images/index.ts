@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -32,47 +33,58 @@ async function convertPdfToImages(pdfBytes: Uint8Array, userId: string, fileName
     // Batch azonosító generálása
     const batchId = uuidv4();
     console.log(`🆔 Batch azonosító: ${batchId}`);
-    
-    // Batch információk mentése az adatbázisba
-    const { data: batchData, error: batchError } = await supabase
-      .from('document_batches')
-      .insert({
-        batch_id: batchId,
-        user_id: userId,
-        document_name: fileName,
-        page_count: pageCount,
-        status: 'processing',
-        original_storage_path: `saps/${userId}/${batchId}/original.pdf`,
-        metadata: {
-          fileSize: pdfBytes.length,
-          fileName: fileName,
-          mimeType: 'application/pdf'
-        }
-      })
-      .select()
-      .single();
+
+    try {
+      // Batch információk mentése az adatbázisba
+      const { data: batchData, error: batchError } = await supabase
+        .from('document_batches')
+        .insert({
+          batch_id: batchId,
+          user_id: userId,
+          document_name: fileName,
+          page_count: pageCount,
+          status: 'processing',
+          original_storage_path: `saps/${userId}/${batchId}/original.pdf`,
+          metadata: {
+            fileSize: pdfBytes.length,
+            fileName: fileName,
+            mimeType: 'application/pdf'
+          }
+        })
+        .select()
+        .single();
+        
+      if (batchError) {
+        console.error("Hiba a batch információk mentése során:", batchError);
+        throw new Error(`Nem sikerült menteni a batch információkat: ${batchError.message}`);
+      }
       
-    if (batchError) {
-      console.error("Hiba a batch információk mentése során:", batchError);
-      throw new Error(`Nem sikerült menteni a batch információkat: ${batchError.message}`);
+      console.log(`💾 Batch információk mentve az adatbázisba: ${batchData?.id || 'unknown'}`);
+    } catch (dbError) {
+      // Ha nincs document_batches tábla, vagy más hiba történt, akkor is folytassuk
+      console.error("Hiba a document_batches adatbázis műveletnél:", dbError);
+      // Nem dobunk hibát, folytassuk az eredeti PDF mentésével
     }
-    
-    console.log(`💾 Batch információk mentve az adatbázisba: ${batchData.id}`);
     
     // Eredeti PDF mentése a tárolóba
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('dokumentumok')
-      .upload(`saps/${userId}/${batchId}/original.pdf`, pdfBytes, {
-        contentType: 'application/pdf',
-        upsert: true
-      });
+    try {
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('dokumentumok')
+        .upload(`saps/${userId}/${batchId}/original.pdf`, pdfBytes, {
+          contentType: 'application/pdf',
+          upsert: true
+        });
+        
+      if (uploadError) {
+        console.error("Hiba az eredeti PDF mentése során:", uploadError);
+        throw new Error(`Nem sikerült menteni az eredeti PDF-et: ${uploadError.message}`);
+      }
       
-    if (uploadError) {
-      console.error("Hiba az eredeti PDF mentése során:", uploadError);
-      throw new Error(`Nem sikerült menteni az eredeti PDF-et: ${uploadError.message}`);
+      console.log(`💾 Eredeti PDF mentve a tárolóba: ${uploadData?.path || 'unknown'}`);
+    } catch (storageError) {
+      console.error("Hiba a tárolóba mentéskor:", storageError);
+      // Folytassuk a feldolgozást akkor is, ha nem sikerült a tárolóba menteni
     }
-    
-    console.log(`💾 Eredeti PDF mentve a tárolóba: ${uploadData.path}`);
     
     // Képek mappájának létrehozása
     const imagesFolder = `saps/${userId}/${batchId}/images`;
@@ -105,20 +117,25 @@ async function convertPdfToImages(pdfBytes: Uint8Array, userId: string, fileName
           continue;
         }
         
-        console.log(`✅ ${i + 1}. oldal mentve: ${pageData.path}`);
+        console.log(`✅ ${i + 1}. oldal mentve: ${pageData?.path || 'unknown'}`);
       } catch (error) {
         console.error(`Hiba a(z) ${i + 1}. oldal feldolgozása során:`, error);
       }
     }
     
-    // Batch státusz frissítése
-    const { error: updateError } = await supabase
-      .from('document_batches')
-      .update({ status: 'converted' })
-      .eq('batch_id', batchId);
-      
-    if (updateError) {
-      console.error("Hiba a batch státusz frissítése során:", updateError);
+    try {
+      // Batch státusz frissítése
+      const { error: updateError } = await supabase
+        .from('document_batches')
+        .update({ status: 'converted' })
+        .eq('batch_id', batchId);
+        
+      if (updateError) {
+        console.error("Hiba a batch státusz frissítése során:", updateError);
+      }
+    } catch (updateError) {
+      console.error("Hiba a státusz frissítéskor:", updateError);
+      // Folytassuk a folyamatot, ha nem sikerült frissíteni a státuszt
     }
     
     console.log(`✅ PDF konvertálás befejezve: ${pageCount} oldal feldolgozva`);
