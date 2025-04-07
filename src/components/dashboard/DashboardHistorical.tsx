@@ -9,6 +9,7 @@ import HistoricalChart from "./historical/HistoricalChart";
 import HistoricalTable from "./historical/HistoricalTable";
 import EmptyHistoricalState from "./historical/EmptyHistoricalState";
 import { fetchHistoricalData } from "@/services/historicalDataService";
+import { HistoricalYear } from "@/types/farm";
 
 const DashboardHistorical = () => {
   const { user } = useAuth();
@@ -25,15 +26,27 @@ const DashboardHistorical = () => {
       try {
         setIsLoading(true);
         
-        const data = await fetchHistoricalData(user.id);
-        setHistoricalData(data);
+        // Pass user id and farm data (null for now, will be implemented later)
+        const rawData = await fetchHistoricalData(null, user.id);
         
-        // Kiszámoljuk az átlagos bevételt
-        if (data.length > 0) {
-          const sum = data.reduce((acc, curr) => acc + curr.totalRevenue, 0);
-          const sumEUR = data.reduce((acc, curr) => acc + curr.totalRevenueEUR, 0);
-          setAverageRevenue(sum / data.length);
-          setAverageRevenueEUR(sumEUR / data.length);
+        // Convert HistoricalYear[] to HistoricalFarmData[]
+        const convertedData: HistoricalFarmData[] = rawData.map(year => ({
+          year: year.year,
+          totalHectares: year.totalHectares,
+          hectares: year.totalHectares, // Using totalHectares as hectares
+          totalRevenue: year.totalRevenueEUR ? year.totalRevenueEUR * 390 : 0, // Convert EUR to HUF (approx)
+          totalRevenueEUR: year.totalRevenueEUR || 0,
+          crops: year.crops
+        }));
+        
+        setHistoricalData(convertedData);
+        
+        // Calculate average revenue
+        if (convertedData.length > 0) {
+          const sum = convertedData.reduce((acc, curr) => acc + curr.totalRevenue, 0);
+          const sumEUR = convertedData.reduce((acc, curr) => acc + curr.totalRevenueEUR, 0);
+          setAverageRevenue(sum / convertedData.length);
+          setAverageRevenueEUR(sumEUR / convertedData.length);
         }
       } catch (err) {
         console.error("Hiba a történeti adatok lekérésekor:", err);
