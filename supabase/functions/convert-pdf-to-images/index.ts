@@ -77,35 +77,58 @@ async function convertPdfToImages(pdfBytes: Uint8Array, userId: string, fileName
       // Create images folder
       const imagesFolder = `saps/${userId}/${batchId}/images`;
       
-      // Use ConvertAPI to convert PDF to JPG images
-      console.log(`🖼️ Starting ConvertAPI PDF to JPG conversion...`);
-      
-      // Prepare FormData for ConvertAPI
+      // Prepare FormData for ConvertAPI with proper content type
       const formData = new FormData();
-      formData.append('File', new Blob([pdfBytes], { type: 'application/pdf' }));
-      formData.append('StoreFile', 'true');
-      formData.append('ImageResolutionH', '300');
-      formData.append('ImageResolutionV', '300');
-      formData.append('ImageQuality', '90');
+      const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+      formData.append('File', pdfBlob, 'document.pdf');
       
-      // Call ConvertAPI to convert PDF to JPG
-      console.log(`🚀 Sending request to ConvertAPI with API key: ${convertApiKey ? "Key provided" : "NO KEY PROVIDED!"}`);
-      const convertResponse = await fetch(
-        `https://v2.convertapi.com/convert/pdf/to/jpg?Secret=${convertApiKey}&StoreFile=true`,
-        {
+      console.log(`🖼️ Starting ConvertAPI PDF to JPG conversion...`);
+      console.log(`🚀 API Key status: ${convertApiKey ? "Provided" : "MISSING!"}`);
+      
+      // Detailed request logging
+      const apiUrl = `https://v2.convertapi.com/convert/pdf/to/jpg?Secret=${convertApiKey}&StoreFile=true&ImageResolutionH=300&ImageResolutionV=300&ImageQuality=90`;
+      console.log(`🌐 Calling ConvertAPI URL: ${apiUrl.replace(convertApiKey, "API_KEY_HIDDEN")}`);
+      
+      // Call ConvertAPI with proper error handling
+      let convertResponse;
+      try {
+        console.log(`📤 Sending PDF to ConvertAPI, size: ${pdfBytes.length} bytes`);
+        convertResponse = await fetch(apiUrl, {
           method: 'POST',
           body: formData
+        });
+        
+        console.log(`📥 ConvertAPI response status: ${convertResponse.status}`);
+        
+        if (!convertResponse.ok) {
+          const errorText = await convertResponse.text();
+          console.error("ConvertAPI error response:", errorText);
+          
+          // Try to parse and log the error details
+          try {
+            const errorJson = JSON.parse(errorText);
+            console.error("ConvertAPI error details:", JSON.stringify(errorJson, null, 2));
+            throw new Error(`ConvertAPI error: ${errorJson.Message || errorText}`);
+          } catch (parseError) {
+            throw new Error(`ConvertAPI error: ${errorText}`);
+          }
         }
-      );
-      
-      if (!convertResponse.ok) {
-        const errorText = await convertResponse.text();
-        console.error("ConvertAPI error:", errorText);
-        console.error("ConvertAPI status:", convertResponse.status);
-        throw new Error(`ConvertAPI error: ${errorText}`);
+      } catch (fetchError) {
+        console.error("Network error during ConvertAPI call:", fetchError);
+        throw new Error(`Failed to connect to ConvertAPI: ${fetchError.message}`);
       }
       
-      const convertResult = await convertResponse.json();
+      // Parse the response
+      let convertResult;
+      try {
+        const responseText = await convertResponse.text();
+        console.log(`📝 ConvertAPI raw response: ${responseText.substring(0, 500)}...`);
+        convertResult = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error("Error parsing ConvertAPI response:", parseError);
+        throw new Error(`Failed to parse ConvertAPI response: ${parseError.message}`);
+      }
+      
       console.log(`✅ ConvertAPI conversion result:`, JSON.stringify(convertResult, null, 2));
       
       // Check if we have files in the result
@@ -231,8 +254,13 @@ serve(async (req) => {
       throw new Error("Missing user ID");
     }
     
-    console.log(`📄 Filename: ${file.name}, size: ${file.size} bytes`);
+    console.log(`📄 Filename: ${file.name}, size: ${file.size} bytes, type: ${file.type}`);
     console.log(`👤 User: ${userId}`);
+    
+    // Validate file type
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      throw new Error("Only PDF files are supported");
+    }
     
     // Read file content
     const fileBuffer = await file.arrayBuffer();
