@@ -1,10 +1,11 @@
 
 import { useEffect, useRef } from "react";
 
-// In a real app, we would use a map library like Leaflet or MapBox
-// For now, we'll just create a placeholder
+interface FarmLocationProps {
+  onComplete: () => void;
+}
 
-const FarmLocation = () => {
+const FarmLocation = ({ onComplete }: FarmLocationProps) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
@@ -93,8 +94,18 @@ const FarmLocation = () => {
   }, []);
   
   return (
-    <div ref={mapContainerRef} className="w-full h-full relative">
-      {/* Map will be rendered here */}
+    <div className="w-full space-y-4">
+      <div ref={mapContainerRef} className="w-full h-96 border rounded-lg shadow-sm relative">
+        {/* Map will be rendered here */}
+      </div>
+      <div className="flex justify-end">
+        <button 
+          onClick={onComplete}
+          className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors"
+        >
+          Tovább
+        </button>
+      </div>
     </div>
   );
 };

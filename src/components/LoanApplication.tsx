@@ -27,6 +27,11 @@ const LoanApplication = () => {
     setStep(step + 1);
   };
   
+  const handleLoanTermsSubmit = (loanSettings: any) => {
+    setLoanAmount(loanSettings.amount);
+    setPaymentFrequency(loanSettings.paymentFrequency);
+  };
+  
   const renderStep = () => {
     switch (step) {
       case 1:
@@ -51,7 +56,9 @@ const LoanApplication = () => {
         />;
       case 6:
         return <LoanTerms 
-          onComplete={handleNextStep} 
+          approvedAmount={farmData?.totalRevenue ? Math.round(farmData.totalRevenue * 0.7) : 1000000}
+          onComplete={handleNextStep}
+          onSubmit={handleLoanTermsSubmit}
         />;
       case 7:
         return <ContractSigning 

@@ -1,10 +1,8 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { ArrowRight, Calendar, CalendarClock, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
@@ -12,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 
 interface LoanTermsProps {
-  approvedAmount: number;
-  onSubmit: (loanSettings: LoanSettings) => void;
+  approvedAmount?: number;
+  onComplete: () => void;
+  onSubmit?: (loanSettings: LoanSettings) => void;
 }
 
 export interface LoanSettings {
@@ -23,7 +22,7 @@ export interface LoanSettings {
   apr: number;
 }
 
-export const LoanTerms = ({ approvedAmount, onSubmit }: LoanTermsProps) => {
+export const LoanTerms = ({ approvedAmount = 1000000, onComplete, onSubmit }: LoanTermsProps) => {
   const [amount, setAmount] = useState(approvedAmount);
   const [duration, setDuration] = useState(12); // default 12 months (1 year)
   const [paymentFrequency, setPaymentFrequency] = useState<"quarterly" | "biannual" | "annual">("annual");
@@ -84,13 +83,17 @@ export const LoanTerms = ({ approvedAmount, onSubmit }: LoanTermsProps) => {
   const paymentAmount = calculatePayment(amount, apr, numberOfPayments);
   
   const handleSubmit = () => {
-    onSubmit({
-      amount,
-      duration,
-      paymentFrequency,
-      apr
-    });
+    if (onSubmit) {
+      onSubmit({
+        amount,
+        duration,
+        paymentFrequency,
+        apr
+      });
+    }
+    
     toast.success("Kölcsön feltételek kiválasztva");
+    onComplete();
   };
 
   const getPaymentFrequencyText = () => {
