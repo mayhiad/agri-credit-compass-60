@@ -17,6 +17,22 @@ export interface MarketPrice {
   lastUpdated: string | Date;
 }
 
+export interface HistoricalCrop {
+  name: string;
+  hectares: number;
+  yield: number;
+  totalYield: number;
+  priceEUR?: number;
+  revenueEUR?: number;
+}
+
+export interface HistoricalYear {
+  year: string;
+  totalHectares: number;
+  crops: HistoricalCrop[];
+  totalRevenueEUR?: number;
+}
+
 export interface FarmData {
   farmId?: string;
   fileName?: string;
@@ -41,6 +57,8 @@ export interface FarmData {
   batchId?: string;  // Added for batch processing
   pageCount?: number; // Added to track document pages
   processingStatus?: string; // Added to track processing status
+  submissionDate?: string; // Added for document submission date
+  historicalData?: HistoricalYear[]; // Added for historical crop data
 }
 
 export interface UserData {

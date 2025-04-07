@@ -1,7 +1,21 @@
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import React from "react";
 import { formatCurrency } from "@/lib/utils";
-import { HistoricalFarmData } from "./types";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, ComposedChart } from "recharts";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+export interface HistoricalFarmData {
+  year: string;
+  hectares: number;
+  totalRevenue: number;
+  totalRevenueEUR: number;
+  crops?: Array<{
+    name: string;
+    hectares: number;
+    yield?: number;
+    revenue?: number;
+  }>;
+}
 
 interface HistoricalChartProps {
   historicalData: HistoricalFarmData[];
@@ -10,57 +24,82 @@ interface HistoricalChartProps {
 }
 
 const HistoricalChart = ({ historicalData, averageRevenue, averageRevenueEUR }: HistoricalChartProps) => {
-  const chartData = historicalData.map(data => ({
-    name: data.year,
-    'Bevétel (HUF)': data.totalRevenue / 1000000, // millió forintban
-    'Bevétel (EUR)': data.totalRevenueEUR / 1000, // ezer euróban
-    hectares: data.totalHectares
+  // Sort data by year to ensure chronological order
+  const sortedData = [...historicalData].sort((a, b) => 
+    parseInt(a.year) - parseInt(b.year)
+  );
+
+  // Transform data for the chart
+  const chartData = sortedData.map(item => ({
+    year: item.year,
+    "Bevétel (ezer Ft)": Math.round(item.totalRevenue / 1000),
+    "Bevétel (EUR)": Math.round(item.totalRevenueEUR),
+    "Hektár": item.hectares,
   }));
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h3 className="text-lg font-medium">Bevétel trend az elmúlt 5 évben</h3>
-        <p className="text-sm text-muted-foreground">
-          Az elmúlt {historicalData.length} év átlagos bevétele: 
-          <span className="font-bold ml-1">{formatCurrency(averageRevenue)}</span> 
-          <span className="text-xs ml-1">({formatCurrency(averageRevenueEUR, "EUR")})</span>
-        </p>
-        
-        <div className="h-[350px] mt-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis yAxisId="left" orientation="left" stroke="#82ca9d" />
-              <YAxis yAxisId="right" orientation="right" stroke="#8884d8" />
-              <Tooltip formatter={(value, name) => {
-                if (name === 'Bevétel (HUF)') return [`${value} millió Ft`, 'Bevétel (HUF)'];
-                if (name === 'Bevétel (EUR)') return [`${value} ezer EUR`, 'Bevétel (EUR)'];
-                return [value, name];
-              }} />
-              <Legend />
-              <Bar yAxisId="left" dataKey="Bevétel (HUF)" fill="#8884d8" name="Bevétel (millió Ft)" />
-              <Bar yAxisId="right" dataKey="Bevétel (EUR)" fill="#82ca9d" name="Bevétel (ezer EUR)" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-      
-      <div className="space-y-2">
-        <h3 className="text-lg font-medium">Összterület trend</h3>
-        <div className="h-[250px] mt-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="hectares" fill="#ffc658" name="Hektár" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+    <div className="space-y-8">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Bevétel és területméret alakulása</CardTitle>
+          <CardDescription>
+            Az elmúlt évek árbevételének és területének változása
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="year" />
+                <YAxis yAxisId="left" orientation="left" />
+                <YAxis yAxisId="right" orientation="right" />
+                <Tooltip formatter={(value, name) => {
+                  if (name === "Bevétel (ezer Ft)") {
+                    return [`${value.toLocaleString()} ezer Ft`, "Bevétel (HUF)"];
+                  } else if (name === "Bevétel (EUR)") {
+                    return [`${value.toLocaleString()} EUR`, "Bevétel (EUR)"];
+                  } else {
+                    return [`${value.toLocaleString()} ha`, name];
+                  }
+                }} />
+                <Legend />
+                <Bar yAxisId="left" dataKey="Bevétel (ezer Ft)" fill="#8884d8" />
+                <Line yAxisId="right" type="monotone" dataKey="Hektár" stroke="#82ca9d" strokeWidth={2} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="bg-blue-50 border-blue-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg text-blue-800">Átlagos éves bevétel (HUF)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-blue-700">
+              {formatCurrency(averageRevenue)}
+            </div>
+            <p className="text-sm text-blue-600 mt-1">
+              Az elmúlt {historicalData.length} év átlagában
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-green-50 border-green-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg text-green-800">Átlagos éves bevétel (EUR)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-700">
+              {Math.round(averageRevenueEUR).toLocaleString()} EUR
+            </div>
+            <p className="text-sm text-green-600 mt-1">
+              Az elmúlt {historicalData.length} év átlagában
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

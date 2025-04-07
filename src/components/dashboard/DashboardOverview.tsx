@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { FarmData } from "@/types/farm";
 import { Calendar, Tractor, CircleDollarSign, FileSpreadsheet, MapPin } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import CreditOfferCard from "../farm/CreditOfferCard";
 
 interface DashboardOverviewProps {
   farmData: FarmData;
@@ -39,12 +40,8 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
   
   // Get top 3 most valuable cultures
   const topCultures = [...farmData.cultures]
-    .sort((a, b) => b.estimatedRevenue - a.estimatedRevenue)
+    .sort((a, b) => (b.estimatedRevenue || 0) - (a.estimatedRevenue || 0))
     .slice(0, 3);
-  
-  // Calculate proportion of each culture
-  const largestCulture = farmData.cultures.reduce((prev, current) => 
-    (prev.hectares > current.hectares) ? prev : current);
   
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -76,9 +73,21 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
               </div>
             </div>
             <div className="flex justify-between">
-              <div className="text-sm text-muted-foreground">Igénylő</div>
+              <div className="text-sm text-muted-foreground">Beadó neve</div>
               <div className="font-medium">
-                {farmData.applicantName || "Ismeretlen igénylő"}
+                {farmData.applicantName || "Ismeretlen beadó"}
+              </div>
+            </div>
+            <div className="flex justify-between">
+              <div className="text-sm text-muted-foreground">Beadó azonosítója</div>
+              <div className="font-medium">
+                {farmData.submitterId || "Ismeretlen azonosító"}
+              </div>
+            </div>
+            <div className="flex justify-between">
+              <div className="text-sm text-muted-foreground">Kérelmező azonosítója</div>
+              <div className="font-medium">
+                {farmData.applicantId || "Ismeretlen azonosító"}
               </div>
             </div>
             <div className="flex justify-between">
@@ -118,7 +127,7 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
         </CardContent>
       </Card>
       
-      {/* Card 3: Revenue */}
+      {/* Card 3: Credit Offer */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-xl flex items-center gap-2">
@@ -138,12 +147,20 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
             {topCultures.map((culture, index) => (
               <div key={index} className="flex justify-between items-center">
                 <span className="text-sm">{culture.name}</span>
-                <span className="font-medium">{formatCurrency(culture.estimatedRevenue)}</span>
+                <span className="font-medium">{formatCurrency(culture.estimatedRevenue || 0)}</span>
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
+
+      {/* Card 4: Credit Offer - Full Width */}
+      <div className="md:col-span-2 lg:col-span-3">
+        <CreditOfferCard 
+          totalRevenue={totalRevenue} 
+          currentYear={displayYear}
+        />
+      </div>
     </div>
   );
 };

@@ -7,6 +7,7 @@ import FarmSummary from "./FarmSummary";
 import CultureTable from "./CultureTable";
 import BlocksAccordion from "./BlocksAccordion";
 import DocumentInfo from "./DocumentInfo";
+import SubmitterInfo from "./SubmitterInfo";
 
 interface FarmInfoDisplayProps {
   farmData: FarmData;
@@ -49,13 +50,19 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoDisplayProps) 
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        <SubmitterInfo 
+          submitterName={farmData.applicantName} 
+          submitterId={farmData.submitterId}
+          applicantId={farmData.applicantId}
+          submissionDate={farmData.submissionDate}
+        />
         <FarmSummary farmData={farmData} />
         <CultureTable farmData={farmData} />
         <BlocksAccordion farmData={farmData} />
         <DocumentInfo 
           documentId={farmData.documentId} 
           applicantName={farmData.applicantName} 
-          documentDate={farmData.documentDate || farmData.year}
+          documentDate={farmData.documentDate || farmData.submissionDate || farmData.year}
         />
       </CardContent>
       <CardFooter>
