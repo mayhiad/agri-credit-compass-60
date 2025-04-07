@@ -1,6 +1,7 @@
+
 import { FarmData } from "@/components/LoanApplication";
 import { supabase } from "@/integrations/supabase/client";
-import { processDocumentWithOpenAI, checkProcessingResults, processDocumentWithGoogleVision } from "@/services/documentProcessingService";
+import { processDocumentWithOpenAI, checkProcessingResults } from "@/services/documentProcessingService";
 import { uploadFileToStorage } from "@/utils/storageUtils";
 import { generateFallbackFarmData, validateAndFixFarmData } from "@/services/fallbackDataService";
 import { extractFarmDataFromOcrText } from "@/services/sapsProcessor";
@@ -19,7 +20,7 @@ export const processSapsDocument = async (
   file: File, 
   user: any, 
   updateStatus: (status: ProcessingStatus) => void,
-  useGoogleVision: boolean = false // Google Vision API használata beállítható
+  useGoogleVision: boolean = false // Parameter retained for backward compatibility but no longer used
 ): Promise<FarmData> => {
   if (!file) {
     throw new Error("Nincs kiválasztva fájl");
@@ -52,104 +53,8 @@ export const processSapsDocument = async (
     progress: 30,
   });
   
-  // Google Vision API OCR használata, ha kérték
-  if (useGoogleVision) {
-    return await processWithGoogleVision(file, user, updateStatus);
-  } else {
-    return await processWithOpenAI(file, user, updateStatus);
-  }
-};
-
-/**
- * Google Vision API használata OCR-hez
- */
-const processWithGoogleVision = async (
-  file: File,
-  user: any,
-  updateStatus: (status: ProcessingStatus) => void
-): Promise<FarmData> => {
-  try {
-    updateStatus({
-      step: "Google Vision OCR szkennelés",
-      progress: 40,
-      details: "Dokumentum szövegének kinyerése Google Vision API-val..."
-    });
-    
-    // Dokumentum feldolgozása Google Vision API-val
-    const visionResult = await processDocumentWithGoogleVision(file, user);
-    
-    if (!visionResult) {
-      throw new Error("Hiba történt a Google Vision feldolgozás során");
-    }
-    
-    updateStatus({
-      step: "Google Vision OCR sikeres",
-      progress: 60,
-      details: "OCR szkennelés sikeresen befejezve, feldolgozott szöveg elemzése...",
-      wordDocumentUrl: visionResult.wordDocumentUrl
-    });
-    
-    // Fallback adatok generálása alapértelmezettként
-    let farmData = generateFallbackFarmData(user.id, file.name, file.size);
-    farmData.fileName = file.name;
-    farmData.fileSize = file.size;
-    
-    // Ha van OCR eredmény, mentjük a nyers adatokba és próbáljuk kinyerni az adatokat
-    if (visionResult.ocrText) {
-      farmData.ocrText = visionResult.ocrText;
-      farmData.wordDocumentUrl = visionResult.wordDocumentUrl;
-      
-      // Próbáljuk meg kinyerni az adatokat az OCR szövegből
-      const extractedData = extractFarmDataFromOcrText(visionResult.ocrText);
-      console.log("Extracted farm data from OCR:", extractedData);
-      
-      // Csak azokat az adatokat írjuk felül, amelyeket sikerült kinyerni
-      if (extractedData.documentId) farmData.documentId = extractedData.documentId;
-      if (extractedData.hectares && extractedData.hectares > 0) farmData.hectares = extractedData.hectares;
-      if (extractedData.applicantName) farmData.applicantName = extractedData.applicantName;
-      if (extractedData.region) farmData.region = extractedData.region;
-      if (extractedData.year) farmData.year = extractedData.year;
-      if (extractedData.blockIds && extractedData.blockIds.length > 0) farmData.blockIds = extractedData.blockIds;
-    } else {
-      console.warn("No OCR text was extracted from the document");
-    }
-    
-    updateStatus({
-      step: "OCR szövegkinyerés befejezve",
-      progress: 90,
-      details: "A Google Vision API sikeresen kinyerte a szöveget a dokumentumból.",
-      wordDocumentUrl: visionResult.wordDocumentUrl
-    });
-    
-    // További validáció és hiányzó mezők pótlása
-    const validatedData = validateAndFixFarmData(farmData);
-    validatedData.wordDocumentUrl = visionResult.wordDocumentUrl;
-    
-    updateStatus({
-      step: "Adatok feldolgozása",
-      progress: 100,
-      details: `OCR feldolgozás befejezve. ${validatedData.ocrText ? validatedData.ocrText.length : 0} karakter kinyerve.`,
-      wordDocumentUrl: visionResult.wordDocumentUrl
-    });
-    
-    return validatedData;
-  } catch (error) {
-    console.error("Google Vision feldolgozási hiba:", error);
-    
-    // Hiba esetén fallback adatokat generálunk
-    const farmData = generateFallbackFarmData(user.id, file.name, file.size);
-    farmData.errorMessage = `Google Vision OCR hiba: ${error.message}`;
-    farmData.fileName = file.name;
-    farmData.fileSize = file.size;
-    
-    updateStatus({
-      step: "OCR hiba",
-      progress: 100,
-      details: "Hiba történt a dokumentum OCR feldolgozása során. Példa adatok generálása..."
-    });
-    
-    return validateAndFixFarmData(farmData);
-  }
+  // Mindig az OpenAI processzálást használjuk
+  return await processWithOpenAI(file, user, updateStatus);
 };
 
 /**
