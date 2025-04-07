@@ -1,87 +1,65 @@
+
 import { UserData } from "@/components/LoanApplication";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CheckCircle, Download, Calendar } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
+import { Link } from "react-router-dom";
 
 interface LoanCompleteProps {
-  userData: UserData;
+  userData?: UserData;
   loanAmount: number;
   paymentFrequency: string;
 }
 
 const LoanComplete = ({ userData, loanAmount, paymentFrequency }: LoanCompleteProps) => {
-  const paymentFrequencyText = 
-    paymentFrequency === "quarterly" ? "negyedéves" : 
-    paymentFrequency === "biannual" ? "féléves" : "éves";
-  const nextPaymentDate = getNextPaymentDate(paymentFrequency);
-  
   return (
-    <Card className="w-full max-w-xl mx-auto">
+    <Card>
       <CardHeader className="text-center">
-        <div className="mx-auto w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-4">
-          <CheckCircle className="h-6 w-6 text-green-600" />
+        <div className="flex justify-center mb-2">
+          <CheckCircle className="h-12 w-12 text-green-500" />
         </div>
-        <CardTitle>Sikeres kölcsönigénylés!</CardTitle>
+        <CardTitle>Sikeres hiteligénylés!</CardTitle>
         <CardDescription>
-          A kölcsön folyósítása 24 órán belül megtörténik
+          A hiteligénylési folyamat sikeresen befejeződött.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="rounded-md bg-muted p-4">
-          <div className="grid grid-cols-1 gap-3">
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Név:</span>
-              <span className="font-medium">{userData.lastName} {userData.firstName}</span>
+        <div className="space-y-4">
+          <div className="p-4 bg-green-50 rounded-lg text-center">
+            <h3 className="text-lg font-medium mb-1">Jóváhagyott hitelösszeg</h3>
+            <p className="text-3xl font-bold text-green-700">{formatCurrency(loanAmount)}</p>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <p className="text-sm text-slate-500">Igénylő neve</p>
+              <p className="font-medium">{userData?.firstName} {userData?.lastName || 'N/A'}</p>
             </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Folyósított összeg:</span>
-              <span className="font-medium">{formatCurrency(loanAmount)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Törlesztési gyakoriság:</span>
-              <span className="font-medium">{paymentFrequencyText}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Következő törlesztési dátum:</span>
-              <span className="font-medium flex items-center">
-                <Calendar className="h-4 w-4 mr-1" />
-                {nextPaymentDate}
-              </span>
+            <div className="p-3 bg-slate-50 rounded-lg flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-slate-400" />
+              <div>
+                <p className="text-sm text-slate-500">Fizetési gyakoriság</p>
+                <p className="font-medium">{paymentFrequency === 'monthly' ? 'Havi' : 'Éves'}</p>
+              </div>
             </div>
           </div>
         </div>
         
-        <div className="space-y-4">
-          <Button variant="outline" className="w-full flex items-center justify-center gap-2">
+        <div className="flex flex-col gap-3 pt-4">
+          <Button variant="outline" className="gap-2">
             <Download className="h-4 w-4" />
             Szerződés letöltése
           </Button>
-          
-          <Link to="/">
-            <Button className="w-full">Vissza a főoldalra</Button>
+          <Link to="/dashboard" className="w-full">
+            <Button className="w-full">
+              Irányítópult megtekintése
+            </Button>
           </Link>
         </div>
       </CardContent>
     </Card>
   );
 };
-
-// Helper function to get the next payment date based on frequency
-function getNextPaymentDate(frequency: string): string {
-  const now = new Date();
-  let nextDate = new Date(now);
-  
-  if (frequency === "quarterly") {
-    nextDate.setMonth(now.getMonth() + 3);
-  } else if (frequency === "biannual") {
-    nextDate.setMonth(now.getMonth() + 6);
-  } else {
-    // annual
-    nextDate.setMonth(now.getMonth() + 12);
-  }
-  
-  return nextDate.toLocaleDateString("hu-HU", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
 
 export default LoanComplete;

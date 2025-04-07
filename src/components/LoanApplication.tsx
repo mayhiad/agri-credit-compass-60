@@ -78,19 +78,19 @@ const LoanApplication = () => {
       case 2:
         return <FarmInfo 
           farmData={farmData} 
-          onNext={handleNextStep} 
+          onComplete={handleNextStep} 
         />;
       case 3:
-        return <FarmLocation onNext={handleNextStep} />;
+        return <FarmLocation onComplete={handleNextStep} />;
       case 4:
         return <PersonalIdentification 
           userData={userData} 
           onNext={handleNextStep} 
         />;
       case 5:
-        return <CreditScore onNext={handleNextStep} />;
+        return <CreditScore onComplete={handleNextStep} />;
       case 6:
-        return <LoanTerms onNext={handleNextStep} />;
+        return <LoanTerms onComplete={handleNextStep} />;
       case 7:
         return <ContractSigning 
           userData={userData}

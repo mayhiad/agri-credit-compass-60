@@ -1,5 +1,5 @@
 
-import { FarmData } from "@/components/LoanApplication";
+import { FarmData } from "@/types/farm";
 import { supabase } from "@/integrations/supabase/client";
 import { processDocumentWithOpenAI, checkProcessingResults } from "@/services/documentProcessingService";
 import { uploadFileToStorage } from "@/utils/storageUtils";

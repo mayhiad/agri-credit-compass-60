@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
-import { FarmData } from "@/components/LoanApplication";
+import { FarmData } from "@/types/farm";
 import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import Header from "@/components/Header";

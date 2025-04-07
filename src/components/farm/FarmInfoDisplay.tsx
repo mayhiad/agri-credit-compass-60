@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { FarmData } from "@/components/LoanApplication";
+import { FarmData } from "@/types/farm";
 import { ArrowRight } from "lucide-react";
 import FarmSummary from "./FarmSummary";
 import CultureTable from "./CultureTable";

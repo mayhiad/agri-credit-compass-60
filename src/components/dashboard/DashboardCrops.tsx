@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FarmData } from "@/components/LoanApplication";
+import { FarmData } from "@/types/farm";
 import { formatCurrency } from "@/lib/utils";
 import { Info, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
