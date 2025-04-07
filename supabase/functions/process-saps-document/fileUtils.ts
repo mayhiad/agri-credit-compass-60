@@ -1,3 +1,4 @@
+
 import { supabase, getErrorDetails } from "./openaiClient.ts";
 
 // Egyszerű PDF és Excel dokumentum szöveg kinyerése
@@ -211,24 +212,4 @@ export async function logExtractionResult(ocrLogId: string, userId: string, extr
     console.error(`❌ Váratlan hiba az AI feldolgozási eredmények mentése során: ${getErrorDetails(error)}`);
     return null;
   }
-}
-
-/**
- * Konvertálja a PDF első oldalát képpé a Claude API számára
- * Ez csak egy helyőrző server oldalon, a tényleges konverzió a kliens oldalon történik
- */
-export async function convertPdfFirstPageToImage(fileBuffer: ArrayBuffer): Promise<string | null> {
-  console.log(`🖼️ PDF képpé konvertálása megkezdve (server oldali funkcionalitás nem elérhető)`);
-  return null;
-}
-
-/**
- * PDF oldal batch feldolgozása Claude számára
- * Ez a funkció a PDF oldalcsoportok feldolgozását végzi
- * @param imageBase64Array - PDF oldalak base64 kódolt tömbje
- * @returns Feldolgozott szöveg
- */
-export async function processPdfBatchWithClaude(imageBase64Array: string[]): Promise<string | null> {
-  console.log(`🧠 PDF batch feldolgozás nem implementált server oldalon`);
-  return null;
 }
