@@ -1,6 +1,6 @@
 
 // This file re-exports the refactored components to maintain backward compatibility
-import { FarmData } from "@/components/LoanApplication";
+import { FarmData } from "@/types/farm";
 import FarmSummary from "./farm/FarmSummary";
 import FarmInfoDisplay from "./farm/FarmInfoDisplay";
 

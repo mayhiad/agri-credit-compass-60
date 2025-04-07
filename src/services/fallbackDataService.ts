@@ -1,4 +1,5 @@
-import { FarmData } from "@/components/LoanApplication";
+
+import { FarmData } from "@/types/farm";
 
 /**
  * Generate fallback data when document processing fails

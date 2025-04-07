@@ -1,5 +1,5 @@
 
-import { UserData } from "@/components/LoanApplication";
+import { UserData } from "@/types/farm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Download, Calendar } from "lucide-react";

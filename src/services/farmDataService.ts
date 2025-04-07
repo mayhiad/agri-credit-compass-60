@@ -1,5 +1,5 @@
 
-import { FarmData } from "@/components/LoanApplication";
+import { FarmData } from "@/types/farm";
 import { supabase } from "@/integrations/supabase/client";
 
 export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string): Promise<string | null> => {

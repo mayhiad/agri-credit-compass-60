@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MapPin } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { FarmData } from "@/components/LoanApplication";
+import { FarmData } from "@/types/farm";
 
 interface FarmSummaryProps {
   farmData: FarmData;

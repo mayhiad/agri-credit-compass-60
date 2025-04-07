@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FarmData } from "@/components/LoanApplication";
+import { FarmData } from "@/types/farm";
 import { formatCurrency } from "@/lib/utils";
 import { CheckCircle, ArrowRight, Clock } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";

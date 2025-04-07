@@ -1,5 +1,5 @@
 
-import { UserData } from "@/components/LoanApplication";
+import { UserData } from "@/types/farm";
 
 interface PersonalIdentificationProps {
   userData?: UserData;

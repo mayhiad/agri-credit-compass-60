@@ -1,5 +1,5 @@
 
-import { FarmData } from "@/components/LoanApplication";
+import { FarmData } from "@/types/farm";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

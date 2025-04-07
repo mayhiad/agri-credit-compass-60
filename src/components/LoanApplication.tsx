@@ -33,38 +33,34 @@ const LoanApplication = () => {
         return <FileUpload onComplete={handleFileUploadComplete} />;
       case 2:
         return <FarmInfo 
-          farmData={farmData} 
+          farmData={farmData!} 
           onComplete={handleNextStep} 
         />;
       case 3:
         return <FarmLocation onComplete={handleNextStep} />;
       case 4:
         return <PersonalIdentification 
-          userData={userData} 
+          userData={userData ?? undefined} 
           onNext={handleNextStep} 
         />;
       case 5:
         return <CreditScore 
-          farmData={farmData}
-          creditLimit={0}
+          farmData={farmData!}
+          creditLimit={farmData?.totalRevenue ? Math.round(farmData.totalRevenue * 0.7) : 0}
           onComplete={handleNextStep} 
         />;
       case 6:
         return <LoanTerms 
-          loanAmount={loanAmount}
-          setLoanAmount={setLoanAmount}
-          paymentFrequency={paymentFrequency}
-          setPaymentFrequency={setPaymentFrequency}
           onComplete={handleNextStep} 
         />;
       case 7:
         return <ContractSigning 
-          userData={userData}
+          userData={userData ?? undefined}
           onNext={handleNextStep} 
         />;
       case 8:
         return <LoanComplete 
-          userData={userData}
+          userData={userData ?? undefined}
           loanAmount={loanAmount}
           paymentFrequency={paymentFrequency}
         />;

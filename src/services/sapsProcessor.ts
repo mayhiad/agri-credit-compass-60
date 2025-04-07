@@ -1,5 +1,5 @@
 
-import { FarmData } from "@/components/LoanApplication";
+import { FarmData } from "@/types/farm";
 
 export const getBlocks = (data: any): string[] => {
   // Extract block IDs from data
