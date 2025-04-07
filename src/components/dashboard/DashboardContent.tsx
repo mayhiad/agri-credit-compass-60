@@ -1,6 +1,7 @@
+
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutDashboard, Map, Tractor, Upload, History, Euro, FileText, Database } from "lucide-react";
+import { LayoutDashboard, Map, Tractor, Upload, History, Euro, Database } from "lucide-react";
 import { FarmData } from "@/types/farm";
 import DashboardOverview from "./DashboardOverview";
 import DashboardCrops from "./DashboardCrops";

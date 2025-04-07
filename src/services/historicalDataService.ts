@@ -96,38 +96,28 @@ export const fetchHistoricalData = async (userId: string): Promise<HistoricalFar
       return generateMockHistoricalData(userId);
     }
     
-    // Check if the farm data has historical_data as a property in its JSON structure
-    // This might be stored in a related table or as a JSON field
-    const { data: historicalRecords, error: historicalError } = await supabase
-      .from('historical_years')
-      .select('*')
-      .eq('farm_id', farmData.id)
-      .order('year', { ascending: true });
-      
-    if (!historicalError && historicalRecords && historicalRecords.length > 0) {
-      // Convert the historical records to our expected format
-      const historicalData: HistoricalYear[] = historicalRecords.map(record => ({
-        year: record.year,
-        totalHectares: record.total_hectares,
-        totalRevenueEUR: record.total_revenue_eur,
-        crops: record.crops || []
-      }));
-      
-      return convertToHistoricalData(historicalData);
-    }
+    // Check if we have historical data in a JSON column or metadata of the farm data
+    // This approach depends on how your data is actually structured in Supabase
     
-    // If no historical data found in dedicated table, try to get from farm_details
+    // First attempt: check farm_details for historical data
     const { data: farmDetails, error: detailsError } = await supabase
       .from('farm_details')
       .select('*')
       .eq('farm_id', farmData.id)
       .single();
+    
+    // If a farm_details record exists and it has historical data in a JSON column
+    if (!detailsError && farmDetails) {
+      // Check if historical data exists in some JSON column (adjust property name as needed)
+      const historicalDataFromJson = farmDetails.market_prices?.historicalData || 
+                                    farmDetails.location_data?.historicalData;
       
-    if (!detailsError && farmDetails && farmDetails.historical_data) {
-      return convertToHistoricalData(farmDetails.historical_data);
+      if (historicalDataFromJson) {
+        return convertToHistoricalData(historicalDataFromJson);
+      }
     }
     
-    // If no historical data is found, return mock data
+    // If no data is found in any table, generate mock data
     console.log("No historical data found in any table, using mock data");
     return generateMockHistoricalData(userId);
   } catch (error) {
