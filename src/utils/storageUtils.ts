@@ -35,7 +35,14 @@ export const uploadFileToStorage = async (fileToUpload: File, userId: string): P
       });
     
     if (error) {
+      // Csak logolja a hibát, de nem dobja tovább, mivel ez nem kritikus hiba a folyamatban
       console.error("Hiba a dokumentum tárolása során:", error.message);
+      
+      // Ellenőrizzük, hogy row-level security policy hiba-e
+      if (error.message.includes("row-level security policy")) {
+        console.warn("Fájl feltöltési jogosultsági hiba. Ellenőrizze a Supabase RLS beállításait a storage.objects táblára!");
+      }
+      
       return null;
     }
     

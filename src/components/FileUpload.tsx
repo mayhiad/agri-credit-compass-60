@@ -97,10 +97,18 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       
     } catch (error) {
       console.error("SAPS feldolgozási hiba:", error);
-      setError(error instanceof Error ? error.message : "Ismeretlen hiba történt a feldolgozás során");
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : "Ismeretlen hiba történt a feldolgozás során";
+        
+      setError(errorMessage);
       toast.error("Hiba történt a dokumentum feldolgozása során");
       
-      setProcessingStatus(null);
+      setProcessingStatus({
+        step: "Hiba a feldolgozás során",
+        progress: 0,
+        details: errorMessage
+      });
     } finally {
       setUploading(false);
     }

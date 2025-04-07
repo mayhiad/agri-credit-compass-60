@@ -46,10 +46,20 @@ serve(async (req) => {
     const fileBuffer = await file.arrayBuffer();
     const fileText = await extractTextFromDocument(fileBuffer, file.name);
     
+    if (!fileText || fileText.length < 50) {
+      throw new Error(`Nem sikerült szöveget kinyerni a dokumentumból. Ellenőrizze, hogy a dokumentum nem sérült és tartalmaz szöveges információt.`);
+    }
+    
     console.log(`📝 Dokumentum szövege kinyerve, hossza: ${fileText.length} karakter`);
     
     // Claude API hívás a szöveg feldolgozásához
     const extractedData = await processWithClaudeAPI(fileText);
+    
+    // Ellenőrizzük, hogy a nevet és azonosítót sikerült-e kinyerni
+    if (!extractedData.applicantName || extractedData.applicantName === "ismeretlen" || 
+        !extractedData.documentId || extractedData.documentId === "ismeretlen") {
+      throw new Error("A Claude AI nem tudta kinyerni a szükséges adatokat (név, azonosítószám) a dokumentumból. Kérjük ellenőrizze, hogy a feltöltött dokumentum megfelelő SAPS dokumentum-e és tartalmazza-e a gazdálkodó nevét és azonosítószámát.");
+    }
     
     console.log("✅ Claude feldolgozás kész:", JSON.stringify(extractedData));
 
@@ -112,11 +122,11 @@ async function extractTextFromDocument(fileBuffer: ArrayBuffer, fileName: string
       return allText;
     } catch (error) {
       console.error("PDF feldolgozási hiba:", error);
-      return "PDF feldolgozási hiba: " + (error instanceof Error ? error.message : String(error));
+      throw new Error("PDF feldolgozási hiba: " + (error instanceof Error ? error.message : String(error)));
     }
   } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
     // Excel esetén egyszerű üzenet
-    return "Excel dokumentum, részletes szöveges tartalom nem áll rendelkezésre.";
+    throw new Error("Excel formátum feldolgozása nem támogatott. Kérjük, konvertálja a dokumentumot PDF formátumba a feltöltés előtt.");
   } else {
     // Egyéb formátumok
     try {
@@ -124,7 +134,7 @@ async function extractTextFromDocument(fileBuffer: ArrayBuffer, fileName: string
       return decoder.decode(fileBuffer);
     } catch (error) {
       console.error("Szöveg dekódolási hiba:", error);
-      return "Szöveg dekódolási hiba: " + (error instanceof Error ? error.message : String(error));
+      throw new Error("Szöveg dekódolási hiba: " + (error instanceof Error ? error.message : String(error)));
     }
   }
 }
@@ -134,7 +144,7 @@ async function processWithClaudeAPI(documentText: string) {
   const CLAUDE_API_KEY = Deno.env.get('CLAUDE_API_KEY');
   
   if (!CLAUDE_API_KEY) {
-    throw new Error('Claude API kulcs nincs beállítva');
+    throw new Error('Claude API kulcs nincs beállítva a Supabase Edge Function változók között');
   }
   
   try {
@@ -202,6 +212,16 @@ FIGYELEM! Csak a kért JSON formátumban válaszolj, más szöveg vagy magyaráz
         const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const extractedJson = JSON.parse(jsonMatch[0]);
+          
+          // Ellenőrizzük, hogy a szükséges adatok megvannak-e
+          if (!extractedJson.applicantName || extractedJson.applicantName === "ismeretlen") {
+            console.warn("⚠️ A gazdálkodó neve nem található a dokumentumban");
+          }
+          
+          if (!extractedJson.documentId || extractedJson.documentId === "ismeretlen") {
+            console.warn("⚠️ A gazdálkodó azonosítószáma nem található a dokumentumban");
+          }
+          
           return {
             ...extractedJson,
             hectares: 0,
@@ -210,25 +230,16 @@ FIGYELEM! Csak a kért JSON formátumban válaszolj, más szöveg vagy magyaráz
             totalRevenue: 0,
             region: ""
           };
+        } else {
+          throw new Error("Nem sikerült JSON objektumot kinyerni a Claude válaszából");
         }
       } catch (jsonError) {
         console.error("JSON feldolgozási hiba:", jsonError);
+        throw new Error("Nem sikerült értelmezni a Claude API válaszát: " + jsonError);
       }
-      
-      // Ha nem sikerült JSON-ként értelmezni, adjunk vissza egy alap objektumot
-      return {
-        applicantName: "Ismeretlen gazdálkodó",
-        documentId: "0000000000",
-        submitterId: "0000000000",
-        hectares: 0,
-        cultures: [],
-        blockIds: [],
-        totalRevenue: 0,
-        region: ""
-      };
     }
     
-    throw new Error("Nem sikerült feldolgozni a Claude választ");
+    throw new Error("Nem sikerült feldolgozni a Claude választ - hiányzó válasz tartalom");
     
   } catch (error) {
     console.error("Claude API hiba:", error);

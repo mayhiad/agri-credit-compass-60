@@ -2,7 +2,6 @@
 import { FarmData } from "@/components/LoanApplication";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadFileToStorage } from "@/utils/storageUtils";
-import { generateFallbackFarmData, validateAndFixFarmData } from "@/services/fallbackDataService";
 import { extractFarmDataFromOcrText } from "@/services/sapsProcessor";
 
 export type ProcessingStatus = {
@@ -119,7 +118,8 @@ const processWithClaudeAI = async (
     const claudeData = await claudeResponse.json();
     
     if (!claudeData.success || !claudeData.data) {
-      throw new Error("Sikertelen adatkinyerés a dokumentumból");
+      throw new Error("Sikertelen adatkinyerés a dokumentumból: " + 
+        (claudeData.error || "A Claude AI nem talált feldolgozható adatokat a dokumentumban"));
     }
     
     // Alapadatok kinyerése
@@ -132,13 +132,10 @@ const processWithClaudeAI = async (
       totalRevenue: 0
     };
     
-    // Validáció és hiányzó mezők pótlása
-    farmData = validateAndFixFarmData(farmData);
-    
     updateStatus({
       step: "Adatok feldolgozása befejezve",
       progress: 90,
-      details: "Alapadatok feldolgozva: " + (farmData.applicantName ? `${farmData.applicantName}` : "Névtelen gazda")
+      details: "Alapadatok feldolgozva: " + (farmData.applicantName ? `${farmData.applicantName}` : "Ismeretlen gazda")
     });
     
     return farmData;
@@ -152,15 +149,8 @@ const processWithClaudeAI = async (
       details: "Hiba történt: " + (error instanceof Error ? error.message : "Ismeretlen hiba")
     });
     
-    // Fallback adatok
-    updateStatus({
-      step: "Alapértelmezett adatok generálása",
-      progress: 85,
-      details: "Példa adatok generálása..."
-    });
-    
-    const fallbackData = generateFallbackFarmData(user.id, file.name, file.size);
-    
-    return fallbackData;
+    // Hibaüzenet részletezése a felhasználó számára
+    const errorMessage = error instanceof Error ? error.message : "Ismeretlen hiba a dokumentum feldolgozása során";
+    throw new Error(`A dokumentum feldolgozása sikertelen: ${errorMessage}`);
   }
 };
