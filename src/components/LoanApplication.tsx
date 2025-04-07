@@ -19,6 +19,8 @@ export interface Culture {
   name: string;
   hectares: number;
   estimatedRevenue: number;
+  yieldPerHectare?: number;
+  pricePerTon?: number;
 }
 
 export interface MarketPrice {

@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 // Fájl feltöltése a Supabase tárolóba
@@ -110,15 +109,11 @@ export const saveOcrTextToWordDocument = async (
     
     // Frissítsük az OCR log rekordot a Word dokumentum URL-jével
     if (ocrLogId) {
-      // Use processing_metadata field instead of document_url
       const { error: updateError } = await supabase
         .from('document_ocr_logs')
         .update({ 
-          processing_metadata: {
-            word_document_path: storagePath,
-            word_document_url: publicUrl,
-            created_at: new Date().toISOString()
-          }
+          storage_path: storagePath,
+          ocr_content: ocrText
         })
         .eq('id', ocrLogId);
       
