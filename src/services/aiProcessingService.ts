@@ -28,6 +28,7 @@ export const processDocumentWithAI = async (file: File, user: any): Promise<{
     convertFormData.append('userId', user.id);
     
     console.log("📡 Küldés a Supabase convert-pdf-to-images végpontra...");
+    console.log("📄 Dokumentum neve:", file.name, "mérete:", file.size, "típusa:", file.type);
     
     const convertResponse = await fetch(
       'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/convert-pdf-to-images',
@@ -71,6 +72,8 @@ export const processDocumentWithAI = async (file: File, user: any): Promise<{
       batchId: convertData.batchId,
       userId: user.id
     };
+    
+    console.log("🔍 Elküldött adatok a process-saps-document végpontnak:", JSON.stringify(processRequest));
     
     const processResponse = await fetch(
       'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-saps-document',

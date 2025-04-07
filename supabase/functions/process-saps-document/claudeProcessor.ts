@@ -88,6 +88,11 @@ export async function processImageBatchWithClaude(
           continue;
         }
         
+        // Detailed logging of each image URL
+        console.log(`📸 Image URL ${i + 1}: ${imageUrl}`);
+        console.log(`   - Format: ${imageUrl.split('.').pop()}`);
+        console.log(`   - Full path: ${imageUrl}`);
+        
         // Use the URL format that Claude accepts
         messageContent.push({
           type: "image",
@@ -103,6 +108,21 @@ export async function processImageBatchWithClaude(
         invalidImageUrls.push(images[i]);
       }
     }
+    
+    // Log the full content structure being sent to Claude API
+    console.log(`🔍 Content structure being sent to Claude API:`);
+    console.log(JSON.stringify(messageContent.map(item => {
+      if (item.type === 'image') {
+        return {
+          type: 'image',
+          source: {
+            type: item.source.type,
+            url: item.source.url.substring(0, 100) + '...' // Truncated for readability
+          }
+        };
+      }
+      return item;
+    }), null, 2));
     
     if (validImageUrls.length === 0) {
       throw new Error(`No valid images found in the batch. All ${images.length} images were invalid or in unsupported formats.`);
