@@ -209,7 +209,7 @@ async function processWithClaudeAPI(documentText: string) {
 Elemezd a következő SAPS dokumentumot és nyerd ki belőle a gazdálkodó adatait.
 
 SAPS dokumentum tartalma:
-${documentText.substring(0, 15000)}
+${documentText.substring(0, 25000)}
 
 A FELADAT: A dokumentumból CSAK a következő információkat kell kinyerned:
 1. A gazdálkodó (kérelmező) neve
@@ -241,7 +241,7 @@ FIGYELEM! Csak a kért JSON formátumban válaszolj, más szöveg vagy magyaráz
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: "claude-3-haiku-20240307",
+        model: "claude-3-opus-20240229",
         max_tokens: 1000,
         messages: [
           {

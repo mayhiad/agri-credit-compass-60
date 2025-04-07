@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { callNewApiService } from "@/services/newApiService";
 import { toast } from "sonner";
-import { AlertCircle, CheckCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, Upload, FileText } from "lucide-react";
 
 export const NewApiDemo = () => {
   const [loading, setLoading] = useState(false);
@@ -57,6 +57,13 @@ export const NewApiDemo = () => {
               />
             </div>
           </div>
+          
+          <Alert className="bg-blue-50 border-blue-200">
+            <FileText className="h-4 w-4 text-blue-500" />
+            <AlertDescription className="text-blue-700">
+              A rendszer most már a Claude 3 Opus modellt használja a nagyméretű PDF-ek feldolgozásához
+            </AlertDescription>
+          </Alert>
           
           {error && (
             <Alert variant="destructive">

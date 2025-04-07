@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { NavBar } from "@/components/NavBar";
+import NavBar from "@/components/NavBar";
 import { Link } from "react-router-dom";
 import NewApiDemo from "@/components/NewApiDemo";
 

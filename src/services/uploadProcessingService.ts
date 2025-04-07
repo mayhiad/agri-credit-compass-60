@@ -30,7 +30,17 @@ export const processSapsDocument = async (
   updateStatus({
     step: "Dokumentum ellenőrzése",
     progress: 10,
+    details: `Fájl méret: ${(file.size / (1024 * 1024)).toFixed(2)} MB`
   });
+  
+  // Fájlméret ellenőrzése
+  if (file.size > 15 * 1024 * 1024) { // 15 MB limit
+    updateStatus({
+      step: "Figyelmeztetés",
+      progress: 10,
+      details: "A fájl mérete túl nagy (> 15 MB). Ez lassú feldolgozást eredményezhet."
+    });
+  }
   
   // Először feltöltjük a dokumentumot a Storage-ba
   let storagePath = null;
@@ -56,6 +66,7 @@ export const processSapsDocument = async (
   updateStatus({
     step: "Dokumentum feltöltése feldolgozásra",
     progress: 30,
+    details: "Claude 3 Opus modell előkészítése a nagyméretű dokumentum feldolgozásához..."
   });
   
   return await processWithClaudeAI(file, user, updateStatus);
@@ -72,9 +83,9 @@ const processWithClaudeAI = async (
   // Dokumentum feldolgozása Claude AI-val
   try {
     updateStatus({
-      step: "Claude AI feldolgozás előkészítése",
+      step: "Claude 3 Opus feldolgozás előkészítése",
       progress: 40,
-      details: "Dokumentum előkészítése a Claude AI elemzésre..."
+      details: "Nagyméretű dokumentum előkészítése a Claude 3 Opus elemzésre..."
     });
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -86,19 +97,21 @@ const processWithClaudeAI = async (
     formData.append('file', file);
     
     updateStatus({
-      step: "Claude AI feldolgozás",
+      step: "Claude 3 Opus feldolgozás",
       progress: 50,
-      details: "A dokumentum Claude AI elemzése folyamatban..."
+      details: "A dokumentum Claude 3 Opus elemzése folyamatban... (nagy dokumentumok feldolgozása több időt vehet igénybe)"
     });
     
     console.log("Calling Claude AI edge function...");
+    console.log("File size:", file.size, "bytes");
     
-    // Explicit timeout control
+    // Explicit timeout control with longer timeout for large files
+    const timeoutDuration = Math.min(300000, 180000 + (file.size / (1024 * 1024)) * 10000); // Base 3 min + extra time based on file size
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 perc
+    const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
     
     // Háromszori próbálkozás lehetősége
-    const maxRetries = 2;
+    const maxRetries = 3;
     let retryCount = 0;
     let lastError = null;
     
@@ -108,11 +121,12 @@ const processWithClaudeAI = async (
           updateStatus({
             step: "Claude AI kapcsolódás újrapróbálása",
             progress: 50,
-            details: `Újrapróbálkozás (${retryCount}/${maxRetries})...`
+            details: `Újrapróbálkozás (${retryCount}/${maxRetries})... A nagyméretű dokumentumok feldolgozása több időt vehet igénybe.`
           });
           
-          // Várunk egy kicsit az újrapróbálkozás előtt
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Várunk egy kicsit az újrapróbálkozás előtt, a nagyobb fájlokhoz több időt
+          const retryDelay = 2000 + (file.size > 5 * 1024 * 1024 ? 3000 : 0);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
         }
         
         const claudeResponse = await fetch(
@@ -146,7 +160,7 @@ const processWithClaudeAI = async (
         }
         
         updateStatus({
-          step: "Claude AI feldolgozás sikeres",
+          step: "Claude 3 Opus feldolgozás sikeres",
           progress: 80,
           details: "A dokumentum elemzése befejeződött, adatok kinyerése..."
         });
@@ -181,7 +195,7 @@ const processWithClaudeAI = async (
         
         if (fetchError.name === 'AbortError') {
           clearTimeout(timeoutId);
-          throw new Error('A dokumentum feldolgozása túl sokáig tartott és megszakításra került (időtúllépés)');
+          throw new Error('A dokumentum feldolgozása túl sokáig tartott és megszakításra került (időtúllépés). Nagy dokumentumok esetén próbáljon kisebb fájlt feltölteni.');
         }
         
         // Részletes hálózati hibák
