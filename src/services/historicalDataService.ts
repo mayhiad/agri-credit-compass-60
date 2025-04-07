@@ -84,7 +84,7 @@ export const fetchHistoricalData = async (userId: string): Promise<HistoricalFar
     // First try to get the latest farm data
     const { data: farmData, error: farmError } = await supabase
       .from('farms')
-      .select('*, historicalData:historical_data(*)')
+      .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -96,42 +96,39 @@ export const fetchHistoricalData = async (userId: string): Promise<HistoricalFar
       return generateMockHistoricalData(userId);
     }
     
-    // If we have historical data in the farm record
-    if (farmData && farmData.historicalData && Array.isArray(farmData.historicalData) && farmData.historicalData.length > 0) {
-      return convertToHistoricalData(farmData.historicalData);
-    }
-    
-    // Try to get historical data from the FarmData type
-    const { data: farms, error: farmsError } = await supabase
-      .from('farms')
+    // Check if the farm data has historical_data as a property in its JSON structure
+    // This might be stored in a related table or as a JSON field
+    const { data: historicalRecords, error: historicalError } = await supabase
+      .from('historical_years')
       .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1);
+      .eq('farm_id', farmData.id)
+      .order('year', { ascending: true });
       
-    if (farmsError || !farms || farms.length === 0) {
-      console.error("Error fetching farms or no farms found:", farmsError);
-      return generateMockHistoricalData(userId);
+    if (!historicalError && historicalRecords && historicalRecords.length > 0) {
+      // Convert the historical records to our expected format
+      const historicalData: HistoricalYear[] = historicalRecords.map(record => ({
+        year: record.year,
+        totalHectares: record.total_hectares,
+        totalRevenueEUR: record.total_revenue_eur,
+        crops: record.crops || []
+      }));
+      
+      return convertToHistoricalData(historicalData);
     }
     
-    // Get the farm details
+    // If no historical data found in dedicated table, try to get from farm_details
     const { data: farmDetails, error: detailsError } = await supabase
       .from('farm_details')
       .select('*')
-      .eq('farm_id', farms[0].id)
+      .eq('farm_id', farmData.id)
       .single();
       
-    if (detailsError || !farmDetails) {
-      console.log("No farm details found, using mock data");
-      return generateMockHistoricalData(userId);
-    }
-    
-    // Check if the latest farm data has historicalData
-    if (farms[0] && farms[0].historical_data && Array.isArray(farms[0].historical_data)) {
-      return convertToHistoricalData(farms[0].historical_data);
+    if (!detailsError && farmDetails && farmDetails.historical_data) {
+      return convertToHistoricalData(farmDetails.historical_data);
     }
     
     // If no historical data is found, return mock data
+    console.log("No historical data found in any table, using mock data");
     return generateMockHistoricalData(userId);
   } catch (error) {
     console.error("Unexpected error fetching historical data:", error);
