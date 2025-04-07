@@ -10,21 +10,21 @@ export interface ParcelData {
 }
 
 /**
- * Extracts basic farmer information from OCR text
- * @param ocrText - The OCR text to extract data from
- * @returns FarmData object with extracted information
+ * Egyszerű adatok kinyerése az OCR szövegből
+ * @param ocrText - OCR szöveg, amiből az adatokat kinyerjük
+ * @returns FarmData objektum a kinyert információkkal
  */
 export const extractFarmDataFromOcrText = (ocrText: string): Partial<FarmData> => {
   if (!ocrText || ocrText.length === 0) {
-    console.warn("Empty OCR text provided to extractFarmDataFromOcrText");
+    console.warn("Üres OCR szöveg érkezett az extractFarmDataFromOcrText függvénybe");
     return {};
   }
 
-  console.log("Extracting farm data from OCR text, length:", ocrText.length);
+  console.log("Adatok kinyerése az OCR szövegből, hossza:", ocrText.length);
   
   const extractedData: Partial<FarmData> = {};
   
-  // Try to extract applicant name (Beadó/Kérelmező neve)
+  // Próbáljuk kinyerni a gazdálkodó nevét
   const namePatterns = [
     /(?:Beadó|Kérelmező|Gazdálkodó|Ügyfél)\s*neve:?\s*([\wáéíóöőúüűÁÉÍÓÖŐÚÜŰ\s.-]{3,50})/i,
     /Név:?\s*([\wáéíóöőúüűÁÉÍÓÖŐÚÜŰ\s.-]{3,50})/i
@@ -38,7 +38,7 @@ export const extractFarmDataFromOcrText = (ocrText: string): Partial<FarmData> =
     }
   }
   
-  // Try to extract document ID (10 digit code for the applicant)
+  // Próbáljuk kinyerni az azonosítószámot
   const idPatterns = [
     /(?:Beadó|Kérelmező|Gazdálkodó|Ügyfél)\s*azonosító(?:ja|:)?\s*:?\s*(\d{10})/i,
     /Azonosító(?:ja|:)?\s*:?\s*(\d{10})/i,
@@ -53,7 +53,7 @@ export const extractFarmDataFromOcrText = (ocrText: string): Partial<FarmData> =
     }
   }
   
-  console.log("Extracted farm data from OCR:", extractedData);
+  console.log("Kinyert adatok az OCR szövegből:", extractedData);
   
   return extractedData;
 };

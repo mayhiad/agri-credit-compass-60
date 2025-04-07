@@ -19,12 +19,18 @@ export const uploadFileToStorage = async (fileToUpload: File, userId: string): P
     
     console.log("Fájl feltöltése a Storage-ba:", storagePath);
     
+    // Megfelelő MIME típus beállítása
+    let contentType = 'application/octet-stream';
+    if (fileExtension === 'pdf') {
+      contentType = 'application/pdf';
+    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+      contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    }
+    
     const { data, error } = await supabase.storage
       .from('dokumentumok')
       .upload(storagePath, fileToUpload, {
-        contentType: fileExtension === 'pdf' ? 'application/pdf' : 
-                    (fileExtension === 'xlsx' || fileExtension === 'xls') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 
-                    'application/octet-stream',
+        contentType: contentType,
         upsert: false
       });
     

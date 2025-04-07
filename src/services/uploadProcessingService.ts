@@ -1,7 +1,6 @@
 
 import { FarmData } from "@/components/LoanApplication";
 import { supabase } from "@/integrations/supabase/client";
-import { processDocumentWithOpenAI, checkProcessingResults } from "@/services/documentProcessingService";
 import { uploadFileToStorage } from "@/utils/storageUtils";
 import { generateFallbackFarmData, validateAndFixFarmData } from "@/services/fallbackDataService";
 import { extractFarmDataFromOcrText } from "@/services/sapsProcessor";
@@ -48,7 +47,7 @@ export const processSapsDocument = async (
   }
   
   updateStatus({
-    step: "Dokumentum feltöltése",
+    step: "Dokumentum feltöltése feldolgozásra",
     progress: 30,
   });
   
@@ -63,147 +62,105 @@ const processWithClaudeAI = async (
   user: any,
   updateStatus: (status: ProcessingStatus) => void
 ): Promise<FarmData> => {
-  // Dokumentum feldolgozása Claude AI-val (jelenleg OpenAI API-t használjuk, később Claude-ra cseréljük)
-  let processResult;
+  // Dokumentum feldolgozása Claude AI-val
   try {
-    processResult = await processDocumentWithOpenAI(file, user);
-    
-    if (!processResult) {
-      throw new Error("Hiba történt a dokumentum feldolgozása során");
+    updateStatus({
+      step: "Claude AI feldolgozás előkészítése",
+      progress: 40,
+      details: "Dokumentum előkészítése a Claude AI elemzésre..."
+    });
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error("Nincs érvényes felhasználói munkamenet");
     }
-  } catch (error) {
-    console.error("AI feldolgozási hiba:", error);
-    throw new Error(`Az AI feldolgozás sikertelen volt: ${error.message || "Ismeretlen hiba"}`);
-  }
-  
-  const { threadId, runId, ocrLogId } = processResult;
-  
-  updateStatus({
-    step: "AI feldolgozás folyamatban",
-    progress: 50,
-    details: "Az AI feldolgozza a dokumentumot, ez akár 1-2 percet is igénybe vehet..."
-  });
-  
-  let isComplete = false;
-  let farmData: FarmData | null = null;
-  let attempts = 0;
-  const maxAttempts = 24; // 2 perces maximális várakozási idő (5 másodperces várakozásokkal)
-  const waitTimeMs = 5000; // 5 másodperc várakozás próbálkozások között
-  let rawContent = "";
-  
-  // Várjunk az eredményre
-  while (!isComplete && attempts < maxAttempts) {
-    attempts++;
     
-    await new Promise(resolve => setTimeout(resolve, waitTimeMs));
-    
-    try {
-      const resultData = await checkProcessingResults(threadId, runId, ocrLogId);
-      
-      // Nyers AI válasz mentése a debuggoláshoz
-      if (resultData.rawContent) {
-        rawContent = resultData.rawContent;
-      }
-      
-      // Ha a feldolgozás status completed, akkor gyorsabban lépünk tovább
-      let progress = 50 + Math.min(40, Math.floor((attempts / maxAttempts) * 40));
-      
-      if (resultData.status === 'completed') {
-        progress = 80; // Gyorsabban mutatunk előrehaladást
-      }
-      
-      updateStatus({
-        step: resultData.status === 'completed' ? "Dokumentum elemzése befejezve" : "AI feldolgozás folyamatban",
-        progress: progress,
-        details: `Feldolgozás: ${resultData.status || 'folyamatban'} (${attempts}/${maxAttempts}. ellenőrzés)`
-      });
-      
-      if (resultData.completed && resultData.data) {
-        isComplete = true;
-        farmData = resultData.data;
-        
-        // Ha a farm adat hiányos, akkor generáljunk fallback adatokat
-        if (!farmData.applicantName) {
-          console.warn("Az AI által feldolgozott adatok hiányosak:", farmData);
-          
-          if (attempts >= maxAttempts / 2) {
-            updateStatus({
-              step: "Alapértelmezett adatok generálása",
-              progress: 85,
-              details: "Az AI nem tudott elegendő adatot kinyerni, példa adatok generálása..."
-            });
-            
-            farmData = generateFallbackFarmData(user.id, file.name, file.size);
-            farmData.ocrText = rawContent;
-            break;
-          }
-          
-          updateStatus({
-            step: "Hiányos adatok",
-            progress: 70,
-            details: "Az AI által kinyert adatok hiányosak. Újbóli feldolgozás..."
-          });
-          
-          if (attempts < maxAttempts / 2) {
-            isComplete = false;
-            farmData = null;
-            continue;
-          }
-        }
-        
-        break;
-      }
-      
-      if (attempts >= maxAttempts / 2 && !isComplete) {
-        updateStatus({
-          step: "Feldolgozás nehézségekbe ütközik",
-          progress: 75,
-          details: "Az AI feldolgozás nehézségekbe ütközik. Példa adatok előkészítése..."
-        });
-      }
-      
-    } catch (checkError) {
-      console.error(`Eredmény ellenőrzési hiba (${attempts}. kísérlet):`, checkError);
-      
-      if (attempts >= maxAttempts / 2) {
-        updateStatus({
-          step: "Alapértelmezett adatok generálása",
-          progress: 85,
-          details: "Az adatkinyerés sikertelen volt, példa adatok generálása..."
-        });
-        
-        farmData = generateFallbackFarmData(user.id, file.name, file.size);
-        farmData.ocrText = rawContent;
-        break;
-      }
-    }
-  }
-  
-  // Ha nem sikerült feldolgozni az AI-val, állítsunk elő fallback adatokat
-  if (!isComplete || !farmData) {
-    console.warn("AI feldolgozás sikertelen, fallback adatok generálása...");
-    farmData = generateFallbackFarmData(user.id, file.name, file.size);
-    farmData.ocrText = rawContent;
+    const formData = new FormData();
+    formData.append('file', file);
     
     updateStatus({
-      step: "Feldolgozás sikertelen",
-      progress: 90,
-      details: "Nem sikerült az adatokat kinyerni. Alapértelmezett adatok előállítása..."
+      step: "Claude AI feldolgozás",
+      progress: 50,
+      details: "A dokumentum Claude AI elemzése folyamatban..."
     });
+    
+    const claudeResponse = await fetch(
+      'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-with-claude',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: formData,
+        signal: AbortSignal.timeout(180000), // 3 perc időtúllépés
+      }
+    );
+    
+    if (!claudeResponse.ok) {
+      const errorText = await claudeResponse.text();
+      console.error("Claude feldolgozási hiba:", errorText);
+      let errorData;
+      
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (parseError) {
+        errorData = { error: errorText || "Ismeretlen hiba történt" };
+      }
+      
+      throw new Error(errorData.error || "Hiba a dokumentum feldolgozása közben");
+    }
+    
+    updateStatus({
+      step: "Claude AI feldolgozás sikeres",
+      progress: 80,
+      details: "A dokumentum elemzése befejeződött, adatok kinyerése..."
+    });
+    
+    const claudeData = await claudeResponse.json();
+    
+    if (!claudeData.success || !claudeData.data) {
+      throw new Error("Sikertelen adatkinyerés a dokumentumból");
+    }
+    
+    // Alapadatok kinyerése
+    let farmData: FarmData = {
+      ...claudeData.data,
+      fileName: file.name,
+      fileSize: file.size,
+      hectares: 0,
+      cultures: [],
+      totalRevenue: 0
+    };
+    
+    // Validáció és hiányzó mezők pótlása
+    farmData = validateAndFixFarmData(farmData);
+    
+    updateStatus({
+      step: "Adatok feldolgozása befejezve",
+      progress: 90,
+      details: "Alapadatok feldolgozva: " + (farmData.applicantName ? `${farmData.applicantName}` : "Névtelen gazda")
+    });
+    
+    return farmData;
+    
+  } catch (error) {
+    console.error("AI feldolgozási hiba:", error);
+    
+    updateStatus({
+      step: "Hiba a feldolgozás során",
+      progress: 70,
+      details: "Hiba történt: " + (error instanceof Error ? error.message : "Ismeretlen hiba")
+    });
+    
+    // Fallback adatok
+    updateStatus({
+      step: "Alapértelmezett adatok generálása",
+      progress: 85,
+      details: "Példa adatok generálása..."
+    });
+    
+    const fallbackData = generateFallbackFarmData(user.id, file.name, file.size);
+    
+    return fallbackData;
   }
-  
-  // Add file metadata
-  farmData.fileName = file.name;
-  farmData.fileSize = file.size;
-  
-  // További validáció és hiányzó mezők pótlása
-  farmData = validateAndFixFarmData(farmData);
-  
-  updateStatus({
-    step: "Adatok feldolgozása",
-    progress: 90,
-    details: "Alapadatok feldolgozva: " + (farmData.applicantName ? `${farmData.applicantName}` : "Névtelen gazda")
-  });
-  
-  return farmData;
 };
