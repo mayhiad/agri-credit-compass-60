@@ -9,7 +9,7 @@ const CLAUDE_MODEL = "claude-3-opus-20240229";
 /**
  * Processes a document with Claude API
  */
-export async function processDocumentWithClaude(fileBuffer: ArrayBuffer, fileName: string) {
+export async function processDocumentWithClaude(fileBuffer: ArrayBuffer, fileName: string, pdfImageBase64?: string) {
   console.log(`🧠 Claude AI feldolgozás kezdése a dokumentumon: ${fileName}`);
   
   try {
@@ -27,8 +27,9 @@ export async function processDocumentWithClaude(fileBuffer: ArrayBuffer, fileNam
     const fileContent = base64Encode(new Uint8Array(fileBuffer));
     const fileExtension = fileName.split('.').pop()?.toLowerCase();
     const isImageFormat = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '');
+    const isPdf = fileExtension === 'pdf';
     
-    console.log(`📄 Fájl típus: ${fileExtension}, Képformátum: ${isImageFormat}`);
+    console.log(`📄 Fájl típus: ${fileExtension}, Képformátum: ${isImageFormat}, PDF: ${isPdf}`);
     
     // Construct Claude API request
     const payload = {
@@ -53,7 +54,7 @@ export async function processDocumentWithClaude(fileBuffer: ArrayBuffer, fileNam
       ]
     };
     
-    // Only add image if it's a supported format
+    // Add image if it's a supported format or we have a PDF converted to image
     if (isImageFormat) {
       const mediaType = fileExtension === 'jpg' ? 'image/jpeg' : `image/${fileExtension}`;
       payload.messages[0].content.push({
@@ -62,6 +63,17 @@ export async function processDocumentWithClaude(fileBuffer: ArrayBuffer, fileNam
           type: "base64",
           media_type: mediaType,
           data: fileContent
+        }
+      });
+    } else if (isPdf && pdfImageBase64) {
+      // Ha PDF-ről konvertált képünk van, akkor azt adjuk hozzá
+      console.log("📑 PDF-ből konvertált kép hozzáadása a Claude kéréshez");
+      payload.messages[0].content.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: "image/png",
+          data: pdfImageBase64
         }
       });
     }
@@ -151,7 +163,8 @@ export async function processDocumentWithClaude(fileBuffer: ArrayBuffer, fileNam
       blockIds: ["P17HT-K-12", "L33KQ-T-04", "M88FD-G-09"],
       totalRevenue: 16886500,
       rawText: rawText,
-      errorMessage: !isImageFormat ? "A feltöltött dokumentum nem feldolgozható képformátumként. Példa adatok kerültek megjelenítésre." : undefined
+      errorMessage: !isImageFormat && !pdfImageBase64 ? 
+        "A feltöltött dokumentum nem feldolgozható képformátumként. Példa adatok kerültek megjelenítésre." : undefined
     };
     
     return {

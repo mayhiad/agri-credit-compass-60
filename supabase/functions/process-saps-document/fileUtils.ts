@@ -1,4 +1,3 @@
-
 import { supabase, getErrorDetails } from "./openaiClient.ts";
 
 // Egyszerű PDF és Excel dokumentum szöveg kinyerése
@@ -210,6 +209,41 @@ export async function logExtractionResult(ocrLogId: string, userId: string, extr
     return data.id;
   } catch (error) {
     console.error(`❌ Váratlan hiba az AI feldolgozási eredmények mentése során: ${getErrorDetails(error)}`);
+    return null;
+  }
+}
+
+/**
+ * Konvertálja a PDF első oldalát képpé a Claude API számára
+ * 
+ * Megjegyzés: ezt a funkciót szerver oldalon implementáljuk, nincs közvetlen DOM hozzáférésünk,
+ * ezért külső szolgáltatásokra van szükségünk, vagy canvas-t emuláló megoldásra, mint a canvas npm csomag.
+ * Egyszerűsítés céljából most csak egy minta implementációt adunk.
+ */
+export async function convertPdfFirstPageToImage(fileBuffer: ArrayBuffer): Promise<string | null> {
+  try {
+    console.log(`🖼️ PDF képpé konvertálása megkezdve`);
+    
+    // Itt lenne a tényleges PDF kép konvertálás. Server side környezetben ez bonyolultabb,
+    // mivel nincs közvetlen DOM hozzáférés (canvas, stb.)
+    // A tényleges implementációhoz használható opcók:
+    // 1. PDF.js + canvas npm csomag (Node.js környezetben)
+    // 2. Külső szolgáltatás, mint Poppler vagy ImageMagick (ha telepítve vannak)
+    // 3. Külső API hívása a konverzióhoz
+    
+    // Minta megvalósítás: egy egyszerű bitmappet generálunk
+    // (A valós implementációban ez a PDF első oldalának tényleges képe lenne)
+    
+    // FONTOS: Ez csak egy helyőrző implementáció
+    // Valós esetben a fileBuffer-ből nyernénk ki a PDF első oldalát és konvert��lnánk képpé
+    
+    // Tényleges API használatra, ez a megoldás csak példa demonstráció
+    console.log(`⚠️ Ez csak egy helyőrző implementáció, tényleges PDF->kép konverzió nem történik`);
+    
+    // Valós implementáció hiányában null-t adunk vissza
+    return null;
+  } catch (error) {
+    console.error(`❌ Hiba a PDF kép konvertálása során: ${getErrorDetails(error)}`);
     return null;
   }
 }

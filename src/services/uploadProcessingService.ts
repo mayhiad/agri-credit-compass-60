@@ -2,7 +2,7 @@
 import { FarmData } from "@/types/farm";
 import { supabase } from "@/integrations/supabase/client";
 import { processDocumentWithOpenAI, checkProcessingResults } from "@/services/documentProcessingService";
-import { uploadFileToStorage } from "@/utils/storageUtils";
+import { uploadFileToStorage, convertPdfToImage } from "@/utils/storageUtils";
 import { generateFallbackFarmData, validateAndFixFarmData } from "@/services/fallbackDataService";
 import { extractFarmDataFromOcrText } from "@/services/sapsProcessor";
 
@@ -47,13 +47,61 @@ export const processSapsDocument = async (
     console.warn("A fájl mentése a tárhelyre sikertelen volt, de a feldolgozás folytatódik");
   }
   
+  // PDF fájl esetén konvertáljuk képpé az első oldalt
+  let pdfImage = null;
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  
+  if (isPdf) {
+    updateStatus({
+      step: "PDF feldolgozása",
+      progress: 25,
+      details: "PDF első oldalának képpé konvertálása..."
+    });
+    
+    try {
+      pdfImage = await convertPdfToImage(file);
+      if (pdfImage) {
+        updateStatus({
+          step: "PDF konvertálva",
+          progress: 30,
+          details: "PDF első oldala sikeresen képpé konvertálva"
+        });
+      } else {
+        updateStatus({
+          step: "PDF konvertálás sikertelen",
+          progress: 30,
+          details: "Nem sikerült a PDF-et képpé konvertálni, folytatás szöveges elemzéssel"
+        });
+      }
+    } catch (error) {
+      console.error("Hiba a PDF képpé konvertálása során:", error);
+      updateStatus({
+        step: "PDF konvertálás sikertelen",
+        progress: 30,
+        details: "Hiba történt a PDF képpé konvertálása során, folytatás szöveges elemzéssel"
+      });
+    }
+  }
+  
   updateStatus({
     step: "Dokumentum feltöltése",
-    progress: 30,
+    progress: 35,
   });
   
+  // Form data létrehozása a fájllal
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  // Ha van PDF kép, azt is elküldjük base64 formátumban
+  if (pdfImage && pdfImage.base64) {
+    const base64Header = document.createElement('input');
+    base64Header.name = 'pdfImageBase64';
+    base64Header.value = pdfImage.base64;
+    formData.append('pdfImageBase64', pdfImage.base64);
+  }
+  
   // Claude feldolgozás
-  return await processWithClaude(file, user, updateStatus);
+  return await processWithClaude(file, formData, user, updateStatus);
 };
 
 /**
@@ -61,6 +109,7 @@ export const processSapsDocument = async (
  */
 const processWithClaude = async (
   file: File,
+  formData: FormData,
   user: any,
   updateStatus: (status: ProcessingStatus) => void
 ): Promise<FarmData> => {
@@ -76,12 +125,13 @@ const processWithClaude = async (
     // Ellenőrizzük, hogy a fájl támogatott formátumú-e Claude-hoz
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
     const isImageFormat = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '');
+    const isPdf = fileExtension === 'pdf' || file.type === 'application/pdf';
     
-    if (!isImageFormat) {
+    if (!isImageFormat && !isPdf) {
       updateStatus({
         step: "Formátum konvertálása",
         progress: 45,
-        details: "PDF formátum feldolgozása szövegként..."
+        details: "A formátum nem támogatott közvetlen képi feldolgozásként, szöveges feldolgozás..."
       });
     }
     

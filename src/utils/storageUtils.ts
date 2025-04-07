@@ -48,6 +48,82 @@ export const generateStorageUrl = (filePath: string): string => {
 };
 
 /**
+ * Converts the first page of a PDF to an image.
+ * @param file The PDF file to convert.
+ * @returns A Promise resolving to a Blob containing the image, or null if conversion fails.
+ */
+export const convertPdfToImage = async (file: File): Promise<{ blob: Blob, base64: string } | null> => {
+  try {
+    // Load the PDF.js library
+    const pdfjsLib = await import('pdfjs-dist');
+    // @ts-ignore
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.js`;
+    
+    // Read the file as an ArrayBuffer
+    const arrayBuffer = await file.arrayBuffer();
+    const typedArray = new Uint8Array(arrayBuffer);
+    
+    // Load the PDF document
+    const loadingTask = pdfjsLib.getDocument(typedArray);
+    const pdf = await loadingTask.promise;
+    
+    // Get the first page
+    const page = await pdf.getPage(1);
+    
+    // Set the scale for rendering
+    const viewport = page.getViewport({ scale: 1.5 });
+    
+    // Create a canvas element to render the page
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    
+    if (!context) {
+      throw new Error('Nem sikerült a canvas kontextus létrehozása');
+    }
+    
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    
+    // Render the page onto the canvas
+    const renderContext = {
+      canvasContext: context,
+      viewport: viewport
+    };
+    
+    await page.render(renderContext).promise;
+    
+    // Convert the canvas to a Blob (PNG format)
+    const blob = await new Promise<Blob>((resolve) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          throw new Error('Nem sikerült a canvas Blob-bá konvertálása');
+        }
+      }, 'image/png', 0.95);
+    });
+    
+    // Convert to base64 for API
+    const base64 = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        // Remove the data URL prefix (e.g., 'data:image/png;base64,')
+        const base64Data = base64String.split(',')[1];
+        resolve(base64Data);
+      };
+      reader.readAsDataURL(blob);
+    });
+    
+    console.log("PDF sikeresen konvertálva képpé");
+    return { blob, base64 };
+  } catch (error) {
+    console.error("Hiba a PDF kép konvertálása során:", error);
+    return null;
+  }
+};
+
+/**
  * Extracts text from a PDF file using PDF.js.
  * @param file The PDF file to extract text from.
  * @returns The extracted text as a string, or null if extraction fails.

@@ -5,7 +5,8 @@ import {
   saveDocumentToStorage, 
   extractTextFromDocument, 
   logOcrResult,
-  logExtractionResult
+  logExtractionResult,
+  convertPdfFirstPageToImage
 } from "./fileUtils.ts";
 import { processDocumentWithClaude } from "./claudeProcessor.ts";
 
@@ -24,9 +25,21 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
     const storagePath = await saveDocumentToStorage(fileBuffer, fileName, userId);
     console.log(`✅ Dokumentum mentése a tárolóba ${storagePath ? 'sikeres' : 'sikertelen'}`);
     
+    // Ellenőrizzük, hogy PDF fájl-e, és ha igen, konvertáljuk az első oldalt képpé
+    let pdfImageBase64 = null;
+    if (fileName.toLowerCase().endsWith('.pdf')) {
+      console.log(`🖼️ PDF első oldalának képpé konvertálása...`);
+      pdfImageBase64 = await convertPdfFirstPageToImage(fileBuffer);
+      if (pdfImageBase64) {
+        console.log(`✅ PDF első oldala sikeresen képpé konvertálva.`);
+      } else {
+        console.warn(`⚠️ Nem sikerült a PDF-et képpé konvertálni.`);
+      }
+    }
+    
     // Dokumentum feldolgozása Claude-dal
     console.log(`🤖 Dokumentum feldolgozása Claude AI-val...`);
-    const result = await processDocumentWithClaude(fileBuffer, fileName);
+    const result = await processDocumentWithClaude(fileBuffer, fileName, pdfImageBase64);
     console.log(`✅ Claude feldolgozás eredménye:`, result);
     
     // OCR eredmény mentése az adatbázisba

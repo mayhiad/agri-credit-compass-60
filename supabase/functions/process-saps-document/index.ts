@@ -22,6 +22,12 @@ serve(async (req) => {
 
     console.log("📄 Fájl fogadva:", file.name, "méret:", file.size, "típus:", file.type);
     
+    // Ellenőrizzük, hogy van-e PDF képi adat
+    const pdfImageBase64 = formData.get('pdfImageBase64') as string;
+    if (pdfImageBase64) {
+      console.log("🖼️ PDF kép adat fogadva a klienstől:", pdfImageBase64.substring(0, 50) + "...");
+    }
+    
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     console.log("🔑 OpenAI API kulcs állapota:", openaiApiKey ? "beállítva (" + openaiApiKey.substring(0, 5) + "...)" : "hiányzik");
 
