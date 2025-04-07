@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { corsHeaders } from "../process-saps-document/cors.ts";
+import { corsHeaders } from "./cors.ts";
 import * as pdf from "https://deno.land/x/pdfjs@v0.1.2/mod.ts";
 
 const API_TIMEOUT = 180000; // 3 perc
