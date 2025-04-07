@@ -94,6 +94,20 @@ serve(async (req) => {
     
     console.log(`📝 Dokumentum szövege kinyerve, hossza: ${fileText.length} karakter`);
     
+    // Claude API kulcs ellenőrzése
+    const CLAUDE_API_KEY = Deno.env.get('CLAUDE_API_KEY');
+    
+    if (!CLAUDE_API_KEY) {
+      console.error("🔑 CLAUDE_API_KEY környezeti változó nincs beállítva!");
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Claude API kulcs nincs beállítva a Supabase Edge Function változók között"
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
     // Claude API hívás a szöveg feldolgozásához
     const extractedData = await processWithClaudeAPI(fileText);
     
@@ -240,6 +254,8 @@ FIGYELEM! Csak a kért JSON formátumban válaszolj, más szöveg vagy magyaráz
     
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`Claude API hiba: ${response.status} ${response.statusText}`);
+      console.error("Hibaüzenet:", errorText);
       throw new Error(`Claude API hiba: ${response.status} ${response.statusText} - ${errorText}`);
     }
     
@@ -278,6 +294,7 @@ FIGYELEM! Csak a kért JSON formátumban válaszolj, más szöveg vagy magyaráz
         }
       } catch (jsonError) {
         console.error("JSON feldolgozási hiba:", jsonError);
+        console.error("Eredeti AI válasz:", aiResponse);
         throw new Error("Nem sikerült értelmezni a Claude API válaszát: " + jsonError);
       }
     }

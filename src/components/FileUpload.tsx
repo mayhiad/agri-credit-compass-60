@@ -42,9 +42,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
     }
   };
   
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const processDocument = async () => {
     if (!file) {
       toast.error("Kérjük, válasszon egy SAPS dokumentumot");
       return;
@@ -122,6 +120,15 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
     }
   };
   
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await processDocument();
+  };
+  
+  const handleRetry = () => {
+    processDocument();
+  };
+  
   return (
     <Card className="w-full max-w-xl mx-auto">
       <CardHeader>
@@ -161,7 +168,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
             <UploadArea file={file} onFileChange={handleFileChange} />
             <ProcessingStatus status={processingStatus} />
             
-            <ErrorDisplay message={error} />
+            <ErrorDisplay message={error} onRetry={handleRetry} />
             <SuccessMessage status={processingStatus} />
           </form>
         </div>
