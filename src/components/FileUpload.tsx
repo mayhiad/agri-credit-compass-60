@@ -1,9 +1,10 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock, ArrowRight, AlertTriangle, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { FarmData } from "@/components/LoanApplication";
+import { FarmData } from "@/types/farm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/App";
@@ -28,14 +29,27 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
-      const allowedTypes = ['application/pdf', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
       
-      if (allowedTypes.includes(selectedFile.type)) {
+      // Allow only supported file types: PDF, Excel, and image formats
+      const allowedTypes = [
+        'application/pdf', 
+        'application/vnd.ms-excel', 
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'image/webp'
+      ];
+      
+      const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase();
+      
+      if (allowedTypes.includes(selectedFile.type) || 
+          ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '')) {
         setFile(selectedFile);
         setError(null);
         setProcessingStatus(null);
       } else {
-        toast.error("Kérjük, PDF vagy Excel formátumú dokumentumot töltsön fel");
+        toast.error("Kérjük, PDF, Excel vagy kép (JPG, PNG, GIF, WebP) formátumú dokumentumot töltsön fel");
         setFile(null);
       }
     }

@@ -11,7 +11,6 @@ import ContractSigning from "@/components/ContractSigning";
 import LoanComplete from "@/components/LoanComplete";
 import { FarmData, UserData } from "@/types/farm";
 
-// Use types from centralized types file rather than redefining them here
 const LoanApplication = () => {
   const [step, setStep] = useState(1);
   const [farmData, setFarmData] = useState<FarmData | null>(null);
@@ -42,20 +41,16 @@ const LoanApplication = () => {
       case 4:
         return <PersonalIdentification 
           userData={userData} 
+          onUpdateUserData={setUserData}
           onNext={handleNextStep} 
         />;
       case 5:
         return <CreditScore 
           farmData={farmData}
-          creditLimit={0}
           onComplete={handleNextStep} 
         />;
       case 6:
         return <LoanTerms 
-          loanAmount={loanAmount}
-          setLoanAmount={setLoanAmount}
-          paymentFrequency={paymentFrequency}
-          setPaymentFrequency={setPaymentFrequency}
           onComplete={handleNextStep} 
         />;
       case 7:
@@ -67,7 +62,6 @@ const LoanApplication = () => {
         return <LoanComplete 
           userData={userData}
           loanAmount={loanAmount}
-          paymentFrequency={paymentFrequency}
         />;
       default:
         return <FileUpload onComplete={handleFileUploadComplete} />;

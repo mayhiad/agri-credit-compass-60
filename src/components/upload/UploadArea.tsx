@@ -14,7 +14,7 @@ export const UploadArea = ({ file, onFileChange }: UploadAreaProps) => {
       <UploadCloud className="h-12 w-12 mx-auto text-gray-400" />
       <div className="space-y-2">
         <p className="text-sm text-gray-500">
-          PDF vagy XLS formátumban
+          PDF, XLS vagy képformátumban (JPG, PNG, GIF, WebP)
         </p>
         <label htmlFor="file-upload" className="cursor-pointer">
           <span className="px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium">
@@ -23,7 +23,7 @@ export const UploadArea = ({ file, onFileChange }: UploadAreaProps) => {
           <Input
             id="file-upload"
             type="file"
-            accept=".pdf,.xls,.xlsx"
+            accept=".pdf,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
             onChange={onFileChange}
             className="hidden"
           />

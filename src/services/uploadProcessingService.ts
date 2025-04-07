@@ -73,6 +73,18 @@ const processWithClaude = async (
       details: "A dokumentum Claude AI-val történő feldolgozása folyamatban..."
     });
     
+    // Ellenőrizzük, hogy a fájl támogatott formátumú-e Claude-hoz
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    const isImageFormat = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '');
+    
+    if (!isImageFormat) {
+      updateStatus({
+        step: "Formátum konvertálása",
+        progress: 45,
+        details: "PDF formátum feldolgozása szövegként..."
+      });
+    }
+    
     processResult = await processDocumentWithOpenAI(file, user);
     
     if (!processResult) {
