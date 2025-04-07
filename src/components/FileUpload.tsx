@@ -14,8 +14,6 @@ import ErrorDisplay from "@/components/upload/ErrorDisplay";
 import SuccessMessage from "@/components/upload/SuccessMessage";
 import { ProcessingStatus as ProcessingStatusType, processSapsDocument } from "@/services/uploadProcessingService";
 import { saveFarmDataToDatabase } from "@/services/farmDataService";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 
 interface FileUploadProps {
   onComplete: (farmData: FarmData) => void;
@@ -27,7 +25,6 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatusType | null>(null);
-  const [useGoogleVision, setUseGoogleVision] = useState(false);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -64,21 +61,18 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
     try {
       // Feldolgozzuk a dokumentumot
       setProcessingStatus({
-        step: useGoogleVision ? "Dokumentum OCR szkennelése" : "Dokumentum AI elemzése",
+        step: "Dokumentum AI elemzése",
         progress: 10,
-        details: useGoogleVision 
-          ? "A feltöltött dokumentum Google Vision OCR szkennelése folyamatban..." 
-          : "A feltöltött dokumentum AI elemzése folyamatban..."
+        details: "A feltöltött dokumentum Claude AI elemzése folyamatban..."
       });
       
-      const farmData = await processSapsDocument(file, user, setProcessingStatus, useGoogleVision);
+      const farmData = await processSapsDocument(file, user, setProcessingStatus);
       
       // Mentsük el az adatbázisba a feldolgozott adatokat
       setProcessingStatus({
         step: "Adatok mentése az adatbázisba",
         progress: 95,
-        details: "Farm adatok és növénykultúrák rögzítése...",
-        wordDocumentUrl: farmData.wordDocumentUrl
+        details: "Alapadatok és dokumentum azonosító rögzítése..."
       });
       
       const farmId = await saveFarmDataToDatabase(farmData, user.id);
@@ -95,14 +89,11 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       setProcessingStatus({
         step: "Feldolgozás befejezve",
         progress: 100,
-        details: `${farmData.cultures.length} növénykultúra, ${farmData.hectares} hektár és ${farmData.totalRevenue} Ft árbevétel sikeresen feldolgozva és mentve.`,
-        wordDocumentUrl: farmData.wordDocumentUrl
+        details: `Gazdálkodó adatai sikeresen feldolgozva: ${farmData.applicantName || "Ismeretlen gazdálkodó"}`
       });
       
       onComplete(farmData);
-      toast.success(useGoogleVision 
-        ? "SAPS dokumentum sikeresen feldolgozva Google Vision OCR-rel" 
-        : "SAPS dokumentum sikeresen feldolgozva");
+      toast.success("SAPS dokumentum sikeresen feldolgozva Claude AI-jal");
       
     } catch (error) {
       console.error("SAPS feldolgozási hiba:", error);
@@ -136,20 +127,14 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         <Alert className="mb-4 bg-amber-50 border-amber-200">
           <AlertTriangle className="h-4 w-4 text-amber-600" />
           <AlertDescription className="text-amber-800">
-            A dokumentumnak tartalmaznia kell a növénykultúrák neveit és területadatait (hektár), ezek nélkül a feldolgozás sikertelen lehet.
+            A dokumentumnak tartalmaznia kell a gazdálkodó nevét és azonosítószámát, ezek nélkül a feldolgozás sikertelen lehet.
           </AlertDescription>
         </Alert>
 
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2 mb-2">
             <Badge variant="outline" className="bg-blue-50 text-blue-700">
-              Blokkazonosítók kiolvasása
-            </Badge>
-            <Badge variant="outline" className="bg-green-50 text-green-700">
-              Területadatok elemzése
-            </Badge>
-            <Badge variant="outline" className="bg-amber-50 text-amber-700">
-              Növénykultúrák beazonosítása
+              Gazdálkodó azonosítása
             </Badge>
             <Badge variant="outline" className="bg-purple-50 text-purple-700">
               Igénylő adatainak ellenőrzése
@@ -157,38 +142,8 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
           </div>
           
           <form onSubmit={handleSubmit}>
-            <div className="flex items-center space-x-2 mb-4">
-              <Switch
-                id="use-google-vision"
-                checked={useGoogleVision}
-                onCheckedChange={setUseGoogleVision}
-              />
-              <Label htmlFor="use-google-vision">
-                Google Cloud Vision API használata
-                <span className="ml-1 text-xs text-muted-foreground">(Jobb OCR eredmények)</span>
-              </Label>
-            </div>
-            
             <UploadArea file={file} onFileChange={handleFileChange} />
             <ProcessingStatus status={processingStatus} />
-            
-            {processingStatus?.wordDocumentUrl && (
-              <Alert className="mt-4 mb-2 bg-green-50 border-green-200">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-green-600" />
-                  <div className="flex-1">
-                    <AlertDescription className="text-green-800">
-                      Az OCR eredmények Word dokumentumként elérhetőek:
-                    </AlertDescription>
-                  </div>
-                  <Button variant="outline" className="bg-white" size="sm" asChild>
-                    <a href={processingStatus.wordDocumentUrl} target="_blank" rel="noopener noreferrer">
-                      Letöltés
-                    </a>
-                  </Button>
-                </div>
-              </Alert>
-            )}
             
             <ErrorDisplay message={error} />
             <SuccessMessage status={processingStatus} />

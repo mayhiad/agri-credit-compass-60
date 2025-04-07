@@ -1,5 +1,4 @@
-import React from 'react';
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Steps } from "@/components/Steps";
@@ -49,6 +48,7 @@ export type FarmData = {
   documentDate?: string;
   parcels?: ParcelData[];
   wordDocumentUrl?: string;
+  submitterId?: string; // Added for the beadó azonosító
 };
 
 export type UserData = {
