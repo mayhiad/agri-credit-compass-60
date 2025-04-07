@@ -120,7 +120,39 @@ serve(async (req) => {
     console.log(`🌐 ${imageUrls.length} image URLs generated`);
     
     // Process all images with Claude AI
-    const result = await processAllImageBatches(imageUrls, userId, batchId);
+    let result;
+    try {
+      result = await processAllImageBatches(imageUrls, userId, batchId);
+    } catch (aiError) {
+      console.error("❌ Claude AI processing error:", aiError);
+      
+      // Return a partial response with error information
+      return new Response(JSON.stringify({
+        error: `AI processing failed: ${aiError.message}`,
+        status: 'failed',
+        data: {
+          applicantName: null,
+          submitterId: null,
+          applicantId: null,
+          region: null,
+          year: new Date().getFullYear().toString(),
+          hectares: 0,
+          cultures: [],
+          blockIds: [],
+          totalRevenue: 0,
+          errorMessage: `Failed to process document: ${aiError.message}`
+        },
+        batchInfo: {
+          totalBatches: Math.ceil(imageUrls.length / 20),
+          processedBatches: 0,
+          totalPages: imageUrls.length,
+          processedPages: 0
+        }
+      }), {
+        status: 200, // Still return 200 with error information in the payload
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
     
     // Save OCR result to the database
     try {

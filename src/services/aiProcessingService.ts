@@ -102,6 +102,17 @@ export const processDocumentWithAI = async (file: File, user: any): Promise<{
     const processResult = await processResponse.json();
     console.log("Claude feldolgozás eredménye:", processResult);
     
+    // Check if there was an error in the processing
+    if (processResult.error) {
+      console.error("Claude feldolgozási hiba:", processResult.error);
+      throw new Error(processResult.error);
+    }
+    
+    // If we got data back but there was an error mentioned, log it but continue
+    if (processResult.data?.errorMessage) {
+      console.warn("Claude feldolgozási figyelmeztetés:", processResult.data.errorMessage);
+    }
+    
     // Claude feldolgozás már a visszatérő adatban van
     return { 
       ocrLogId: processResult.ocrLogId,

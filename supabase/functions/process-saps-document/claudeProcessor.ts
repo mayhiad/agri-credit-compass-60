@@ -8,6 +8,19 @@ const CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
 const CLAUDE_MODEL = "claude-3-opus-20240229";
 const MAX_IMAGES_PER_REQUEST = 20; // Claude API limit
 
+// Supported image formats by Claude API
+const SUPPORTED_IMAGE_FORMATS = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+
+/**
+ * Checks if an image URL has a supported file format
+ */
+function isImageFormatSupported(imageUrl: string): boolean {
+  // Check if URL ends with a supported format
+  return SUPPORTED_IMAGE_FORMATS.some(format => 
+    imageUrl.toLowerCase().endsWith(format)
+  );
+}
+
 /**
  * Processes a batch of images with Claude API
  */
@@ -47,37 +60,44 @@ export async function processImageBatchWithClaude(
     // Collect valid images
     const validImageUrls = [];
     const invalidImageUrls = [];
+    const unsupportedFormatUrls = [];
     
     // Add all images to the message content
     for (let i = 0; i < images.length; i++) {
       try {
         const imageUrl = images[i];
-        // Check if URL is publicly accessible
-        if (imageUrl.includes('supabase.co')) {
-          // Add some validation to ensure URL is properly formatted
-          const cleanedUrl = imageUrl.trim();
-          
-          // Skip invalid URLs
-          if (!cleanedUrl.startsWith('http')) {
-            console.warn(`⚠️ Skipping invalid URL format at index ${i}: ${cleanedUrl}`);
-            invalidImageUrls.push(imageUrl);
-            continue;
-          }
-          
-          // Use the URL format that Claude accepts
-          messageContent.push({
-            type: "image",
-            source: {
-              type: "url",
-              url: cleanedUrl
-            }
-          });
-          
-          validImageUrls.push(cleanedUrl);
-        } else {
-          console.warn(`⚠️ Image URL is not public, skipping: ${imageUrl}`);
+        
+        // Check if URL is properly formatted
+        if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.startsWith('http')) {
+          console.warn(`⚠️ Skipping invalid URL format at index ${i}: ${imageUrl}`);
           invalidImageUrls.push(imageUrl);
+          continue;
         }
+        
+        // Check if URL is publicly accessible from Supabase
+        if (!imageUrl.includes('supabase.co')) {
+          console.warn(`⚠️ Image URL is not from Supabase, skipping: ${imageUrl}`);
+          invalidImageUrls.push(imageUrl);
+          continue;
+        }
+        
+        // Check if image format is supported by Claude API
+        if (!isImageFormatSupported(imageUrl)) {
+          console.warn(`⚠️ Image format not supported by Claude API, skipping: ${imageUrl}`);
+          unsupportedFormatUrls.push(imageUrl);
+          continue;
+        }
+        
+        // Use the URL format that Claude accepts
+        messageContent.push({
+          type: "image",
+          source: {
+            type: "url",
+            url: imageUrl
+          }
+        });
+        
+        validImageUrls.push(imageUrl);
       } catch (imageError) {
         console.error(`❌ Error processing image at index ${i}:`, imageError);
         invalidImageUrls.push(images[i]);
@@ -85,10 +105,10 @@ export async function processImageBatchWithClaude(
     }
     
     if (validImageUrls.length === 0) {
-      throw new Error(`No valid images found in the batch. All ${images.length} images were invalid.`);
+      throw new Error(`No valid images found in the batch. All ${images.length} images were invalid or in unsupported formats.`);
     }
     
-    console.log(`✅ Processed ${validImageUrls.length} valid images, skipped ${invalidImageUrls.length} invalid images`);
+    console.log(`✅ Processed ${validImageUrls.length} valid images, skipped ${invalidImageUrls.length} invalid URLs and ${unsupportedFormatUrls.length} unsupported formats`);
     
     // Construct Claude API request
     const payload = {
@@ -106,6 +126,14 @@ export async function processImageBatchWithClaude(
     
     console.log(`🚀 Sending Claude API request: ${CLAUDE_API_URL}, model: ${CLAUDE_MODEL}, with ${validImageUrls.length} images`);
     
+    // Log a sample of the request for debugging
+    console.log(`Request sample: ${JSON.stringify({
+      model: payload.model,
+      message_count: payload.messages.length,
+      content_items: payload.messages[0].content.length,
+      system_prompt_length: payload.system.length
+    })}`);
+    
     const response = await fetch(CLAUDE_API_URL, {
       method: "POST",
       headers: {
@@ -119,7 +147,15 @@ export async function processImageBatchWithClaude(
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`❌ Claude API error: ${response.status} - ${errorText}`);
-      throw new Error(`Claude API error: ${response.status} - ${errorText}`);
+      
+      // Try to extract more meaningful error information
+      try {
+        const errorJson = JSON.parse(errorText);
+        const errorMessage = errorJson.error?.message || errorJson.error || errorText;
+        throw new Error(`Claude API error: ${response.status} - ${errorMessage}`);
+      } catch (parseError) {
+        throw new Error(`Claude API error: ${response.status} - ${errorText}`);
+      }
     }
     
     const result = await response.json();
@@ -213,22 +249,34 @@ export async function processAllImageBatches(
     return isValid;
   });
   
-  console.log(`✅ After filtering: ${filteredUrls.length} valid images`);
+  // Further filter for supported image formats
+  const supportedUrls = filteredUrls.filter(url => {
+    const isSupported = isImageFormatSupported(url);
+    if (!isSupported) {
+      console.warn(`⚠️ Filtering out unsupported image format: ${url}`);
+    }
+    return isSupported;
+  });
   
-  if (filteredUrls.length === 0) {
-    throw new Error("No valid image URLs found to process");
+  console.log(`✅ After filtering: ${supportedUrls.length} valid and supported images out of ${imageUrls.length} total`);
+  
+  if (supportedUrls.length === 0) {
+    throw new Error("No valid and supported image URLs found to process");
   }
   
   // Split images into batches of MAX_IMAGES_PER_REQUEST
   const batches = [];
-  for (let i = 0; i < filteredUrls.length; i += MAX_IMAGES_PER_REQUEST) {
-    batches.push(filteredUrls.slice(i, i + MAX_IMAGES_PER_REQUEST));
+  for (let i = 0; i < supportedUrls.length; i += MAX_IMAGES_PER_REQUEST) {
+    batches.push(supportedUrls.slice(i, i + MAX_IMAGES_PER_REQUEST));
   }
   
   console.log(`📦 Number of batches: ${batches.length}`);
   
   let allExtractedData = {};
   let foundUsefulData = false;
+  let processedBatches = 0;
+  let failedBatches = 0;
+  let lastError = null;
   
   // Process each batch sequentially until we find useful data
   for (let i = 0; i < batches.length; i++) {
@@ -242,6 +290,8 @@ export async function processAllImageBatches(
         i + 1,
         batches.length
       );
+      
+      processedBatches++;
       
       // Merge any extracted data
       allExtractedData = {
@@ -257,9 +307,16 @@ export async function processAllImageBatches(
       }
     } catch (batchError) {
       console.error(`❌ Error processing batch ${i+1}:`, batchError);
+      failedBatches++;
+      lastError = batchError;
       // Continue with next batch instead of failing completely
       continue;
     }
+  }
+  
+  // If all batches failed, throw the last error
+  if (processedBatches === 0 && failedBatches > 0 && lastError) {
+    throw new Error(`All batches failed to process. Last error: ${lastError.message}`);
   }
   
   // Update the batch status in the database
@@ -271,7 +328,9 @@ export async function processAllImageBatches(
         metadata: {
           foundUsefulData,
           processedAt: new Date().toISOString(),
-          extractedData: allExtractedData
+          extractedData: allExtractedData,
+          processedBatches,
+          failedBatches
         }
       })
       .eq('batch_id', batchId);
@@ -308,11 +367,12 @@ export async function processAllImageBatches(
     success: foundUsefulData,
     batchInfo: {
       totalBatches: batches.length,
-      processedBatches: foundUsefulData ? batches.findIndex(b => b.includes(batches[0][0])) + 1 : batches.length,
-      totalPages: filteredUrls.length,
+      processedBatches: processedBatches,
+      failedBatches: failedBatches,
+      totalPages: supportedUrls.length,
       processedPages: foundUsefulData ? 
-        (batches.findIndex(b => b.includes(batches[0][0])) + 1) * MAX_IMAGES_PER_REQUEST : 
-        filteredUrls.length
+        Math.min(processedBatches * MAX_IMAGES_PER_REQUEST, supportedUrls.length) : 
+        supportedUrls.length
     }
   };
 }
