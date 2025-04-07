@@ -1,18 +1,12 @@
-
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { UserData } from "@/components/LoanApplication";
-import { formatCurrency } from "@/lib/utils";
-import { CheckCircle, Calendar, Download } from "lucide-react";
-import { Link } from "react-router-dom";
 
 interface LoanCompleteProps {
   userData: UserData;
   loanAmount: number;
-  paymentFrequency: "quarterly" | "biannual" | "annual";
+  paymentFrequency: string;
 }
 
-export const LoanComplete = ({ userData, loanAmount, paymentFrequency }: LoanCompleteProps) => {
+const LoanComplete = ({ userData, loanAmount, paymentFrequency }: LoanCompleteProps) => {
   const paymentFrequencyText = 
     paymentFrequency === "quarterly" ? "negyedéves" : 
     paymentFrequency === "biannual" ? "féléves" : "éves";
@@ -70,7 +64,7 @@ export const LoanComplete = ({ userData, loanAmount, paymentFrequency }: LoanCom
 };
 
 // Helper function to get the next payment date based on frequency
-function getNextPaymentDate(frequency: "quarterly" | "biannual" | "annual"): string {
+function getNextPaymentDate(frequency: string): string {
   const now = new Date();
   let nextDate = new Date(now);
   

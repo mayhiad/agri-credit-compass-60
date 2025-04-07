@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import FileUpload from "@/components/FileUpload";
 import Steps from "@/components/Steps";
@@ -15,6 +16,14 @@ export interface Culture {
   yieldPerHectare?: number;
   pricePerTon?: number;
   estimatedRevenue?: number;
+}
+
+export interface MarketPrice {
+  culture: string;
+  averageYield: number;
+  price: number;
+  trend: number;
+  lastUpdated: string | Date;
 }
 
 export interface FarmData {
@@ -35,11 +44,23 @@ export interface FarmData {
   submitterId?: string;
   applicantId?: string;
   rawText?: string;
+  marketPrices?: MarketPrice[];
+  documentDate?: string;
+  parcels?: any[];
+}
+
+export interface UserData {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  taxId?: string;
 }
 
 const LoanApplication = () => {
   const [step, setStep] = useState(1);
   const [farmData, setFarmData] = useState<FarmData | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
   
   const handleFileUploadComplete = (data: FarmData) => {
     setFarmData(data);
@@ -55,19 +76,32 @@ const LoanApplication = () => {
       case 1:
         return <FileUpload onComplete={handleFileUploadComplete} />;
       case 2:
-        return <FarmInfo farmData={farmData} onNext={handleNextStep} />;
+        return <FarmInfo 
+          farmData={farmData} 
+          onNext={handleNextStep} 
+        />;
       case 3:
         return <FarmLocation onNext={handleNextStep} />;
       case 4:
-        return <PersonalIdentification onNext={handleNextStep} />;
+        return <PersonalIdentification 
+          userData={userData} 
+          onNext={handleNextStep} 
+        />;
       case 5:
         return <CreditScore onNext={handleNextStep} />;
       case 6:
         return <LoanTerms onNext={handleNextStep} />;
       case 7:
-        return <ContractSigning onNext={handleNextStep} />;
+        return <ContractSigning 
+          userData={userData}
+          onNext={handleNextStep} 
+        />;
       case 8:
-        return <LoanComplete />;
+        return <LoanComplete 
+          userData={userData}
+          loanAmount={0}
+          paymentFrequency="monthly"
+        />;
       default:
         return <FileUpload onComplete={handleFileUploadComplete} />;
     }
@@ -75,7 +109,10 @@ const LoanApplication = () => {
   
   return (
     <div className="container mx-auto py-6 space-y-8">
-      <Steps currentStep={step} />
+      <Steps 
+        currentStep={step}
+        steps={["Dokumentum", "Gazdaság", "Helyszín", "Személyes", "Hitelpontszám", "Feltételek", "Szerződés", "Kész"]}
+      />
       <div className="mt-6">
         {renderStep()}
       </div>
