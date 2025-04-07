@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 import { Document, Packer, Paragraph, TextRun } from "docx";
@@ -69,7 +70,10 @@ export const extractTextFromPdf = async (file: File): Promise<string | null> => 
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const content = await page.getTextContent();
-            text += content.items.map(item => item.str).join(" ") + "\n";
+            text += content.items.map(item => {
+              // Check if item has str property (TextItem) before accessing it
+              return 'str' in item ? item.str : '';
+            }).join(" ") + "\n";
           }
           
           resolve(text);

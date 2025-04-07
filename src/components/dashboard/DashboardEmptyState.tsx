@@ -1,5 +1,7 @@
 
+import React from "react";
 import { Button } from "@/components/ui/button";
+import { FileUpload } from "lucide-react";
 
 interface DashboardEmptyStateProps {
   onShowUploadForm: () => void;
@@ -7,23 +9,23 @@ interface DashboardEmptyStateProps {
 
 const DashboardEmptyState = ({ onShowUploadForm }: DashboardEmptyStateProps) => {
   return (
-    <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6 text-center">
-      <div className="mb-6">
-        <img 
-          src="/placeholder.svg" 
-          alt="SAPS dokumentum" 
-          className="mx-auto w-32 h-32 opacity-70"
-        />
+    <div className="text-center p-12 border border-dashed border-gray-300 rounded-lg bg-gray-50">
+      <div className="flex flex-col items-center max-w-md mx-auto space-y-6">
+        <div className="bg-primary/10 p-4 rounded-full">
+          <FileUpload className="h-10 w-10 text-primary" />
+        </div>
+        
+        <div className="space-y-2">
+          <h3 className="text-xl font-medium">Nincs még feltöltött SAPS dokumentum</h3>
+          <p className="text-muted-foreground">
+            Kezdje a gazdálkodását egy SAPS egységes kérelem dokumentum feltöltésével, hogy láthassa a gazdasága adatait.
+          </p>
+        </div>
+        
+        <Button onClick={onShowUploadForm} size="lg">
+          SAPS dokumentum feltöltése
+        </Button>
       </div>
-      
-      <h2 className="text-2xl font-semibold mb-2">Nincsenek még gazdasági adatok</h2>
-      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-        Adja hozzá gazdaságának adatait egyszerűen, töltse fel SAPS dokumentumát a hiteligénylési folyamat megkezdéséhez.
-      </p>
-      
-      <Button onClick={onShowUploadForm} size="lg" className="mt-2">
-        SAPS dokumentum feltöltése
-      </Button>
     </div>
   );
 };
