@@ -10,6 +10,7 @@ export const processDocumentWithAI = async (file: File, user: any): Promise<{
   ocrLogId?: string;
   data?: FarmData;
   status?: string;
+  batchInfo?: any;
 } | null> => {
   try {
     if (!user) {
@@ -21,26 +22,28 @@ export const processDocumentWithAI = async (file: File, user: any): Promise<{
       throw new Error("Nincs érvényes felhasználói munkamenet");
     }
     
-    const formData = new FormData();
-    formData.append('file', file);
+    // First, we need to convert the PDF to images using our edge function
+    const convertFormData = new FormData();
+    convertFormData.append('file', file);
+    convertFormData.append('userId', user.id);
     
-    console.log("📡 Küldés a Supabase process-saps-document végpontra...");
+    console.log("📡 Küldés a Supabase convert-pdf-to-images végpontra...");
     
-    const scanResponse = await fetch(
-      'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-saps-document',
+    const convertResponse = await fetch(
+      'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/convert-pdf-to-images',
       {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: formData,
-        signal: AbortSignal.timeout(180000), // 3 perc időtúllépés
+        body: convertFormData,
+        signal: AbortSignal.timeout(300000), // 5 perc időtúllépés
       }
     );
     
-    if (!scanResponse.ok) {
-      const errorText = await scanResponse.text();
-      console.error("SAPS dokumentum feltöltési hiba:", errorText);
+    if (!convertResponse.ok) {
+      const errorText = await convertResponse.text();
+      console.error("PDF konvertálási hiba:", errorText);
       let errorData;
       
       try {
@@ -49,17 +52,62 @@ export const processDocumentWithAI = async (file: File, user: any): Promise<{
         errorData = { error: errorText || "Ismeretlen hiba történt" };
       }
       
-      throw new Error(errorData.error || "Hiba a dokumentum feldolgozása közben");
+      throw new Error(errorData.error || "Hiba a dokumentum konvertálása közben");
     }
     
-    const scanData = await scanResponse.json();
-    console.log("Claude scan válasz:", scanData);
+    const convertData = await convertResponse.json();
+    console.log("PDF konvertálás eredménye:", convertData);
+    
+    // Check if we got batch information
+    if (!convertData.batchId || !convertData.pageCount) {
+      throw new Error("A PDF konvertálás sikertelen volt, hiányzó batch információk");
+    }
+    
+    // Now process the converted images with Claude AI
+    console.log("📡 Küldés a Supabase process-saps-document végpontra...");
+    
+    // Prepare the request for Claude processing
+    const processRequest = {
+      batchId: convertData.batchId,
+      userId: user.id
+    };
+    
+    const processResponse = await fetch(
+      'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-saps-document',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(processRequest),
+        signal: AbortSignal.timeout(180000), // 3 perc időtúllépés
+      }
+    );
+    
+    if (!processResponse.ok) {
+      const errorText = await processResponse.text();
+      console.error("Claude feldolgozási hiba:", errorText);
+      let errorData;
+      
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (parseError) {
+        errorData = { error: errorText || "Ismeretlen hiba történt" };
+      }
+      
+      throw new Error(errorData.error || "Hiba a dokumentum feldolgozása során");
+    }
+    
+    const processResult = await processResponse.json();
+    console.log("Claude feldolgozás eredménye:", processResult);
     
     // Claude feldolgozás már a visszatérő adatban van
     return { 
-      ocrLogId: scanData.ocrLogId,
-      data: scanData.data,
-      status: scanData.status || 'completed'
+      ocrLogId: processResult.ocrLogId,
+      data: processResult.data,
+      status: processResult.status || 'completed',
+      batchInfo: processResult.batchInfo
     };
   } catch (error) {
     console.error("Dokumentum feldolgozási hiba:", error);

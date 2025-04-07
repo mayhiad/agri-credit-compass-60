@@ -44,22 +44,51 @@ export async function processImageBatchWithClaude(
       }
     ];
     
+    // Collect valid images
+    const validImageUrls = [];
+    const invalidImageUrls = [];
+    
     // Add all images to the message content
-    for (const imageUrl of images) {
-      // Check if URL is publicly accessible
-      if (imageUrl.includes('supabase.co')) {
-        // Use the URL format that Claude accepts
-        messageContent.push({
-          type: "image",
-          source: {
-            type: "url",
-            url: imageUrl
+    for (let i = 0; i < images.length; i++) {
+      try {
+        const imageUrl = images[i];
+        // Check if URL is publicly accessible
+        if (imageUrl.includes('supabase.co')) {
+          // Add some validation to ensure URL is properly formatted
+          const cleanedUrl = imageUrl.trim();
+          
+          // Skip invalid URLs
+          if (!cleanedUrl.startsWith('http')) {
+            console.warn(`⚠️ Skipping invalid URL format at index ${i}: ${cleanedUrl}`);
+            invalidImageUrls.push(imageUrl);
+            continue;
           }
-        });
-      } else {
-        throw new Error(`Image URL is not public: ${imageUrl}`);
+          
+          // Use the URL format that Claude accepts
+          messageContent.push({
+            type: "image",
+            source: {
+              type: "url",
+              url: cleanedUrl
+            }
+          });
+          
+          validImageUrls.push(cleanedUrl);
+        } else {
+          console.warn(`⚠️ Image URL is not public, skipping: ${imageUrl}`);
+          invalidImageUrls.push(imageUrl);
+        }
+      } catch (imageError) {
+        console.error(`❌ Error processing image at index ${i}:`, imageError);
+        invalidImageUrls.push(images[i]);
       }
     }
+    
+    if (validImageUrls.length === 0) {
+      throw new Error(`No valid images found in the batch. All ${images.length} images were invalid.`);
+    }
+    
+    console.log(`✅ Processed ${validImageUrls.length} valid images, skipped ${invalidImageUrls.length} invalid images`);
     
     // Construct Claude API request
     const payload = {
@@ -75,7 +104,7 @@ export async function processImageBatchWithClaude(
       ]
     };
     
-    console.log(`🚀 Sending Claude API request: ${CLAUDE_API_URL}, model: ${CLAUDE_MODEL}, with ${images.length} images`);
+    console.log(`🚀 Sending Claude API request: ${CLAUDE_API_URL}, model: ${CLAUDE_MODEL}, with ${validImageUrls.length} images`);
     
     const response = await fetch(CLAUDE_API_URL, {
       method: "POST",
@@ -129,8 +158,8 @@ export async function processImageBatchWithClaude(
           total_batches: totalBatches,
           extracted_data: extractedData,
           raw_response: rawText,
-          image_count: images.length,
-          images_processed: images
+          image_count: validImageUrls.length,
+          images_processed: validImageUrls
         })
         .select('id')
         .single();
@@ -156,7 +185,7 @@ export async function processImageBatchWithClaude(
       hasUsefulData,
       batchIndex,
       totalBatches,
-      imageCount: images.length
+      imageCount: validImageUrls.length
     };
     
   } catch (error) {
@@ -175,10 +204,25 @@ export async function processAllImageBatches(
 ) {
   console.log(`🔄 Starting all image batch processing: ${imageUrls.length} images`);
   
+  // Filter out any obviously invalid URLs before batching
+  const filteredUrls = imageUrls.filter(url => {
+    const isValid = url && typeof url === 'string' && url.includes('supabase.co') && url.startsWith('http');
+    if (!isValid) {
+      console.warn(`⚠️ Filtering out invalid URL: ${url}`);
+    }
+    return isValid;
+  });
+  
+  console.log(`✅ After filtering: ${filteredUrls.length} valid images`);
+  
+  if (filteredUrls.length === 0) {
+    throw new Error("No valid image URLs found to process");
+  }
+  
   // Split images into batches of MAX_IMAGES_PER_REQUEST
   const batches = [];
-  for (let i = 0; i < imageUrls.length; i += MAX_IMAGES_PER_REQUEST) {
-    batches.push(imageUrls.slice(i, i + MAX_IMAGES_PER_REQUEST));
+  for (let i = 0; i < filteredUrls.length; i += MAX_IMAGES_PER_REQUEST) {
+    batches.push(filteredUrls.slice(i, i + MAX_IMAGES_PER_REQUEST));
   }
   
   console.log(`📦 Number of batches: ${batches.length}`);
@@ -190,25 +234,31 @@ export async function processAllImageBatches(
   for (let i = 0; i < batches.length; i++) {
     console.log(`⏳ Processing batch ${i+1}/${batches.length}...`);
     
-    const result = await processImageBatchWithClaude(
-      batches[i],
-      userId,
-      batchId,
-      i + 1,
-      batches.length
-    );
-    
-    // Merge any extracted data
-    allExtractedData = {
-      ...allExtractedData,
-      ...result.extractedData
-    };
-    
-    // Check if we found useful data
-    if (result.hasUsefulData) {
-      console.log(`✅ Found useful data in batch ${i+1}, stopping processing`);
-      foundUsefulData = true;
-      break;
+    try {
+      const result = await processImageBatchWithClaude(
+        batches[i],
+        userId,
+        batchId,
+        i + 1,
+        batches.length
+      );
+      
+      // Merge any extracted data
+      allExtractedData = {
+        ...allExtractedData,
+        ...result.extractedData
+      };
+      
+      // Check if we found useful data
+      if (result.hasUsefulData) {
+        console.log(`✅ Found useful data in batch ${i+1}, stopping processing`);
+        foundUsefulData = true;
+        break;
+      }
+    } catch (batchError) {
+      console.error(`❌ Error processing batch ${i+1}:`, batchError);
+      // Continue with next batch instead of failing completely
+      continue;
     }
   }
   
@@ -259,10 +309,10 @@ export async function processAllImageBatches(
     batchInfo: {
       totalBatches: batches.length,
       processedBatches: foundUsefulData ? batches.findIndex(b => b.includes(batches[0][0])) + 1 : batches.length,
-      totalPages: imageUrls.length,
+      totalPages: filteredUrls.length,
       processedPages: foundUsefulData ? 
         (batches.findIndex(b => b.includes(batches[0][0])) + 1) * MAX_IMAGES_PER_REQUEST : 
-        imageUrls.length
+        filteredUrls.length
     }
   };
 }

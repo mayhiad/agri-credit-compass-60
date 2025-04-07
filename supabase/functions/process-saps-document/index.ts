@@ -105,9 +105,16 @@ serve(async (req) => {
     
     // Generate public URLs for the images
     const imageUrls = sortedFiles.map(file => {
-      return supabase.storage
+      const publicUrl = supabase.storage
         .from('dokumentumok')
         .getPublicUrl(`saps/${userId}/${batchId}/images/${file.name}`).data.publicUrl;
+      
+      // Log the first few URLs for debugging
+      if (sortedFiles.indexOf(file) < 5) {
+        console.log(`Example image URL ${sortedFiles.indexOf(file)}: ${publicUrl}`);
+      }
+      
+      return publicUrl;
     });
     
     console.log(`🌐 ${imageUrls.length} image URLs generated`);
