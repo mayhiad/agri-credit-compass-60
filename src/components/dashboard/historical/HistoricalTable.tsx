@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { ArrowDown, ArrowUp, Minus } from "lucide-react";
-import { HistoricalFarmData } from "./HistoricalChart";
+import { HistoricalFarmData, HistoricalCrop } from "./types";
 
 interface HistoricalTableProps {
   historicalData: HistoricalFarmData[];

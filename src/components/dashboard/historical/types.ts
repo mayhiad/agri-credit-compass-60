@@ -1,16 +1,21 @@
 
+export interface HistoricalCrop {
+  name: string;
+  hectares: number;
+  yield?: number;
+  totalYield?: number;
+  pricePerTon?: number;
+  revenue?: number;
+  revenueEUR?: number;
+}
+
 export interface HistoricalFarmData {
   year: string;
+  hectares: number;
   totalHectares: number;
   totalRevenue: number;
   totalRevenueEUR: number;
-  cultures: {
-    name: string;
-    hectares: number;
-    revenue: number;
-    pricePerTon?: number;
-    yieldPerHectare?: number;
-  }[];
+  crops?: HistoricalCrop[];
 }
 
 export interface ExtractionData {
@@ -38,7 +43,7 @@ export interface ExtractionData {
   processedAt?: string;
   fileName?: string;
   fileSize?: number;
-  errorMessage?: string; // Javítás: Hiba üzenetet tárol hibás feldolgozás esetén
+  errorMessage?: string;
 }
 
 export interface MarketPrice {

@@ -1,22 +1,30 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { HistoricalFarmData } from "@/components/dashboard/historical/HistoricalChart";
+import { HistoricalFarmData, HistoricalCrop } from "@/components/dashboard/historical/types";
+import { FarmData, HistoricalYear } from "@/types/farm";
 
 // Function to convert Supabase data to HistoricalFarmData
-const convertToHistoricalData = (data: any[]): HistoricalFarmData[] => {
+const convertToHistoricalData = (data: HistoricalYear[]): HistoricalFarmData[] => {
   return data.map(item => {
+    // Convert crops to the required format
+    const crops: HistoricalCrop[] = item.crops.map(crop => ({
+      name: crop.name,
+      hectares: crop.hectares,
+      yield: crop.yield,
+      totalYield: crop.totalYield,
+      pricePerTon: crop.priceEUR,
+      revenue: crop.revenueEUR ? crop.revenueEUR * 390 : undefined, // Convert EUR to HUF
+      revenueEUR: crop.revenueEUR
+    }));
+
     // Create a structured historical data object
     return {
-      year: item.year || "Ismeretlen",
-      hectares: item.total_hectares || 0,
-      totalRevenue: item.total_revenue || 0,
-      totalRevenueEUR: item.total_revenue_eur || (item.total_revenue / 390) || 0,
-      crops: item.crops?.map((crop: any) => ({
-        name: crop.name || "Ismeretlen kultúra",
-        hectares: crop.hectares || 0,
-        yield: crop.yield_per_hectare || 0,
-        revenue: crop.revenue || 0
-      })) || []
+      year: item.year,
+      hectares: item.totalHectares,
+      totalHectares: item.totalHectares,
+      totalRevenue: item.totalRevenueEUR ? item.totalRevenueEUR * 390 : 0, // Convert EUR to HUF
+      totalRevenueEUR: item.totalRevenueEUR || 0,
+      crops
     };
   });
 };
@@ -60,6 +68,7 @@ const generateMockHistoricalData = (userId: string): HistoricalFarmData[] => {
     mockData.push({
       year,
       hectares: parseFloat(totalHectares.toFixed(2)),
+      totalHectares: parseFloat(totalHectares.toFixed(2)),
       totalRevenue: Math.round(totalRevenue),
       totalRevenueEUR: Math.round(totalRevenue / 390), // Approximate HUF to EUR conversion
       crops
@@ -69,28 +78,60 @@ const generateMockHistoricalData = (userId: string): HistoricalFarmData[] => {
   return mockData;
 };
 
-// Function to fetch historical data from the database
+// Function to fetch historical data from the database or FarmData
 export const fetchHistoricalData = async (userId: string): Promise<HistoricalFarmData[]> => {
   try {
-    // Try to fetch the data from Supabase
-    const { data, error } = await supabase
-      .from('historical_farm_data')
-      .select('*')
+    // First try to get the latest farm data
+    const { data: farmData, error: farmError } = await supabase
+      .from('farms')
+      .select('*, historicalData:historical_data(*)')
       .eq('user_id', userId)
-      .order('year', { ascending: false });
-    
-    if (error) {
-      console.error("Error fetching historical data:", error);
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (farmError) {
+      console.error("Error fetching farm data:", farmError);
       // If there was an error, return mock data for now
       return generateMockHistoricalData(userId);
     }
     
-    // If we got data from the database, convert and return it
-    if (data && data.length > 0) {
-      return convertToHistoricalData(data);
+    // If we have historical data in the farm record
+    if (farmData && farmData.historicalData && Array.isArray(farmData.historicalData) && farmData.historicalData.length > 0) {
+      return convertToHistoricalData(farmData.historicalData);
     }
     
-    // If no data was found, return mock data
+    // Try to get historical data from the FarmData type
+    const { data: farms, error: farmsError } = await supabase
+      .from('farms')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+      
+    if (farmsError || !farms || farms.length === 0) {
+      console.error("Error fetching farms or no farms found:", farmsError);
+      return generateMockHistoricalData(userId);
+    }
+    
+    // Get the farm details
+    const { data: farmDetails, error: detailsError } = await supabase
+      .from('farm_details')
+      .select('*')
+      .eq('farm_id', farms[0].id)
+      .single();
+      
+    if (detailsError || !farmDetails) {
+      console.log("No farm details found, using mock data");
+      return generateMockHistoricalData(userId);
+    }
+    
+    // Check if the latest farm data has historicalData
+    if (farms[0] && farms[0].historical_data && Array.isArray(farms[0].historical_data)) {
+      return convertToHistoricalData(farms[0].historical_data);
+    }
+    
+    // If no historical data is found, return mock data
     return generateMockHistoricalData(userId);
   } catch (error) {
     console.error("Unexpected error fetching historical data:", error);

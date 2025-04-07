@@ -3,19 +3,7 @@ import React from "react";
 import { formatCurrency } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, ComposedChart } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-export interface HistoricalFarmData {
-  year: string;
-  hectares: number;
-  totalRevenue: number;
-  totalRevenueEUR: number;
-  crops?: Array<{
-    name: string;
-    hectares: number;
-    yield?: number;
-    revenue?: number;
-  }>;
-}
+import { HistoricalFarmData } from "./types";
 
 interface HistoricalChartProps {
   historicalData: HistoricalFarmData[];
