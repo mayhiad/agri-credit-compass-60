@@ -1,6 +1,11 @@
 
 import { FarmData } from "@/components/LoanApplication";
 
+export const getBlocks = (data: any): string[] => {
+  // Extract block IDs from data
+  return data.blockIds || [];
+};
+
 export interface ParcelData {
   id: string;
   blockId: string;
@@ -9,51 +14,76 @@ export interface ParcelData {
   cultures: string[];
 }
 
-/**
- * Egyszerű adatok kinyerése az OCR szövegből
- * @param ocrText - OCR szöveg, amiből az adatokat kinyerjük
- * @returns FarmData objektum a kinyert információkkal
- */
+export const parseParcelsFromSapsData = (data: any): ParcelData[] => {
+  // Extract parcels from SAPS data or generate sample data
+  if (data && data.blockIds && Array.isArray(data.blockIds) && data.blockIds.length > 0) {
+    return data.blockIds.map((blockId: string, index: number) => {
+      // Choose some cultures for each parcel
+      const allCultures = data.cultures || [];
+      const parcelCultures = allCultures
+        .slice(index % allCultures.length, (index % allCultures.length) + 2)
+        .map((c: any) => c.name);
+      
+      return {
+        id: `parcel-${index + 1}`,
+        blockId,
+        area: data.hectares / data.blockIds.length,
+        location: `${data.region || 'Ismeretlen'} külterület`,
+        cultures: parcelCultures.length > 0 ? parcelCultures : ['Ismeretlen növénykultúra']
+      };
+    });
+  }
+  
+  return [];
+};
+
+// Add new function to try to extract farm data from OCR text
 export const extractFarmDataFromOcrText = (ocrText: string): Partial<FarmData> => {
-  if (!ocrText || ocrText.length === 0) {
-    console.warn("Üres OCR szöveg érkezett az extractFarmDataFromOcrText függvénybe");
+  if (!ocrText || typeof ocrText !== 'string' || ocrText.length < 10) {
     return {};
   }
-
-  console.log("Adatok kinyerése az OCR szövegből, hossza:", ocrText.length);
+  
+  console.log(`Attempting to extract farm data from OCR text (${ocrText.length} characters)`);
   
   const extractedData: Partial<FarmData> = {};
   
-  // Próbáljuk kinyerni a gazdálkodó nevét
-  const namePatterns = [
-    /(?:Beadó|Kérelmező|Gazdálkodó|Ügyfél)\s*neve:?\s*([\wáéíóöőúüűÁÉÍÓÖŐÚÜŰ\s.-]{3,50})/i,
-    /Név:?\s*([\wáéíóöőúüűÁÉÍÓÖŐÚÜŰ\s.-]{3,50})/i
-  ];
-  
-  for (const pattern of namePatterns) {
-    const match = ocrText.match(pattern);
-    if (match && match[1]) {
-      extractedData.applicantName = match[1].trim();
-      break;
-    }
+  // Try to extract document ID (various formats like SAPS-XXX, etc.)
+  const docIdMatch = ocrText.match(/(?:dokumentum|azonosító|kód|szám|SAPS)[\s:-]*([A-Z0-9][A-Z0-9\/-]+)/i);
+  if (docIdMatch && docIdMatch[1]) {
+    extractedData.documentId = docIdMatch[1].trim();
   }
   
-  // Próbáljuk kinyerni az azonosítószámot
-  const idPatterns = [
-    /(?:Beadó|Kérelmező|Gazdálkodó|Ügyfél)\s*azonosító(?:ja|:)?\s*:?\s*(\d{10})/i,
-    /Azonosító(?:ja|:)?\s*:?\s*(\d{10})/i,
-    /(?:Ügyfél-)?azonosító\s*szám:?\s*(\d{10})/i
-  ];
-  
-  for (const pattern of idPatterns) {
-    const match = ocrText.match(pattern);
-    if (match && match[1]) {
-      extractedData.documentId = match[1].trim();
-      break;
-    }
+  // Try to extract hectares 
+  const hectaresMatch = ocrText.match(/(\d+[,.]\d+)\s*(?:ha|hektár)/i);
+  if (hectaresMatch && hectaresMatch[1]) {
+    const hectaresStr = hectaresMatch[1].replace(',', '.');
+    extractedData.hectares = parseFloat(hectaresStr);
   }
   
-  console.log("Kinyert adatok az OCR szövegből:", extractedData);
+  // Try to extract year/date
+  const yearMatch = ocrText.match(/(20\d\d)[\/\.\s-]/);
+  if (yearMatch && yearMatch[1]) {
+    extractedData.year = yearMatch[1];
+  }
   
+  // Try to extract applicant name
+  const nameMatch = ocrText.match(/(?:kérelmező|gazdálkodó|igénylő)[\s:]*([A-ZÁÉÍÓÖŐÚÜŰa-záéíóöőúüű\s\.]+)(?:\r|\n|,)/i);
+  if (nameMatch && nameMatch[1]) {
+    extractedData.applicantName = nameMatch[1].trim();
+  }
+  
+  // Try to extract region
+  const regionMatch = ocrText.match(/(?:régió|megye|település)[\s:]*([A-ZÁÉÍÓÖŐÚÜŰa-záéíóöőúüű\s\.]+)(?:\r|\n|,)/i);
+  if (regionMatch && regionMatch[1]) {
+    extractedData.region = regionMatch[1].trim();
+  }
+  
+  // Try to extract blocks
+  const blockMatches = Array.from(ocrText.matchAll(/(?:blokk|parcella)[\s:-]*([A-Z0-9-]+)/ig));
+  if (blockMatches && blockMatches.length > 0) {
+    extractedData.blockIds = blockMatches.map(match => match[1].trim());
+  }
+  
+  console.log("Extracted data from OCR:", extractedData);
   return extractedData;
-};
+}

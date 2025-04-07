@@ -24,31 +24,55 @@ A dokumentumok gazdálkodók területalapú támogatási kérelmeit tartalmazzá
 
 NAGYON FONTOS! OLVASD EL ALAPOSAN ÉS KÖVESD PONTOSAN AZ UTASÍTÁSOKAT!
 
-A FELADAT: A feltöltött SAPS dokumentumból CSAK a következő információkat kell kinyerned:
-1. A gazdálkodó (kérelmező) neve
-2. A gazdálkodó (kérelmező) azonosítószáma (10 jegyű szám)
-3. A beadó/benyújtó azonosítószáma (ha különbözik a kérelmezőétől)
+A FELADAT: A feltöltött SAPS dokumentumból ki kell nyerned a következő információkat:
+1. A gazdálkodó neve
+2. A dokumentum azonosítója
+3. A régió (megye) neve
+4. Az összes növénykultúra neve és területe hektárban
+5. Minden kultúrához reális termésátlag (t/ha) értéket és piaci árat (Ft/t) kell rendelned
 
 KÖVETELMÉNYEK:
-1. CSAK a fenti adatokat keresd, semmi mást!
-2. Ha nem találod a pontos adatokat, akkor írd, hogy "ismeretlen" vagy "nem található"
-3. NE TALÁLJ KI ADATOKAT! Csak a dokumentumban ténylegesen szereplő információkat használd!
+1. MINDEN SZÁMSZERŰ ÉRTÉKNEK NAGYOBBNAK KELL LENNIE NULLÁNÁL - ez különösen fontos a hektár, termésátlag és ár adatoknál!
+2. Ha a dokumentumból nem tudod kiolvasni a pontos hektárszámot egy kultúrához, akkor NE HASZNÁLJ KITALÁLT ADATOT, hanem hagyj ki azt a kultúrát.
+3. A termésátlag (yieldPerHectare) értékeknek reális magyar értékeknek kell lenniük (pl. búza: 5-6 t/ha, kukorica: 7-9 t/ha)
+4. A piaci áraknak (pricePerTon) aktuális magyarországi áraknak kell lenniük (pl. búza: ~80-90ezer Ft/t, kukorica: ~70-75ezer Ft/t)
+5. Az árbevétel számítása: hektár × termésátlag × ár képlettel történik minden kultúrára
+6. A teljes árbevétel az összes kultúra árbevételének összege
+7. TILTOTT A RANDOM ADATOK GENERÁLÁSA! Csak valós, a dokumentumból kiolvasott vagy ahhoz kapcsolódó reális adatokat használj!
+8. Ha nem tudod kiolvasni az adatokat, akkor inkább hagyj üres adatstruktúrát, de NE adj meg kitalált értékeket!
 
 Az adatokat a következő JSON formátumban add vissza:
 {
-  "applicantName": "A gazdálkodó neve vagy 'ismeretlen'",
-  "documentId": "10 jegyű azonosító vagy 'ismeretlen'",
-  "submitterId": "10 jegyű beadói azonosító vagy 'ismeretlen' (ha ugyanaz, mint a kérelmezőé, akkor is add meg)",
-  "hectares": 0,
-  "cultures": [],
-  "blockIds": [],
-  "totalRevenue": 0,
-  "region": ""
+  "applicantName": "A gazdálkodó neve",
+  "documentId": "Dokumentum/kérelem azonosító",
+  "region": "Régió neve (megye)",
+  "year": "Az év, amelyre a dokumentum vonatkozik",
+  "hectares": 123.45,
+  "cultures": [
+    {
+      "name": "Kukorica",
+      "hectares": 45.6,
+      "yieldPerHectare": 8.2,
+      "pricePerTon": 72000,
+      "estimatedRevenue": 26913600
+    },
+    {
+      "name": "Búza",
+      "hectares": 77.85,
+      "yieldPerHectare": 5.5,
+      "pricePerTon": 85000,
+      "estimatedRevenue": 36378375
+    }
+  ],
+  "blockIds": ["L12AB-1-23", "K45CD-6-78"],
+  "totalRevenue": 63291975
 }
 
-FIGYELEM! Ne generálj véletlenszerű adatokat! Ha nem találod az információt a dokumentumban, akkor használj "ismeretlen" értéket vagy üres mezőt.
+FIGYELEM! Ne generálj véletlenszerű adatokat! Ha nem találod az információt a dokumentumban, akkor inkább használj üres listát vagy nullát, de ne találj ki adatokat!
 
-A SAPS dokumentumokban általában az első oldalakon szerepel a gazdálkodó neve a "Kérelmező" vagy "Ügyfél" vagy hasonló fejléc alatt, valamint a 10 jegyű azonosítószám, amit "Ügyfél-azonosító" vagy "Azonosító" néven jelölnek.`
+FELDOLGOZÁSI ELŐFELTÉTEL: A dokumentumnak tartalmaznia kell legalább egy növénykultúrát és területadatot, különben nem feldolgozható.
+
+HA NEM TUDOD KINYERNI A SZÜKSÉGES ADATOKAT, AZT JELEZD EGYÉRTELMŰEN, de adj vissza egy üres adatstruktúrát a megadott formátumban.`
     });
 
     const ms = Date.now() - start;
@@ -88,33 +112,56 @@ export async function processDocumentText(threadId: string, assistantId: string,
       content: `
 NAGYON FONTOS! OLVASD EL ALAPOSAN ÉS KÖVESD PONTOSAN AZ UTASÍTÁSOKAT!
 
-Elemezd a következő SAPS dokumentumot és nyerd ki belőle a gazdálkodó adatait:
+Elemezd a következő SAPS dokumentumot és nyerd ki belőle a mezőgazdasági információkat:
 
 ${documentText.substring(0, 25000)}
 
-A FELADAT: A dokumentumból CSAK a következő információkat kell kinyerned:
-1. A gazdálkodó (kérelmező) neve
-2. A gazdálkodó (kérelmező) azonosítószáma (10 jegyű szám)
-3. A beadó/benyújtó azonosítószáma (ha különbözik a kérelmezőétől)
+A FELADAT: A dokumentumból ki kell nyerned a következő információkat:
+1. A gazdálkodó neve
+2. A dokumentum azonosítója
+3. A régió (megye) neve
+4. Az összes növénykultúra neve és területe hektárban
+5. Minden kultúrához reális termésátlag (t/ha) értéket és piaci árat (Ft/t) kell rendelned
 
 KÖVETELMÉNYEK:
-1. CSAK a fenti adatokat keresd, semmi mást!
-2. Ha nem találod a pontos adatokat, akkor írd, hogy "ismeretlen" vagy "nem található"
-3. NE TALÁLJ KI ADATOKAT! Csak a dokumentumban ténylegesen szereplő információkat használd!
+1. MINDEN SZÁMSZERŰ ÉRTÉKNEK NAGYOBBNAK KELL LENNIE NULLÁNÁL - ez különösen fontos a hektár, termésátlag és ár adatoknál!
+2. Ha a dokumentumból nem tudod kiolvasni a pontos hektárszámot egy kultúrához, akkor NE HASZNÁLJ KITALÁLT ADATOT, hanem hagyj ki azt a kultúrát.
+3. A termésátlag (yieldPerHectare) értékeknek reális magyar értékeknek kell lenniük (pl. búza: 5-6 t/ha, kukorica: 7-9 t/ha)
+4. A piaci áraknak (pricePerTon) aktuális magyarországi áraknak kell lenniük (pl. búza: ~80-90ezer Ft/t, kukorica: ~70-75ezer Ft/t)
+5. Az árbevétel számítása: hektár × termésátlag × ár képlettel történik minden kultúrára
+6. A teljes árbevétel az összes kultúra árbevételének összege
+7. TILTOTT A RANDOM ADATOK GENERÁLÁSA! Csak valós, a dokumentumból kiolvasott vagy ahhoz kapcsolódó reális adatokat használj!
 
 Az adatokat a következő JSON formátumban add vissza:
 {
-  "applicantName": "A gazdálkodó neve vagy 'ismeretlen'",
-  "documentId": "10 jegyű azonosító vagy 'ismeretlen'",
-  "submitterId": "10 jegyű beadói azonosító vagy 'ismeretlen' (ha ugyanaz, mint a kérelmezőé, akkor is add meg)",
-  "hectares": 0,
-  "cultures": [],
-  "blockIds": [],
-  "totalRevenue": 0,
-  "region": ""
+  "applicantName": "A gazdálkodó neve",
+  "documentId": "Dokumentum/kérelem azonosító",
+  "region": "Régió neve (megye)",
+  "year": "Az év, amelyre a dokumentum vonatkozik",
+  "hectares": 123.45,
+  "cultures": [
+    {
+      "name": "Kukorica",
+      "hectares": 45.6,
+      "yieldPerHectare": 8.2,
+      "pricePerTon": 72000,
+      "estimatedRevenue": 26913600
+    },
+    {
+      "name": "Búza",
+      "hectares": 77.85,
+      "yieldPerHectare": 5.5,
+      "pricePerTon": 85000,
+      "estimatedRevenue": 36378375
+    }
+  ],
+  "blockIds": ["L12AB-1-23", "K45CD-6-78"],
+  "totalRevenue": 63291975
 }
 
-FIGYELEM! Ne generálj véletlenszerű adatokat! Ha nem találod az információt a dokumentumban, akkor használj "ismeretlen" értéket vagy üres mezőt.`
+FIGYELEM! Ne generálj véletlenszerű adatokat! Ha nem találod az információt a dokumentumban, akkor inkább használj üres listát vagy nullát, de ne találj ki adatokat!
+
+HA NEM TUDSZ VALÓS ADATOKAT KINYERNI, AZT JELEZD EGYÉRTELMŰEN, de adj vissza egy üres adatstruktúrát a megadott formátumban.`
     });
     console.log(`✅ Üzenet létrehozva: ${message.id}`);
     
@@ -125,15 +172,27 @@ FIGYELEM! Ne generálj véletlenszerű adatokat! Ha nem találod az információ
       instructions: `
 NAGYON FONTOS! A FELDOLGOZÁST PONTOSAN ÉS PRECÍZEN VÉGEZD EL!
 
-Elemezd a SAPS dokumentumot és olvasd ki belőle CSAK a kért adatokat:
-1. A gazdálkodó (kérelmező) neve
-2. A gazdálkodó (kérelmező) azonosítószáma (10 jegyű szám)
-3. A beadó/benyújtó azonosítószáma (ha különbözik a kérelmezőétől)
+Elemezd a SAPS dokumentumot és olvasd ki belőle a gazdálkodási információkat.
 
-CSAK ezeket az adatokat keresd, semmi mást! Válaszolj a megadott JSON formátumban.
-Ha nem találsz valamit, használj "ismeretlen" értéket.
+A FELADAT: A dokumentumból ki kell nyerned a következő információkat:
+1. A gazdálkodó neve
+2. A dokumentum azonosítója
+3. A régió (megye) neve
+4. Az összes növénykultúra neve és területe hektárban
+5. Minden kultúrához reális termésátlag (t/ha) értéket és piaci árat (Ft/t) kell rendelned
 
-Kerüld az adatok kitalálását, csak azt add vissza, amit tisztán látsz a dokumentumban!
+KÖVETELMÉNYEK:
+1. MINDEN SZÁMSZERŰ ÉRTÉKNEK NAGYOBBNAK KELL LENNIE NULLÁNÁL - ez különösen fontos a hektár, termésátlag és ár adatoknál!
+2. Ha a dokumentumból nem tudod kiolvasni a pontos hektárszámot egy kultúrához, akkor NE HASZNÁLJ KITALÁLT ADATOT, hanem hagyj ki azt a kultúrát.
+3. A termésátlag (yieldPerHectare) értékeknek reális magyar értékeknek kell lenniük (pl. búza: 5-6 t/ha, kukorica: 7-9 t/ha)
+4. A piaci áraknak (pricePerTon) aktuális magyarországi áraknak kell lenniük (pl. búza: ~80-90ezer Ft/t, kukorica: ~70-75ezer Ft/t)
+5. Az árbevétel számítása: hektár × termésátlag × ár képlettel történik minden kultúrára
+6. A teljes árbevétel az összes kultúra árbevételének összege
+7. TILTOTT A RANDOM ADATOK GENERÁLÁSA! Csak valós, a dokumentumból kiolvasott vagy ahhoz kapcsolódó reális adatokat használj!
+
+Ha nem sikerül érvényes adatokat kinyerned, vagy nem biztos, hogy helyesek az adatok, akkor azt egyértelműen jelezd, és adj vissza egy üres adatstruktúrát vagy nullákat a kötelező mezőkben.
+
+LEGFONTOSABB SZEMPONT: INKÁBB SEMMILYEN ADAT, MINT HIBÁS VAGY KITALÁLT ADAT!
 `
     });
     

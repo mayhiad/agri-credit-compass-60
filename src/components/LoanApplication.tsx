@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React from 'react';
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Steps } from "@/components/Steps";
@@ -18,8 +19,6 @@ export interface Culture {
   name: string;
   hectares: number;
   estimatedRevenue: number;
-  yieldPerHectare?: number;
-  pricePerTon?: number;
 }
 
 export interface MarketPrice {
@@ -48,7 +47,6 @@ export type FarmData = {
   documentDate?: string;
   parcels?: ParcelData[];
   wordDocumentUrl?: string;
-  submitterId?: string; // Added for the beadó azonosító
 };
 
 export type UserData = {

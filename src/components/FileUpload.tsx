@@ -14,6 +14,8 @@ import ErrorDisplay from "@/components/upload/ErrorDisplay";
 import SuccessMessage from "@/components/upload/SuccessMessage";
 import { ProcessingStatus as ProcessingStatusType, processSapsDocument } from "@/services/uploadProcessingService";
 import { saveFarmDataToDatabase } from "@/services/farmDataService";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface FileUploadProps {
   onComplete: (farmData: FarmData) => void;
@@ -25,6 +27,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatusType | null>(null);
+  const [useGoogleVision, setUseGoogleVision] = useState(false);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -42,7 +45,9 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
     }
   };
   
-  const processDocument = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     if (!file) {
       toast.error("Kérjük, válasszon egy SAPS dokumentumot");
       return;
@@ -59,74 +64,55 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
     try {
       // Feldolgozzuk a dokumentumot
       setProcessingStatus({
-        step: "Dokumentum AI elemzése",
+        step: useGoogleVision ? "Dokumentum OCR szkennelése" : "Dokumentum AI elemzése",
         progress: 10,
-        details: "A feltöltött dokumentum Claude AI elemzése folyamatban..."
+        details: useGoogleVision 
+          ? "A feltöltött dokumentum Google Vision OCR szkennelése folyamatban..." 
+          : "A feltöltött dokumentum AI elemzése folyamatban..."
       });
       
-      const farmData = await processSapsDocument(file, user, setProcessingStatus);
+      const farmData = await processSapsDocument(file, user, setProcessingStatus, useGoogleVision);
       
       // Mentsük el az adatbázisba a feldolgozott adatokat
       setProcessingStatus({
         step: "Adatok mentése az adatbázisba",
         progress: 95,
-        details: "Alapadatok és dokumentum azonosító rögzítése..."
+        details: "Farm adatok és növénykultúrák rögzítése...",
+        wordDocumentUrl: farmData.wordDocumentUrl
       });
       
-      try {
-        const farmId = await saveFarmDataToDatabase(farmData, user.id);
-        
-        if (farmId) {
-          // Frissítsük a farm adatait a farmId-vel
-          farmData.farmId = farmId;
-        }
-        
-        localStorage.setItem("farmData", JSON.stringify(farmData));
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        setProcessingStatus({
-          step: "Feldolgozás befejezve",
-          progress: 100,
-          details: `Gazdálkodó adatai sikeresen feldolgozva: ${farmData.applicantName || "Ismeretlen gazdálkodó"}`
-        });
-        
-        onComplete(farmData);
-        toast.success("SAPS dokumentum sikeresen feldolgozva Claude AI-jal");
-      } catch (dbError) {
-        console.error("Adatbázis mentési hiba:", dbError);
-        toast.error("Az adatok adatbázisba mentése nem sikerült, de a dokumentum feldolgozása sikeres volt");
-        // Annak ellenére hogy adatbázis hiba történt, az onComplete-et meghívjuk
-        // hiszen a dokumentum feldolgozás sikeres volt
-        onComplete(farmData);
+      const farmId = await saveFarmDataToDatabase(farmData, user.id);
+      
+      if (farmId) {
+        // Frissítsük a farm adatait a farmId-vel
+        farmData.farmId = farmId;
       }
+      
+      localStorage.setItem("farmData", JSON.stringify(farmData));
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setProcessingStatus({
+        step: "Feldolgozás befejezve",
+        progress: 100,
+        details: `${farmData.cultures.length} növénykultúra, ${farmData.hectares} hektár és ${farmData.totalRevenue} Ft árbevétel sikeresen feldolgozva és mentve.`,
+        wordDocumentUrl: farmData.wordDocumentUrl
+      });
+      
+      onComplete(farmData);
+      toast.success(useGoogleVision 
+        ? "SAPS dokumentum sikeresen feldolgozva Google Vision OCR-rel" 
+        : "SAPS dokumentum sikeresen feldolgozva");
       
     } catch (error) {
       console.error("SAPS feldolgozási hiba:", error);
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : "Ismeretlen hiba történt a feldolgozás során";
-        
-      setError(errorMessage);
+      setError(error instanceof Error ? error.message : "Ismeretlen hiba történt a feldolgozás során");
       toast.error("Hiba történt a dokumentum feldolgozása során");
       
-      setProcessingStatus({
-        step: "Hiba a feldolgozás során",
-        progress: 0,
-        details: errorMessage
-      });
+      setProcessingStatus(null);
     } finally {
       setUploading(false);
     }
-  };
-  
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await processDocument();
-  };
-  
-  const handleRetry = () => {
-    processDocument();
   };
   
   return (
@@ -150,14 +136,20 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         <Alert className="mb-4 bg-amber-50 border-amber-200">
           <AlertTriangle className="h-4 w-4 text-amber-600" />
           <AlertDescription className="text-amber-800">
-            A dokumentumnak tartalmaznia kell a gazdálkodó nevét és azonosítószámát, ezek nélkül a feldolgozás sikertelen lehet.
+            A dokumentumnak tartalmaznia kell a növénykultúrák neveit és területadatait (hektár), ezek nélkül a feldolgozás sikertelen lehet.
           </AlertDescription>
         </Alert>
 
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2 mb-2">
             <Badge variant="outline" className="bg-blue-50 text-blue-700">
-              Gazdálkodó azonosítása
+              Blokkazonosítók kiolvasása
+            </Badge>
+            <Badge variant="outline" className="bg-green-50 text-green-700">
+              Területadatok elemzése
+            </Badge>
+            <Badge variant="outline" className="bg-amber-50 text-amber-700">
+              Növénykultúrák beazonosítása
             </Badge>
             <Badge variant="outline" className="bg-purple-50 text-purple-700">
               Igénylő adatainak ellenőrzése
@@ -165,10 +157,40 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
           </div>
           
           <form onSubmit={handleSubmit}>
+            <div className="flex items-center space-x-2 mb-4">
+              <Switch
+                id="use-google-vision"
+                checked={useGoogleVision}
+                onCheckedChange={setUseGoogleVision}
+              />
+              <Label htmlFor="use-google-vision">
+                Google Cloud Vision API használata
+                <span className="ml-1 text-xs text-muted-foreground">(Jobb OCR eredmények)</span>
+              </Label>
+            </div>
+            
             <UploadArea file={file} onFileChange={handleFileChange} />
             <ProcessingStatus status={processingStatus} />
             
-            <ErrorDisplay message={error} onRetry={handleRetry} />
+            {processingStatus?.wordDocumentUrl && (
+              <Alert className="mt-4 mb-2 bg-green-50 border-green-200">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-green-600" />
+                  <div className="flex-1">
+                    <AlertDescription className="text-green-800">
+                      Az OCR eredmények Word dokumentumként elérhetőek:
+                    </AlertDescription>
+                  </div>
+                  <Button variant="outline" className="bg-white" size="sm" asChild>
+                    <a href={processingStatus.wordDocumentUrl} target="_blank" rel="noopener noreferrer">
+                      Letöltés
+                    </a>
+                  </Button>
+                </div>
+              </Alert>
+            )}
+            
+            <ErrorDisplay message={error} />
             <SuccessMessage status={processingStatus} />
           </form>
         </div>

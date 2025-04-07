@@ -19,30 +19,17 @@ export const uploadFileToStorage = async (fileToUpload: File, userId: string): P
     
     console.log("Fájl feltöltése a Storage-ba:", storagePath);
     
-    // Megfelelő MIME típus beállítása
-    let contentType = 'application/octet-stream';
-    if (fileExtension === 'pdf') {
-      contentType = 'application/pdf';
-    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-      contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-    }
-    
     const { data, error } = await supabase.storage
       .from('dokumentumok')
       .upload(storagePath, fileToUpload, {
-        contentType: contentType,
+        contentType: fileExtension === 'pdf' ? 'application/pdf' : 
+                    (fileExtension === 'xlsx' || fileExtension === 'xls') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 
+                    'application/octet-stream',
         upsert: false
       });
     
     if (error) {
-      // Csak logolja a hibát, de nem dobja tovább, mivel ez nem kritikus hiba a folyamatban
       console.error("Hiba a dokumentum tárolása során:", error.message);
-      
-      // Ellenőrizzük, hogy row-level security policy hiba-e
-      if (error.message.includes("row-level security policy")) {
-        console.warn("Fájl feltöltési jogosultsági hiba. Ellenőrizze a Supabase RLS beállításait a storage.objects táblára!");
-      }
-      
       return null;
     }
     
@@ -50,6 +37,99 @@ export const uploadFileToStorage = async (fileToUpload: File, userId: string): P
     return storagePath;
   } catch (err) {
     console.error("Váratlan hiba a tárolás során:", err);
+    return null;
+  }
+};
+
+// OCR szöveg mentése Word dokumentumként a Supabase tárolóba
+export const saveOcrTextToWordDocument = async (
+  ocrText: string, 
+  fileName: string,
+  userId: string,
+  ocrLogId?: string
+): Promise<string | null> => {
+  try {
+    console.log(`OCR szöveg mentése Word dokumentumként: ${fileName}`);
+    
+    // Egyszerű Word XML formátum létrehozása
+    const wordXml = `
+      <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+      <?mso-application progid="Word.Document"?>
+      <w:wordDocument xmlns:w="http://schemas.microsoft.com/office/word/2003/wordml">
+        <w:body>
+          <w:p>
+            <w:r>
+              <w:t>OCR Eredmény - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</w:t>
+            </w:r>
+          </w:p>
+          <w:p>
+            <w:r>
+              <w:t>OCR Log ID: ${ocrLogId || 'Nincs'}</w:t>
+            </w:r>
+          </w:p>
+          <w:p>
+            <w:r>
+              <w:t>Feldolgozva: ${new Date().toISOString()}</w:t>
+            </w:r>
+          </w:p>
+          <w:p>
+            <w:r>
+              <w:t>${ocrText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '</w:t></w:r></w:p><w:p><w:r><w:t>')}</w:t>
+            </w:r>
+          </w:p>
+        </w:body>
+      </w:wordDocument>
+    `;
+    
+    // Konvertáljuk a Word XML-t bináris formátumba
+    const encoder = new TextEncoder();
+    const wordData = encoder.encode(wordXml);
+    
+    // Mentjük a Supabase Storage-ba
+    const storagePath = `ocrresults/${userId}/${fileName}`;
+    
+    const { data, error } = await supabase.storage
+      .from('ocrresults')
+      .upload(storagePath, wordData, {
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        upsert: true
+      });
+    
+    if (error) {
+      console.error("Hiba a Word dokumentum tárolása során:", error.message);
+      return null;
+    }
+    
+    // Publikus URL létrehozása a letöltéshez
+    const { data: urlData } = await supabase.storage
+      .from('ocrresults')
+      .getPublicUrl(storagePath);
+    
+    const publicUrl = urlData?.publicUrl;
+    console.log("Word dokumentum sikeresen tárolva:", publicUrl);
+    
+    // Frissítsük az OCR log rekordot a Word dokumentum URL-jével
+    if (ocrLogId) {
+      // Use processing_metadata field instead of document_url
+      const { error: updateError } = await supabase
+        .from('document_ocr_logs')
+        .update({ 
+          processing_metadata: {
+            word_document_path: storagePath,
+            word_document_url: publicUrl,
+            created_at: new Date().toISOString()
+          }
+        })
+        .eq('id', ocrLogId);
+      
+      if (updateError) {
+        console.warn("Figyelem: Az OCR log frissítése sikertelen volt:", updateError);
+      }
+    }
+    
+    return publicUrl;
+  } catch (err) {
+    console.error("Váratlan hiba a Word dokumentum létrehozása során:", err);
     return null;
   }
 };
