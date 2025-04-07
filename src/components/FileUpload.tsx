@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,20 +58,20 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
     setError(null);
     
     try {
-      // Feldolgozzuk a dokumentumot
+      // Feldolgozzuk a dokumentumot Claude-dal
       setProcessingStatus({
-        step: "Dokumentum AI elemzése",
+        step: "Dokumentum Claude AI elemzése",
         progress: 10,
-        details: "A feltöltött dokumentum AI elemzése folyamatban..."
+        details: "A feltöltött dokumentum Claude AI elemzése folyamatban..."
       });
       
-      const farmData = await processSapsDocument(file, user, setProcessingStatus, false);
+      const farmData = await processSapsDocument(file, user, setProcessingStatus);
       
       // Mentsük el az adatbázisba a feldolgozott adatokat
       setProcessingStatus({
         step: "Adatok mentése az adatbázisba",
         progress: 95,
-        details: "Farm adatok és növénykultúrák rögzítése...",
+        details: "Ügyfél adatok rögzítése...",
         wordDocumentUrl: farmData.wordDocumentUrl
       });
       
@@ -90,7 +89,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       setProcessingStatus({
         step: "Feldolgozás befejezve",
         progress: 100,
-        details: `${farmData.cultures.length} növénykultúra, ${farmData.hectares} hektár és ${farmData.totalRevenue} Ft árbevétel sikeresen feldolgozva és mentve.`,
+        details: `Ügyfél-azonosító: ${farmData.submitterId || "Ismeretlen"}, Név: ${farmData.applicantName || "Ismeretlen"} sikeresen feldolgozva és mentve.`,
         wordDocumentUrl: farmData.wordDocumentUrl
       });
       
@@ -129,20 +128,17 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         <Alert className="mb-4 bg-amber-50 border-amber-200">
           <AlertTriangle className="h-4 w-4 text-amber-600" />
           <AlertDescription className="text-amber-800">
-            A dokumentumnak tartalmaznia kell a növénykultúrák neveit és területadatait (hektár), ezek nélkül a feldolgozás sikertelen lehet.
+            A dokumentumnak tartalmaznia kell az ügyfél nevét és azonosítóját, ezek nélkül a feldolgozás sikertelen lehet.
           </AlertDescription>
         </Alert>
 
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2 mb-2">
             <Badge variant="outline" className="bg-blue-50 text-blue-700">
-              Blokkazonosítók kiolvasása
+              Ügyfél-azonosító kiolvasása
             </Badge>
             <Badge variant="outline" className="bg-green-50 text-green-700">
-              Területadatok elemzése
-            </Badge>
-            <Badge variant="outline" className="bg-amber-50 text-amber-700">
-              Növénykultúrák beazonosítása
+              Ügyfél adatok elemzése
             </Badge>
             <Badge variant="outline" className="bg-purple-50 text-purple-700">
               Igénylő adatainak ellenőrzése

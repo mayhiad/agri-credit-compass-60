@@ -1,13 +1,14 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { FarmData } from "@/components/LoanApplication";
 import { saveOcrTextToWordDocument } from "@/utils/storageUtils";
 
 export const processDocumentWithOpenAI = async (file: File, user: any): Promise<{
-  threadId: string;
-  runId: string;
+  threadId?: string;
+  runId?: string;
   assistantId?: string;
   ocrLogId?: string;
+  data?: FarmData;
+  status?: string;
 } | null> => {
   try {
     if (!user) {
@@ -51,22 +52,21 @@ export const processDocumentWithOpenAI = async (file: File, user: any): Promise<
     }
     
     const scanData = await scanResponse.json();
-    console.log("OpenAI scan válasz:", scanData);
+    console.log("Claude scan válasz:", scanData);
     
-    const { threadId, runId, ocrLogId, assistantId } = scanData;
-    
-    if (!threadId || !runId) {
-      throw new Error("Hiányzó thread vagy run azonosító");
-    }
-    
-    return { threadId, runId, ocrLogId, assistantId };
+    // Claude feldolgozás már a visszatérő adatban van
+    return { 
+      ocrLogId: scanData.ocrLogId,
+      data: scanData.data,
+      status: scanData.status || 'completed'
+    };
   } catch (error) {
     console.error("Dokumentum feldolgozási hiba:", error);
     throw error;
   }
 };
 
-export const checkProcessingResults = async (threadId: string, runId: string, ocrLogId?: string): Promise<{ 
+export const checkProcessingResults = async (threadId?: string, runId?: string, ocrLogId?: string): Promise<{ 
   completed: boolean;
   status: string;
   data?: FarmData;
@@ -76,6 +76,11 @@ export const checkProcessingResults = async (threadId: string, runId: string, oc
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       throw new Error("Nincs érvényes felhasználói munkamenet");
+    }
+    
+    // Ha nincs threadId és runId, akkor nem kell ellenőrizni
+    if (!threadId || !runId) {
+      return { completed: true, status: 'completed' };
     }
     
     console.log(`Eredmény ellenőrzése a thread ID-val: ${threadId}, run ID-val: ${runId}`);
@@ -115,10 +120,8 @@ export const checkProcessingResults = async (threadId: string, runId: string, oc
   }
 };
 
-// Az RPC függvényhívásokat javítjuk TypeScript hibák miatt
 export const getDocumentOcrLogs = async (): Promise<any[]> => {
   try {
-    // Közvetlenül SQL lekérdezést használunk
     const { data, error } = await supabase
       .from('document_ocr_logs')
       .select('*')
@@ -136,10 +139,8 @@ export const getDocumentOcrLogs = async (): Promise<any[]> => {
   }
 };
 
-// Az RPC függvényhívásokat javítjuk TypeScript hibák miatt
 export const getExtractionResultById = async (logId: string): Promise<any | null> => {
   try {
-    // Közvetlenül SQL lekérdezést használunk
     const { data, error } = await supabase
       .from('document_extraction_results')
       .select('*')
@@ -158,7 +159,6 @@ export const getExtractionResultById = async (logId: string): Promise<any | null
   }
 };
 
-// Új funkció: Google Cloud Vision API-val OCR szkennelés
 export const processDocumentWithGoogleVision = async (file: File, user: any): Promise<{
   ocrLogId?: string;
   ocrText?: string;
@@ -210,7 +210,6 @@ export const processDocumentWithGoogleVision = async (file: File, user: any): Pr
     
     const { ocrLogId, ocrText } = scanData;
     
-    // Ha van OCR szöveg, mentjük Word dokumentumként a Storage-ba
     let wordDocumentUrl = null;
     if (ocrText && ocrText.length > 0) {
       const originalFilename = file.name.split('.')[0];
