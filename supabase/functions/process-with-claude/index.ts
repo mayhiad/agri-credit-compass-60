@@ -8,15 +8,57 @@ const API_TIMEOUT = 180000; // 3 perc
 
 serve(async (req) => {
   // CORS kezelése
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { 
+      headers: corsHeaders,
+      status: 204
+    });
+  }
 
   try {
     console.log("📥 Claude AI feldolgozás indítása");
     
-    const formData = await req.formData();
+    // Ellenőrizzük, hogy a kérés formData típusú-e
+    const contentType = req.headers.get('content-type') || '';
+    if (!contentType.includes('multipart/form-data')) {
+      console.error("🚫 Nem multipart/form-data típusú kérés érkezett");
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Érvénytelen kérés: a kérésnek multipart/form-data típusúnak kell lennie"
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // FormData kinyerése
+    let formData;
+    try {
+      formData = await req.formData();
+    } catch (formError) {
+      console.error("🚫 FormData feldolgozási hiba:", formError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: "A formData feldolgozása sikertelen"
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
     const file = formData.get('file') as File;
     
-    if (!file) throw new Error('Nem érkezett fájl');
+    if (!file) {
+      console.error("🚫 Nem érkezett fájl");
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Nem érkezett fájl"
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
     console.log("📄 Fájl fogadva:", file.name, "méret:", file.size, "típus:", file.type);
     
     // Felhasználói azonosító kinyerése a JWT tokenből
@@ -88,6 +130,7 @@ serve(async (req) => {
     }
     
     return new Response(JSON.stringify({ 
+      success: false,
       error: errorMessage, 
       details: errorDetails,
       stack: errorStack

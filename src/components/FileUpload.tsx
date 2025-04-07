@@ -75,25 +75,33 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         details: "Alapadatok és dokumentum azonosító rögzítése..."
       });
       
-      const farmId = await saveFarmDataToDatabase(farmData, user.id);
-      
-      if (farmId) {
-        // Frissítsük a farm adatait a farmId-vel
-        farmData.farmId = farmId;
+      try {
+        const farmId = await saveFarmDataToDatabase(farmData, user.id);
+        
+        if (farmId) {
+          // Frissítsük a farm adatait a farmId-vel
+          farmData.farmId = farmId;
+        }
+        
+        localStorage.setItem("farmData", JSON.stringify(farmData));
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        setProcessingStatus({
+          step: "Feldolgozás befejezve",
+          progress: 100,
+          details: `Gazdálkodó adatai sikeresen feldolgozva: ${farmData.applicantName || "Ismeretlen gazdálkodó"}`
+        });
+        
+        onComplete(farmData);
+        toast.success("SAPS dokumentum sikeresen feldolgozva Claude AI-jal");
+      } catch (dbError) {
+        console.error("Adatbázis mentési hiba:", dbError);
+        toast.error("Az adatok adatbázisba mentése nem sikerült, de a dokumentum feldolgozása sikeres volt");
+        // Annak ellenére hogy adatbázis hiba történt, az onComplete-et meghívjuk
+        // hiszen a dokumentum feldolgozás sikeres volt
+        onComplete(farmData);
       }
-      
-      localStorage.setItem("farmData", JSON.stringify(farmData));
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setProcessingStatus({
-        step: "Feldolgozás befejezve",
-        progress: 100,
-        details: `Gazdálkodó adatai sikeresen feldolgozva: ${farmData.applicantName || "Ismeretlen gazdálkodó"}`
-      });
-      
-      onComplete(farmData);
-      toast.success("SAPS dokumentum sikeresen feldolgozva Claude AI-jal");
       
     } catch (error) {
       console.error("SAPS feldolgozási hiba:", error);

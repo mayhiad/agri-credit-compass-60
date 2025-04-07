@@ -83,62 +83,89 @@ const processWithClaudeAI = async (
       details: "A dokumentum Claude AI elemzése folyamatban..."
     });
     
-    const claudeResponse = await fetch(
-      'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-with-claude',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: formData,
-        signal: AbortSignal.timeout(180000), // 3 perc időtúllépés
-      }
-    );
+    console.log("Calling Claude AI edge function...");
     
-    if (!claudeResponse.ok) {
-      const errorText = await claudeResponse.text();
-      console.error("Claude feldolgozási hiba:", errorText);
-      let errorData;
+    // Explicit timeout control
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 perc
+    
+    try {
+      const claudeResponse = await fetch(
+        'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-with-claude',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: formData,
+          signal: controller.signal,
+        }
+      );
       
-      try {
-        errorData = JSON.parse(errorText);
-      } catch (parseError) {
-        errorData = { error: errorText || "Ismeretlen hiba történt" };
+      clearTimeout(timeoutId);
+      
+      console.log("Claude AI response status:", claudeResponse.status);
+      
+      if (!claudeResponse.ok) {
+        const errorText = await claudeResponse.text();
+        console.error("Claude feldolgozási hiba:", errorText);
+        let errorData;
+        
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (parseError) {
+          errorData = { error: errorText || "Ismeretlen hiba történt" };
+        }
+        
+        throw new Error(errorData.error || "Hiba a dokumentum feldolgozása közben");
       }
       
-      throw new Error(errorData.error || "Hiba a dokumentum feldolgozása közben");
+      updateStatus({
+        step: "Claude AI feldolgozás sikeres",
+        progress: 80,
+        details: "A dokumentum elemzése befejeződött, adatok kinyerése..."
+      });
+      
+      const claudeData = await claudeResponse.json();
+      console.log("Claude AI response data:", claudeData);
+      
+      if (!claudeData.success || !claudeData.data) {
+        throw new Error("Sikertelen adatkinyerés a dokumentumból: " + 
+          (claudeData.error || "A Claude AI nem talált feldolgozható adatokat a dokumentumban"));
+      }
+      
+      // Alapadatok kinyerése
+      let farmData: FarmData = {
+        ...claudeData.data,
+        fileName: file.name,
+        fileSize: file.size,
+        hectares: 0,
+        cultures: [],
+        totalRevenue: 0
+      };
+      
+      updateStatus({
+        step: "Adatok feldolgozása befejezve",
+        progress: 90,
+        details: "Alapadatok feldolgozva: " + (farmData.applicantName ? `${farmData.applicantName}` : "Ismeretlen gazda")
+      });
+      
+      return farmData;
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      
+      if (fetchError.name === 'AbortError') {
+        throw new Error('A dokumentum feldolgozása túl sokáig tartott és megszakításra került (időtúllépés)');
+      }
+      
+      // Részletes hálózati hibák
+      if (fetchError instanceof TypeError && fetchError.message === 'Failed to fetch') {
+        console.error("Hálózati hiba:", fetchError);
+        throw new Error('Hálózati kapcsolati hiba a Claude AI kiszolgálóval. Ellenőrizze internetkapcsolatát vagy próbálja újra később.');
+      }
+      
+      throw fetchError;
     }
-    
-    updateStatus({
-      step: "Claude AI feldolgozás sikeres",
-      progress: 80,
-      details: "A dokumentum elemzése befejeződött, adatok kinyerése..."
-    });
-    
-    const claudeData = await claudeResponse.json();
-    
-    if (!claudeData.success || !claudeData.data) {
-      throw new Error("Sikertelen adatkinyerés a dokumentumból: " + 
-        (claudeData.error || "A Claude AI nem talált feldolgozható adatokat a dokumentumban"));
-    }
-    
-    // Alapadatok kinyerése
-    let farmData: FarmData = {
-      ...claudeData.data,
-      fileName: file.name,
-      fileSize: file.size,
-      hectares: 0,
-      cultures: [],
-      totalRevenue: 0
-    };
-    
-    updateStatus({
-      step: "Adatok feldolgozása befejezve",
-      progress: 90,
-      details: "Alapadatok feldolgozva: " + (farmData.applicantName ? `${farmData.applicantName}` : "Ismeretlen gazda")
-    });
-    
-    return farmData;
     
   } catch (error) {
     console.error("AI feldolgozási hiba:", error);
