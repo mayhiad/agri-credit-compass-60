@@ -8,7 +8,6 @@ import DashboardMap from "./DashboardMap";
 import DashboardHistorical from "./DashboardHistorical";
 import CurrentYearRevenue from "@/components/farm/CurrentYearRevenue";
 import FileUpload from "@/components/FileUpload";
-import OcrLogViewer from "./OcrLogViewer";
 import { toast } from "sonner";
 import { useAuth } from "@/App";
 import { supabase } from "@/integrations/supabase/client";
@@ -112,10 +111,6 @@ const DashboardContent = ({ farmData, onFarmDataUpdate }: DashboardContentProps)
             <Map className="h-4 w-4 mr-2" />
             Földterületek
           </TabsTrigger>
-          <TabsTrigger value="ocrlogs">
-            <FileText className="h-4 w-4 mr-2" />
-            OCR Naplók
-          </TabsTrigger>
           <TabsTrigger value="upload">
             <Upload className="h-4 w-4 mr-2" />
             SAPS dokumentum feltöltése
@@ -143,10 +138,6 @@ const DashboardContent = ({ farmData, onFarmDataUpdate }: DashboardContentProps)
         
         <TabsContent value="map">
           <DashboardMap />
-        </TabsContent>
-        
-        <TabsContent value="ocrlogs">
-          <OcrLogViewer />
         </TabsContent>
 
         <TabsContent value="upload">
