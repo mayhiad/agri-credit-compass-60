@@ -11,7 +11,6 @@ import ContractSigning from "@/components/ContractSigning";
 import LoanComplete from "@/components/LoanComplete";
 import { FarmData, UserData } from "@/types/farm";
 
-// Use types from centralized types file rather than redefining them here
 const LoanApplication = () => {
   const [step, setStep] = useState(1);
   const [farmData, setFarmData] = useState<FarmData | null>(null);

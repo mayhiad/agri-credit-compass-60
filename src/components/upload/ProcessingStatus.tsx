@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Progress } from "@/components/ui/progress";
-import { ProcessingStatus } from "@/services/uploadProcessingService";
+import { ProcessingStatus } from "@/types/processing";
 import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 

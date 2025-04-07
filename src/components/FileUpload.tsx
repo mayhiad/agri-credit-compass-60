@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Clock, ArrowRight, AlertTriangle, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { FarmData } from "@/components/LoanApplication";
+import { FarmData } from "@/types/farm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/App";
@@ -11,8 +11,9 @@ import UploadArea from "@/components/upload/UploadArea";
 import ProcessingStatus from "@/components/upload/ProcessingStatus";
 import ErrorDisplay from "@/components/upload/ErrorDisplay";
 import SuccessMessage from "@/components/upload/SuccessMessage";
-import { ProcessingStatus as ProcessingStatusType, processSapsDocument } from "@/services/uploadProcessingService";
-import { saveFarmDataToDatabase } from "@/services/farmDataService";
+import { processSapsDocument } from "@/services/uploadProcessingService";
+import { ProcessingStatus as ProcessingStatusType } from "@/types/processing";
+import { validateDocumentFile } from "@/services/documentValidation";
 
 interface FileUploadProps {
   onComplete: (farmData: FarmData) => void;
@@ -28,14 +29,14 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
-      const allowedTypes = ['application/pdf', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+      const validation = validateDocumentFile(selectedFile);
       
-      if (allowedTypes.includes(selectedFile.type)) {
+      if (validation.valid) {
         setFile(selectedFile);
         setError(null);
         setProcessingStatus(null);
       } else {
-        toast.error("Kérjük, PDF vagy Excel formátumú dokumentumot töltsön fel");
+        toast.error(validation.error || "Nem támogatott fájlformátum");
         setFile(null);
       }
     }
@@ -66,32 +67,6 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       });
       
       const farmData = await processSapsDocument(file, user, setProcessingStatus);
-      
-      // Mentsük el az adatbázisba a feldolgozott adatokat
-      setProcessingStatus({
-        step: "Adatok mentése az adatbázisba",
-        progress: 95,
-        details: "Ügyfél adatok rögzítése...",
-        wordDocumentUrl: farmData.wordDocumentUrl
-      });
-      
-      const farmId = await saveFarmDataToDatabase(farmData, user.id);
-      
-      if (farmId) {
-        // Frissítsük a farm adatait a farmId-vel
-        farmData.farmId = farmId;
-      }
-      
-      localStorage.setItem("farmData", JSON.stringify(farmData));
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setProcessingStatus({
-        step: "Feldolgozás befejezve",
-        progress: 100,
-        details: `Ügyfél-azonosító: ${farmData.submitterId || "Ismeretlen"}, Név: ${farmData.applicantName || "Ismeretlen"} sikeresen feldolgozva és mentve.`,
-        wordDocumentUrl: farmData.wordDocumentUrl
-      });
       
       onComplete(farmData);
       toast.success("SAPS dokumentum sikeresen feldolgozva");
