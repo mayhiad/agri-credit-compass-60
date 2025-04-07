@@ -74,6 +74,84 @@ export type Database = {
         }
         Relationships: []
       }
+      document_batch_results: {
+        Row: {
+          batch_id: string
+          batch_index: number
+          created_at: string
+          extracted_data: Json | null
+          id: string
+          image_count: number | null
+          images_processed: string[] | null
+          raw_response: string | null
+          total_batches: number
+          user_id: string
+        }
+        Insert: {
+          batch_id: string
+          batch_index: number
+          created_at?: string
+          extracted_data?: Json | null
+          id?: string
+          image_count?: number | null
+          images_processed?: string[] | null
+          raw_response?: string | null
+          total_batches: number
+          user_id: string
+        }
+        Update: {
+          batch_id?: string
+          batch_index?: number
+          created_at?: string
+          extracted_data?: Json | null
+          id?: string
+          image_count?: number | null
+          images_processed?: string[] | null
+          raw_response?: string | null
+          total_batches?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      document_batches: {
+        Row: {
+          batch_id: string
+          created_at: string
+          document_name: string
+          id: string
+          metadata: Json | null
+          original_storage_path: string | null
+          page_count: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          document_name: string
+          id?: string
+          metadata?: Json | null
+          original_storage_path?: string | null
+          page_count: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          document_name?: string
+          id?: string
+          metadata?: Json | null
+          original_storage_path?: string | null
+          page_count?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       document_extraction_results: {
         Row: {
           created_at: string

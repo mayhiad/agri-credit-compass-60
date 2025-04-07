@@ -18,29 +18,29 @@ export async function processImageBatchWithClaude(
   batchIndex: number,
   totalBatches: number
 ) {
-  console.log(`🧠 Claude AI feldolgozás kezdése a ${batchIndex}/${totalBatches}. képkötegen: ${images.length} kép`);
+  console.log(`🧠 Starting Claude AI processing for batch ${batchIndex}/${totalBatches}: ${images.length} images`);
   
   try {
     const claudeApiKey = Deno.env.get('ANTHROPIC_API_KEY');
     
     if (!claudeApiKey) {
-      throw new Error("ANTHROPIC_API_KEY környezeti változó nincs beállítva");
+      throw new Error("ANTHROPIC_API_KEY environment variable not set");
     }
     
     // Verify we don't exceed the maximum images per request
     if (images.length > MAX_IMAGES_PER_REQUEST) {
-      throw new Error(`Túl sok kép egy kérésben: ${images.length}. Maximum: ${MAX_IMAGES_PER_REQUEST}`);
+      throw new Error(`Too many images in one request: ${images.length}. Maximum: ${MAX_IMAGES_PER_REQUEST}`);
     }
     
     // Build the message content with all images in the batch
     const messageContent = [
       {
         type: "text",
-        text: "Ez egy mezőgazdasági területalapú támogatási dokumentum. Kérlek, keresd meg és add vissza JSON formátumban a következő adatokat:\n" +
-              "- submitterName: a beadó neve, amely általában az első oldalon található\n" +
-              "- submitterId: a beadó ügyfél-azonosító száma, egy 10 számjegyű szám\n" +
-              "- applicantId: a kérelmező ügyfél-azonosító száma, egy 10 számjegyű szám (adott esetben megegyezik a beadó személyével)\n\n" +
-              "Csak a következő JSON formátumot add vissza: { \"submitterName\": \"...\", \"submitterId\": \"...\", \"applicantId\": \"...\" }"
+        text: "This is an agricultural area-based support document. Please find and return the following data in JSON format:\n" +
+              "- submitterName: the name of the submitter, usually found on the first page\n" +
+              "- submitterId: the submitter's client ID number, a 10-digit number\n" +
+              "- applicantId: the applicant's client ID number, a 10-digit number (may be the same as the submitter)\n\n" +
+              "Only return the following JSON format: { \"submitterName\": \"...\", \"submitterId\": \"...\", \"applicantId\": \"...\" }"
       }
     ];
     
@@ -56,7 +56,7 @@ export async function processImageBatchWithClaude(
           }
         });
       } else {
-        throw new Error(`A kép URL nem nyilvános: ${imageUrl}`);
+        throw new Error(`Image URL is not public: ${imageUrl}`);
       }
     }
     
@@ -65,7 +65,7 @@ export async function processImageBatchWithClaude(
       model: CLAUDE_MODEL,
       max_tokens: 4000,
       temperature: 0,
-      system: "Te egy mezőgazdasági adatok elemzésére szakosodott asszisztens vagy. Pontosan olvasd ki a dokumentumokból a kért információkat. Ne találj ki adatokat, és ha nem vagy biztos valamiben, inkább hagyd üresen. Az eredményt mindig csak a kért JSON formátumban add vissza.",
+      system: "You are an assistant specialized in analyzing agricultural data. Read the documents accurately to extract the requested information. Don't make up data, and if you're unsure about something, leave it blank. Always return results only in the requested JSON format.",
       messages: [
         {
           role: "user",
@@ -74,7 +74,7 @@ export async function processImageBatchWithClaude(
       ]
     };
     
-    console.log(`🚀 Claude API kérés küldése: ${CLAUDE_API_URL}, model: ${CLAUDE_MODEL}, ${images.length} képpel`);
+    console.log(`🚀 Sending Claude API request: ${CLAUDE_API_URL}, model: ${CLAUDE_MODEL}, with ${images.length} images`);
     
     const response = await fetch(CLAUDE_API_URL, {
       method: "POST",
@@ -88,12 +88,12 @@ export async function processImageBatchWithClaude(
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`❌ Claude API hiba: ${response.status} - ${errorText}`);
-      throw new Error(`Claude API hiba: ${response.status} - ${errorText}`);
+      console.error(`❌ Claude API error: ${response.status} - ${errorText}`);
+      throw new Error(`Claude API error: ${response.status} - ${errorText}`);
     }
     
     const result = await response.json();
-    console.log(`✅ Claude API válasz megérkezett:`, result);
+    console.log(`✅ Claude API response received:`, result);
     
     // Extract the JSON response from Claude's text output
     let extractedData = {};
@@ -108,35 +108,41 @@ export async function processImageBatchWithClaude(
         const jsonMatch = rawText.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           extractedData = JSON.parse(jsonMatch[0]);
-          console.log(`✅ Adatok kinyerve: ${JSON.stringify(extractedData)}`);
+          console.log(`✅ Data extracted: ${JSON.stringify(extractedData)}`);
         } else {
-          console.warn(`⚠️ Nem sikerült JSON adatot kinyerni a válaszból`);
+          console.warn(`⚠️ Could not extract JSON data from the response`);
         }
       } catch (parseError) {
-        console.error(`❌ JSON elemzési hiba: ${parseError.message}`);
+        console.error(`❌ JSON parsing error: ${parseError.message}`);
       }
     }
     
     // Log batch processing results
-    const { data, error } = await supabase
-      .from('document_batch_results')
-      .insert({
-        batch_id: batchId,
-        user_id: userId,
-        batch_index: batchIndex,
-        total_batches: totalBatches,
-        extracted_data: extractedData,
-        raw_response: rawText,
-        image_count: images.length,
-        images_processed: images
-      })
-      .select('id')
-      .single();
-      
-    if (error) {
-      console.error(`❌ Hiba a batch eredmények mentésekor:`, error);
-    } else {
-      console.log(`✅ Batch eredmények mentve: ${data.id}`);
+    try {
+      const { data, error } = await supabase
+        .from('document_batch_results')
+        .insert({
+          batch_id: batchId,
+          user_id: userId,
+          batch_index: batchIndex,
+          total_batches: totalBatches,
+          extracted_data: extractedData,
+          raw_response: rawText,
+          image_count: images.length,
+          images_processed: images
+        })
+        .select('id')
+        .single();
+        
+      if (error) {
+        console.error(`❌ Error saving batch results:`, error);
+        console.error(`Error details:`, JSON.stringify(error, null, 2));
+      } else {
+        console.log(`✅ Batch results saved: ${data.id}`);
+      }
+    } catch (dbError) {
+      console.error(`❌ Database error while saving batch results:`, dbError);
+      // Continue processing despite database error
     }
     
     // Check if we found any useful data
@@ -153,7 +159,7 @@ export async function processImageBatchWithClaude(
     };
     
   } catch (error) {
-    console.error(`❌ Claude feldolgozási hiba: ${error.message}`);
+    console.error(`❌ Claude processing error: ${error.message}`);
     throw error;
   }
 }
@@ -166,7 +172,7 @@ export async function processAllImageBatches(
   userId: string,
   batchId: string
 ) {
-  console.log(`🔄 Összes képköteg feldolgozása kezdődik: ${imageUrls.length} kép`);
+  console.log(`🔄 Starting all image batch processing: ${imageUrls.length} images`);
   
   // Split images into batches of MAX_IMAGES_PER_REQUEST
   const batches = [];
@@ -174,14 +180,14 @@ export async function processAllImageBatches(
     batches.push(imageUrls.slice(i, i + MAX_IMAGES_PER_REQUEST));
   }
   
-  console.log(`📦 Kötegek száma: ${batches.length}`);
+  console.log(`📦 Number of batches: ${batches.length}`);
   
   let allExtractedData = {};
   let foundUsefulData = false;
   
   // Process each batch sequentially until we find useful data
   for (let i = 0; i < batches.length; i++) {
-    console.log(`⏳ ${i+1}/${batches.length}. köteg feldolgozása...`);
+    console.log(`⏳ Processing batch ${i+1}/${batches.length}...`);
     
     const result = await processImageBatchWithClaude(
       batches[i],
@@ -199,27 +205,35 @@ export async function processAllImageBatches(
     
     // Check if we found useful data
     if (result.hasUsefulData) {
-      console.log(`✅ Használható adatokat találtunk a ${i+1}. kötegben, megállítjuk a feldolgozást`);
+      console.log(`✅ Found useful data in batch ${i+1}, stopping processing`);
       foundUsefulData = true;
       break;
     }
   }
   
   // Update the batch status in the database
-  const { error } = await supabase
-    .from('document_batches')
-    .update({
-      status: foundUsefulData ? 'completed' : 'failed',
-      metadata: {
-        foundUsefulData,
-        processedAt: new Date().toISOString(),
-        extractedData: allExtractedData
-      }
-    })
-    .eq('batch_id', batchId);
-    
-  if (error) {
-    console.error(`❌ Hiba a batch státusz frissítésekor:`, error);
+  try {
+    const { error } = await supabase
+      .from('document_batches')
+      .update({
+        status: foundUsefulData ? 'completed' : 'failed',
+        metadata: {
+          foundUsefulData,
+          processedAt: new Date().toISOString(),
+          extractedData: allExtractedData
+        }
+      })
+      .eq('batch_id', batchId);
+      
+    if (error) {
+      console.error(`❌ Error updating batch status:`, error);
+      console.error(`Error details:`, JSON.stringify(error, null, 2));
+    } else {
+      console.log(`✅ Batch status updated to ${foundUsefulData ? 'completed' : 'failed'}`);
+    }
+  } catch (updateError) {
+    console.error(`❌ Database error while updating batch status:`, updateError);
+    // Continue processing despite database error
   }
   
   // Create farm data structure from the extracted data
