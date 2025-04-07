@@ -48,6 +48,7 @@ export async function processImageBatchWithClaude(
     for (const imageUrl of images) {
       // Check if URL is publicly accessible
       if (imageUrl.includes('supabase.co')) {
+        // Use the URL format that Claude accepts
         messageContent.push({
           type: "image",
           source: {
@@ -257,10 +258,10 @@ export async function processAllImageBatches(
     success: foundUsefulData,
     batchInfo: {
       totalBatches: batches.length,
-      processedBatches: foundUsefulData ? batches.findIndex(b => b.includes(imageUrls[0])) + 1 : batches.length,
+      processedBatches: foundUsefulData ? batches.findIndex(b => b.includes(batches[0][0])) + 1 : batches.length,
       totalPages: imageUrls.length,
       processedPages: foundUsefulData ? 
-        (batches.findIndex(b => b.includes(imageUrls[0])) + 1) * MAX_IMAGES_PER_REQUEST : 
+        (batches.findIndex(b => b.includes(batches[0][0])) + 1) * MAX_IMAGES_PER_REQUEST : 
         imageUrls.length
     }
   };
