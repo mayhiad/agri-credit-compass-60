@@ -1,4 +1,6 @@
 
+// I'll only update the relevant parts of this file to improve progress reporting
+
 import { FarmData } from "@/types/farm";
 import { ProcessingStatus } from "@/types/processing";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,16 +24,36 @@ export const processSapsDocument = async (
     throw new Error("A dokumentum feldolgozásához be kell jelentkeznie");
   }
   
-  updateStatus({
+  // Store the last progress to detect if we're stuck
+  let lastProgress = 0;
+  
+  // Helper function to update status with lastProgress tracking
+  const updateProgressStatus = (status: ProcessingStatus) => {
+    const updatedStatus = {
+      ...status,
+      lastProgress: lastProgress
+    };
+    lastProgress = status.progress;
+    updateStatus(updatedStatus);
+  };
+  
+  updateProgressStatus({
     step: "Dokumentum ellenőrzése",
     progress: 10,
+    details: "Dokumentum formátum és méret ellenőrzése folyamatban...",
   });
   
+  // Validate document
+  const validation = validateDocumentFile(file);
+  if (!validation.valid) {
+    throw new Error(validation.error || "A dokumentum érvénytelen");
+  }
+  
   // Step 1: Convert PDF to images
-  updateStatus({
+  updateProgressStatus({
     step: "PDF konvertálása képekké",
     progress: 20,
-    details: "A dokumentum képekké konvertálása folyamatban...",
+    details: `${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB) konvertálása képekké folyamatban...`,
   });
   
   // Prepare form data for the conversion request
@@ -48,6 +70,12 @@ export const processSapsDocument = async (
   // Call our Supabase Edge Function to convert PDF to images
   try {
     console.log("Calling convert-pdf-to-images edge function...");
+    
+    updateProgressStatus({
+      step: "PDF konvertálása képekké",
+      progress: 25,
+      details: "Kapcsolódás a szerverhez, dokumentum feltöltése folyamatban...",
+    });
     
     // Create a custom AbortController with a timeout
     const controller = new AbortController();
@@ -78,6 +106,13 @@ export const processSapsDocument = async (
       
       const errorMessage = errorData.error || "Hiba a dokumentum konvertálása közben";
       console.error(`PDF konvertálási hiba részletei: ${errorMessage}`);
+      
+      updateProgressStatus({
+        step: "Hiba a PDF konvertálása során",
+        progress: 0,
+        details: `Hiba: ${errorMessage}`,
+      });
+      
       throw new Error(errorMessage);
     }
     
@@ -93,10 +128,10 @@ export const processSapsDocument = async (
     const pageCount = convertData.pageCount;
     const totalBatches = Math.ceil(pageCount / 20);
     
-    updateStatus({
+    updateProgressStatus({
       step: "PDF konvertálás befejezve",
       progress: 30,
-      details: `A dokumentum sikeresen konvertálva ${pageCount} képpé`,
+      details: `A dokumentum sikeresen konvertálva ${pageCount} képpé (${totalBatches} köteg)`,
       batchProgress: {
         currentBatch: 0,
         totalBatches: totalBatches,
@@ -106,7 +141,7 @@ export const processSapsDocument = async (
     });
     
     // Step 2: Process the images with Claude AI
-    updateStatus({
+    updateProgressStatus({
       step: "Claude AI feldolgozás",
       progress: 40,
       details: "A dokumentum elemzése Claude AI segítségével...",
@@ -157,6 +192,19 @@ export const processSapsDocument = async (
       
       const errorMessage = errorData.error || "Hiba a dokumentum feldolgozása során";
       console.error(`Claude feldolgozási hiba részletei: ${errorMessage}`);
+      
+      updateProgressStatus({
+        step: "Hiba a dokumentum feldolgozása során",
+        progress: 40,
+        details: `Claude AI feldolgozási hiba: ${errorMessage}`,
+        batchProgress: {
+          currentBatch: 1,
+          totalBatches: totalBatches,
+          pagesProcessed: Math.min(20, pageCount),
+          totalPages: pageCount
+        }
+      });
+      
       throw new Error(errorMessage);
     }
     
@@ -165,7 +213,7 @@ export const processSapsDocument = async (
     
     // Update batch progress information from the response
     if (processResult.batchInfo) {
-      updateStatus({
+      updateProgressStatus({
         step: "Claude AI feldolgozás befejezve",
         progress: 70,
         details: `Dokumentum feldolgozva (${processResult.batchInfo.processedBatches}/${processResult.batchInfo.totalBatches} köteg)`,
@@ -192,11 +240,23 @@ export const processSapsDocument = async (
     farmData.pageCount = pageCount;
     farmData.processingStatus = 'completed';
     
+    updateProgressStatus({
+      step: "Adatok elemzése",
+      progress: 80,
+      details: "Ügyfél és növénytermesztési adatok elemzése folyamatban...",
+      batchProgress: {
+        currentBatch: processResult.batchInfo.totalBatches,
+        totalBatches: processResult.batchInfo.totalBatches,
+        pagesProcessed: processResult.batchInfo.totalPages,
+        totalPages: processResult.batchInfo.totalPages || pageCount
+      }
+    });
+    
     // Check if the farm data is incomplete
     if (!farmData.applicantName || !farmData.submitterId || !farmData.applicantId) {
       console.warn("A Claude által feldolgozott adatok hiányosak:", farmData);
       
-      updateStatus({
+      updateProgressStatus({
         step: "Alapértelmezett adatok generálása",
         progress: 85,
         details: "Az AI nem tudott elegendő adatot kinyerni, példa adatok generálása...",
@@ -226,13 +286,25 @@ export const processSapsDocument = async (
     }
     
     // Additional validation and fix missing fields
+    updateProgressStatus({
+      step: "Adatok validálása",
+      progress: 90,
+      details: "Kisgazdasági adatok ellenőrzése és javítása...",
+      batchProgress: {
+        currentBatch: totalBatches,
+        totalBatches: totalBatches,
+        pagesProcessed: pageCount,
+        totalPages: pageCount
+      }
+    });
+    
     farmData = validateAndFixFarmData(farmData);
     
     // Save the farm data to the database
-    updateStatus({
+    updateProgressStatus({
       step: "Adatok mentése az adatbázisba",
       progress: 95,
-      details: "Ügyfél adatok rögzítése...",
+      details: "Ügyfél adatok rögzítése az adatbázisba...",
       batchProgress: {
         currentBatch: totalBatches,
         totalBatches: totalBatches,
@@ -249,7 +321,7 @@ export const processSapsDocument = async (
         farmData.farmId = farmId;
       }
       
-      updateStatus({
+      updateProgressStatus({
         step: "Feldolgozás befejezve",
         progress: 100,
         details: `Ügyfél-azonosító: ${farmData.submitterId || "Ismeretlen"}, Név: ${farmData.applicantName || "Ismeretlen"} sikeresen feldolgozva és mentve.`,
@@ -265,7 +337,7 @@ export const processSapsDocument = async (
     } catch (error) {
       console.error("Hiba az adatok mentése során:", error);
       
-      updateStatus({
+      updateProgressStatus({
         step: "Feldolgozás befejezve figyelmeztetéssel",
         progress: 100,
         details: "Adatok feldolgozva, de nem sikerült menteni az adatbázisba.",

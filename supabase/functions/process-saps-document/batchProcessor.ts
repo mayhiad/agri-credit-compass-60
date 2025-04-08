@@ -19,15 +19,18 @@ export async function processImageBatchWithClaude(
   
   try {
     // Process and validate images
+    console.log(`🔍 Validating and processing ${images.length} images in batch ${batchIndex}/${totalBatches}`);
     const { validImageUrls, invalidImageUrls, unsupportedFormatUrls } = processImages(images);
     
     if (validImageUrls.length === 0) {
+      console.error(`❌ No valid images found in batch ${batchIndex}/${totalBatches}. Invalid: ${invalidImageUrls.length}, Unsupported: ${unsupportedFormatUrls.length}`);
       throw new Error(`No valid images found in the batch. All ${images.length} images were invalid or in unsupported formats.`);
     }
     
-    console.log(`✅ Proceeding with ${validImageUrls.length} valid images for Claude API processing`);
+    console.log(`✅ Proceeding with ${validImageUrls.length} valid images for Claude API processing (batch ${batchIndex}/${totalBatches})`);
     
     // Create the message content with all images in the batch
+    console.log(`📝 Creating Claude prompt for batch ${batchIndex}/${totalBatches}`);
     const messageContent = [
       {
         type: "text",
@@ -52,11 +55,17 @@ export async function processImageBatchWithClaude(
     
     while (retryCount <= maxBatchRetries) {
       try {
+        console.log(`🚀 Sending request to Claude API for batch ${batchIndex}/${totalBatches} (attempt ${retryCount + 1}/${maxBatchRetries + 1})`);
+        
         // Send the request to Claude API
         const result = await sendClaudeRequest(messageContent, validImageUrls);
         
+        console.log(`🎯 Received response from Claude API for batch ${batchIndex}/${totalBatches}, extracting data...`);
+        
         // Extract the data from Claude's response
         const { extractedData, rawText } = extractDataFromClaudeResponse(result);
+        
+        console.log(`📊 Logging batch ${batchIndex}/${totalBatches} processing results to database`);
         
         // Log batch processing results
         await logBatchResults(
@@ -73,6 +82,8 @@ export async function processImageBatchWithClaude(
         const hasUsefulData = extractedData && 
                             (extractedData.applicantName || extractedData.documentId || 
                             (extractedData.cultures && extractedData.cultures.length > 0));
+        
+        console.log(`📋 Batch ${batchIndex}/${totalBatches} processing complete. Found useful data: ${hasUsefulData ? 'YES' : 'NO'}`);
         
         return {
           extractedData,
@@ -102,7 +113,7 @@ export async function processImageBatchWithClaude(
     // This should never be reached due to the throw in the loop
     throw new Error("Unexpected error in batch processing retry loop");
   } catch (error) {
-    console.error(`❌ Claude processing error: ${error.message}`);
+    console.error(`❌ Claude processing error for batch ${batchIndex}/${totalBatches}: ${error.message}`);
     throw error;
   }
 }
