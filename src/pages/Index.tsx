@@ -5,6 +5,7 @@ import { useAuth } from "@/App";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, LogIn, FileText, Upload, Search, FileCheck, FileSignature, PiggyBank } from "lucide-react";
 import { motion } from "framer-motion";
+import Steps from "@/components/Steps";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -16,42 +17,14 @@ const Index = () => {
     }
   }, [user, navigate]);
 
-  const processSteps = [
-    { 
-      id: 1, 
-      title: "Regisztráció", 
-      icon: <LogIn className="h-8 w-8 text-primary" />
-    },
-    { 
-      id: 2, 
-      title: "Gazdaság adatainak feltöltése", 
-      icon: <Upload className="h-8 w-8 text-primary" /> 
-    },
-    { 
-      id: 3, 
-      title: "Hitelajánlat", 
-      icon: <Search className="h-8 w-8 text-primary" /> 
-    },
-    { 
-      id: 4, 
-      title: "Személyazonosítás", 
-      icon: <FileText className="h-8 w-8 text-primary" /> 
-    },
-    { 
-      id: 5, 
-      title: "Feltételek áttekintése", 
-      icon: <FileCheck className="h-8 w-8 text-primary" /> 
-    },
-    { 
-      id: 6, 
-      title: "Szerződéskötés", 
-      icon: <FileSignature className="h-8 w-8 text-primary" /> 
-    },
-    { 
-      id: 7, 
-      title: "Folyósítás", 
-      icon: <PiggyBank className="h-8 w-8 text-primary" /> 
-    }
+  const loanProcessSteps = [
+    "Regisztráció", 
+    "Gazdaság adatai", 
+    "Hitelajánlat", 
+    "Személyazonosítás", 
+    "Feltételek", 
+    "Szerződéskötés", 
+    "Folyósítás"
   ];
 
   return (
@@ -69,7 +42,12 @@ const Index = () => {
       {/* Main content */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
         {/* Logo and tagline */}
-        <div className="text-center mb-16 max-w-3xl">
+        <motion.div 
+          className="text-center mb-16 max-w-3xl"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
           <img 
             src="/lovable-uploads/48c8da26-9c78-4840-b766-0dae2b64a5d4.png" 
             alt="AgriFIX Logo" 
@@ -79,39 +57,26 @@ const Index = () => {
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Nyújtsd be a hitelkérelmet mindössze 10 perc alatt, mi pedig 24 órán belül folyósítjuk a kért összeget!
           </p>
-        </div>
+        </motion.div>
 
         {/* Process flow */}
-        <div className="w-full max-w-6xl mb-16">
+        <motion.div 
+          className="w-full max-w-5xl mb-16 px-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+        >
           <h2 className="text-2xl font-semibold text-center mb-10">A hitelkérelem folyamata</h2>
-          
-          <div className="relative">
-            {/* Connecting line */}
-            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-200 -translate-y-1/2 z-0"></div>
-            
-            {/* Process steps */}
-            <div className="flex justify-between relative z-10">
-              {processSteps.map((step, index) => (
-                <div key={step.id} className="flex flex-col items-center">
-                  <div className="bg-white rounded-full p-4 border-2 border-primary mb-3">
-                    {step.icon}
-                  </div>
-                  <span className="text-sm font-medium text-center max-w-[120px]">{step.title}</span>
-                  
-                  {/* Arrow between steps (except after the last step) */}
-                  {index < processSteps.length - 1 && (
-                    <div className="absolute top-1/2 left-[calc((100%/7)*{index}+50px)] -translate-y-1/2 text-gray-400">
-                      <ChevronRight className="h-6 w-6" />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+          <Steps steps={loanProcessSteps} currentStep={0} />
+        </motion.div>
 
         {/* CTA */}
-        <div className="text-center max-w-2xl">
+        <motion.div 
+          className="text-center max-w-2xl"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6, duration: 0.5 }}
+        >
           <Link to="/auth">
             <Button size="lg" className="px-8 py-6 text-lg">
               Regisztráció megkezdése
@@ -122,7 +87,7 @@ const Index = () => {
           <p className="mt-6 text-gray-600 text-sm max-w-xl mx-auto">
             Készítsd elő a legfrisebb területalapú támogatási dokumentumodat, amelyről a szükséges naturália adatokat beolvassuk a hitelajánlat elkészítéséhez!
           </p>
-        </div>
+        </motion.div>
       </main>
     </div>
   );
