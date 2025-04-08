@@ -3,7 +3,7 @@
 
 // API constants
 export const CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
-export const CLAUDE_MODEL = "claude-3-opus-20240229";
+export const CLAUDE_MODEL = "claude-3-sonnet-20240229"; // Updated to use the latest available Claude model
 export const API_TIMEOUT = 300000; // 5 minutes
 export const MAX_IMAGES_PER_REQUEST = 20; // Claude limitations for images per request
 
