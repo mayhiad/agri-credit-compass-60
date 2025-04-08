@@ -76,7 +76,7 @@ export const saveHistoricalData = async (
       // Convert location_data to object if it's a string
       const updatedLocationData = typeof locationData === 'string' 
         ? JSON.parse(locationData) 
-        : {...locationData};
+        : { ...(locationData as Record<string, any>) };
       
       // Add historical years to location_data
       updatedLocationData.historical_years = historicalData;

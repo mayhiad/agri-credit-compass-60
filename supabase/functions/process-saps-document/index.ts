@@ -81,6 +81,72 @@ serve(async (req) => {
           status: 'processing'
         })
         .eq('batch_id', batchId);
+        
+      // Store the original PDF in the dokumentumok bucket
+      try {
+        console.log("📁 Checking for original PDF file in 'saps' path");
+        
+        const { data: originalFiles } = await supabase.storage
+          .from('dokumentumok')
+          .list(`saps/${userId}/${batchId}`);
+          
+        if (originalFiles && originalFiles.length > 0) {
+          const pdfFiles = originalFiles.filter(file => 
+            file.name.toLowerCase().endsWith('.pdf')
+          );
+          
+          if (pdfFiles.length > 0) {
+            // Get the original PDF file
+            const pdfFile = pdfFiles[0];
+            console.log(`📄 Found original PDF: ${pdfFile.name}`);
+            
+            // Download the PDF file
+            const { data: pdfData, error: pdfDownloadError } = await supabase.storage
+              .from('dokumentumok')
+              .download(`saps/${userId}/${batchId}/${pdfFile.name}`);
+              
+            if (pdfDownloadError) {
+              console.error("Error downloading original PDF:", pdfDownloadError);
+            } else if (pdfData) {
+              // Create the dokumentumok bucket if it doesn't exist
+              try {
+                const { data: buckets } = await supabase.storage.listBuckets();
+                const dokumentumokBucketExists = buckets.some(bucket => bucket.name === 'dokumentumok');
+                
+                if (!dokumentumokBucketExists) {
+                  await supabase.storage.createBucket('dokumentumok', {
+                    public: false
+                  });
+                  console.log(`✅ Created dokumentumok bucket`);
+                }
+              } catch (bucketError) {
+                console.warn(`⚠️ Error checking/creating dokumentumok bucket: ${bucketError.message}`);
+              }
+              
+              // Upload to 'dokumentumok' bucket with processingId
+              const { error: pdfUploadError } = await supabase.storage
+                .from('dokumentumok')
+                .upload(`${processingId}.pdf`, pdfData, {
+                  contentType: 'application/pdf',
+                  upsert: true
+                });
+                
+              if (pdfUploadError) {
+                console.error("Error uploading PDF to dokumentumok bucket:", pdfUploadError);
+              } else {
+                console.log(`✅ Copied original PDF to dokumentumok bucket as ${processingId}.pdf`);
+              }
+            }
+          } else {
+            console.warn(`⚠️ No PDF files found in saps/${userId}/${batchId}`);
+          }
+        } else {
+          console.warn(`⚠️ No files found in saps/${userId}/${batchId}`);
+        }
+      } catch (storageError) {
+        console.error("Error handling original PDF:", storageError);
+      }
+      
     } catch (error) {
       console.error(`Error checking/updating batch:`, error);
       throw new Error(`Failed to process batch: ${error.message}`);
@@ -243,6 +309,36 @@ serve(async (req) => {
       });
     }
     
+    // Save the final Claude response to clauderesponse bucket as a text file
+    if (result.rawText) {
+      try {
+        // Since we can't use docx directly in Deno, we'll save as plain text file
+        const textContent = `CLAUDE RESPONSE FOR ${processingId}\n\n${result.rawText}`;
+        const textEncoder = new TextEncoder();
+        const fileContent = textEncoder.encode(textContent);
+        
+        const { data: textUpload, error: textError } = await supabase.storage
+          .from('clauderesponse')
+          .upload(`${processingId}.txt`, fileContent, {
+            contentType: 'text/plain',
+            upsert: true
+          });
+          
+        if (textError) {
+          console.warn(`⚠️ Error saving Claude response to storage: ${textError.message}`);
+        } else {
+          const textUrl = supabase.storage
+            .from('clauderesponse')
+            .getPublicUrl(`${processingId}.txt`).data.publicUrl;
+            
+          console.log(`✅ Claude response saved to storage: ${textUrl}`);
+          result.claudeResponseUrl = textUrl;
+        }
+      } catch (textError) {
+        console.warn(`⚠️ Error creating Claude response text file: ${textError.message}`);
+      }
+    }
+    
     // Save OCR result to the database
     let ocrLogId = null;
     try {
@@ -255,7 +351,8 @@ serve(async (req) => {
           file_type: 'application/pdf',
           storage_path: `saps/${userId}/${batchId}/images`,
           ocr_content: result.rawText || "No OCR text available",
-          processing_id: processingId
+          processing_id: processingId,
+          claude_response_url: result.claudeResponseUrl
         })
         .select('id')
         .single();
@@ -267,41 +364,6 @@ serve(async (req) => {
         console.log(`✅ OCR log successfully created: ${ocrLog.id}`);
         ocrLogId = ocrLog.id;
       
-        // Save Claude raw response to clauderesponse bucket as Word document
-        if (result.rawText) {
-          try {
-            // Since we can't use docx directly in Deno, we'll save as plain text file
-            const textContent = `CLAUDE RESPONSE FOR ${processingId}\n\n${result.rawText}`;
-            const textEncoder = new TextEncoder();
-            const fileContent = textEncoder.encode(textContent);
-            
-            const { data: wordUpload, error: wordError } = await supabase.storage
-              .from('clauderesponse')
-              .upload(`${processingId}.txt`, fileContent, {
-                contentType: 'text/plain',
-                upsert: true
-              });
-              
-            if (wordError) {
-              console.warn(`⚠️ Error saving Claude response to storage: ${wordError.message}`);
-            } else {
-              const wordUrl = supabase.storage
-                .from('clauderesponse')
-                .getPublicUrl(`${processingId}.txt`).data.publicUrl;
-                
-              console.log(`✅ Claude response saved to storage: ${wordUrl}`);
-              
-              // Update OCR log with Claude response URL
-              await supabase
-                .from('document_ocr_logs')
-                .update({ claude_response_url: wordUrl })
-                .eq('id', ocrLogId);
-            }
-          } catch (wordError) {
-            console.warn(`⚠️ Error creating Claude response document: ${wordError.message}`);
-          }
-        }
-        
         // Save AI processing result
         const { error: extractionError } = await supabase
           .from('document_extraction_results')

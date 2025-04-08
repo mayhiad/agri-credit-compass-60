@@ -16,7 +16,6 @@ export const processAllImageBatches = async (
   
   // Process each batch sequentially
   let combinedResult: any = {
-    // Initialize with empty values - don't provide fallback values
     applicantName: "N/A",
     submitterId: "N/A",
     applicantId: "N/A",
@@ -132,8 +131,8 @@ export const processAllImageBatches = async (
         combinedResult.submissionDate !== "N/A" &&
         combinedResult.year !== "N/A" &&
         combinedResult.blockIds.length > 0 &&
-        combinedResult.hectares > 0 &&
-        combinedResult.cultures.length > 0;
+        combinedResult.cultures.length > 0 &&
+        combinedResult.hectares > 0;
         
       if (allRequiredDataFound) {
         console.log(`✅ All required data found after processing ${i + 1}/${batches.length} batches. Stopping early.`);
@@ -162,9 +161,6 @@ async function processImageBatch(
   processingId: string,
   batchIndex: number
 ) {
-  // This is a placeholder for the actual implementation
-  // In real implementation, we would call Claude API here
-  
   // Import Anthropic API client
   const API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
   if (!API_KEY) {
@@ -221,10 +217,11 @@ SPECIFIC INSTRUCTIONS:
 2. Find all block IDs which look like alphanumeric codes (e.g., "C1N7J518").
 3. Extract all crop types ("kultúra") and their corresponding areas in hectares.
 4. The total hectares should be the sum of all culture areas.
-5. Find the submission date of the document and the year it refers to.
+5. Find the submission date of the document ("Benyújtás dátuma") and the year it refers to ("Tárgyév").
 6. If you can't find certain information, use "N/A" for string values and 0 for numeric values.
 7. DON'T MAKE UP OR ESTIMATE DATA. If you're uncertain, use "N/A" or 0.
 8. Return ONLY the JSON object with no additional text or explanation.
+9. DO NOT USE placeholder data like "Szántóföldi kultúra" with 123.45 hectares. If you can't extract the real data, set cultures to an empty array.
 
 ## HISTORICAL DATA EXTRACTION
 For historical data ("historikus adatok"), look for tables showing crop data from previous years:
@@ -241,6 +238,15 @@ For historical data ("historikus adatok"), look for tables showing crop data fro
 6. Make sure to capture data for all crops, including those grown in smaller areas.
 7. Data is typically in tables with crops in rows and years in columns.
 8. Check for both area (ha) and yield (t) data for each crop and for each year listed.
+
+## 1.3 - Histórikus adatok:
+
+| Kultúra | [Év1] |  | [Év2] |  | [Év3] |  | [Év4] |  | [Év5] |  |
+|---------|------|------|------|------|------|------|------|------|------|------|
+|         | ha | t | ha | t | ha | t | ha | t | ha | t |
+| [Kultúra1] | [érték] | [érték] | ... | ... | ... | ... | ... | ... | ... | ... |
+| ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| **Összesen** | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] |
 
 NOTE: These documents may be in Hungarian. Look for words like "kérelmező", "ügyfél-azonosító", "blokkazonosító", "hektár", "terület", "dátum", "benyújtás dátuma", "tárgyév", etc.`;
 
@@ -314,8 +320,6 @@ NOTE: These documents may be in Hungarian. Look for words like "kérelmező", "�
   }
 }
 
-// Add utils.ts for batchArray function if it's not already there
-// We can provide a simple implementation here
 export const batchArray = <T>(array: T[], batchSize: number): T[][] => {
   const batches = [];
   for (let i = 0; i < array.length; i += batchSize) {

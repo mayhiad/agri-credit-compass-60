@@ -103,6 +103,39 @@ export const processSapsDocument = async (
       if (farmId) {
         // Update the farm data with the farm ID
         farmData.farmId = farmId;
+        
+        // After saving to the database, fetch the data again to ensure we have the latest
+        try {
+          const { data: farmRecord, error: farmError } = await supabase
+            .from('farms')
+            .select('*')
+            .eq('id', farmId)
+            .single();
+            
+          if (!farmError && farmRecord) {
+            // Update the total hectares and revenue from the database record
+            farmData.hectares = farmRecord.hectares;
+            farmData.totalRevenue = farmRecord.total_revenue;
+            
+            // Get the cultures for this farm
+            const { data: cultures, error: culturesError } = await supabase
+              .from('cultures')
+              .select('*')
+              .eq('farm_id', farmId);
+              
+            if (!culturesError && cultures && cultures.length > 0) {
+              // Update the cultures from the database
+              farmData.cultures = cultures.map(culture => ({
+                name: culture.name,
+                hectares: culture.hectares,
+                estimatedRevenue: culture.estimated_revenue
+              }));
+            }
+          }
+        } catch (fetchError) {
+          console.warn("Error fetching updated farm data:", fetchError);
+          // Continue with the data we have
+        }
       }
       
       updateStatus({
