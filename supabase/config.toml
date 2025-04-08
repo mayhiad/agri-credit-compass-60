@@ -4,6 +4,9 @@ ynfciltkzptrsmrjylkd = "https://ynfciltkzptrsmrjylkd.supabase.co"
 [functions.convert-pdf-to-images]
 verify_jwt = true
 
+[functions.delete-user]
+verify_jwt = true
+
 [functions.get-thread-results]
 verify_jwt = true
 
