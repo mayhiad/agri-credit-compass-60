@@ -41,7 +41,8 @@ const LoanApplication = () => {
         if (!farmData) {
           setFarmData({
             totalRevenue: totalRevenue,
-            cultures: []
+            cultures: [],
+            hectares: 0 // Added the required hectares property with a default value
           });
         }
       }
