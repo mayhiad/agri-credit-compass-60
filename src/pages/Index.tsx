@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/App";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, LogIn, FileText, Upload, Search, FileCheck, FileSignature, PiggyBank } from "lucide-react";
+import { ChevronRight, LogIn } from "lucide-react";
 import { motion } from "framer-motion";
 import Steps from "@/components/Steps";
 
@@ -48,12 +48,9 @@ const Index = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <img 
-            src="/lovable-uploads/48c8da26-9c78-4840-b766-0dae2b64a5d4.png" 
-            alt="AgriFIX Logo" 
-            className="h-16 mx-auto mb-6"
-          />
-          <h1 className="text-3xl font-bold mb-4">Mezőgazdasági szabadfelhasználású gyorshitel</h1>
+          <h1 className="text-6xl font-bold mb-6 text-primary">
+            AgriFIX
+          </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Nyújtsd be a hitelkérelmet mindössze 10 perc alatt, mi pedig 24 órán belül folyósítjuk a kért összeget!
           </p>
@@ -94,3 +91,4 @@ const Index = () => {
 };
 
 export default Index;
+
