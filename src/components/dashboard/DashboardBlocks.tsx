@@ -71,7 +71,7 @@ const DashboardBlocks = ({ farmData }: DashboardBlocksProps) => {
             {farmData.hectares && (
               <div className="mt-6 pt-6 border-t">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">A blokkazonosítók alatt részletezett területméretek összege:</span>
+                  <span className="text-sm text-muted-foreground">Blokkok összesített mérete:</span>
                   <span className="font-medium">
                     {typeof farmData.hectares === 'number' 
                       ? farmData.hectares.toFixed(2).replace('.', ',') + " ha" 

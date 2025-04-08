@@ -236,16 +236,20 @@ Az alapadatok a SAPS dokumentum első oldalán találhatók mindig. Itt keresd:
 ## 1.2 - BLOKKOK
 A blokkok a "14 Területek összesítése hasznosítási adatok szerint" és a "16 EFA területek összesítése" között található "15 Területek összesítése blokkhasználat szerint" modulban találhatók. Ebben a részben:
 1. Keresd a blokkokat, melyek általában alfanumerikus kódok (pl. "C1N7J518")
-2. A blokkok mellett találhatók a területméretek hektárban
-3. Számold ki az összes blokk teljes területméretét (hektár) - ezt az értéket add meg a "hectares" mezőben
+2. A blokkok mellett találhatók az adott kódjelű blokkhoz tartó területméret hektárban
+3. Számold ki az összes blokk teljes területméretét (hektár) - ezt az értéket add meg a "blokkok összesített mérete" mezőben
 4. A teljes hektárméret a blokkok mellett lévő értékek összege
 
 ## 1.3 - HISTORIKUS ADATOK
 A historikus adatokat a "10 Változásvezetés" és a "12 Növényvédelmi szakirányító nyilatkozat" között található "11 Kárenyhítés/Biztosítási díjtámogatás" modulban keresd, azon belül a "Termésmennyiség megadása a mezőgazdasági termelést érintő időjárási és más természeti kockázatok kezelésére szolgáló rendszer keretében" részben:
-1. Ez a táblázat tartalmazza az elmúlt 5 év adatait
-2. Minden évhez tartozik terület (ha) és termés (t) adat
+1. Ez a táblázat tartalmazza az elmúlt 5 év adatait - add vissza JSON-ban, hogy mely évek ezek
+2. Minden évhez tartozik terület (ha) és termés (t) adat - a sorszámok mutatják, hogy melyik kultúráról van szó. Amennyiben a kultúra (sor) és az "[x] évi
+terület(ha)" histórikus év metszetében van egy szám, az azt jelenti, hogy az adott kulturát ennyi hektáron termesztették abban az évben.
+Amennyiben a kultúra (sor) és az "[x] évi
+termésm(t)" metszetében van egy érték, az azt jelenti, hogy az adott kultúrából ekkora mennyiséget termeltek hektáronként abban az évben. A kettő szorzata (hektár mennyisége) x (termésm(t)) megadja, hogy adott évben ÖSSZESEN hány tonna mennyiséget termeltek a kultúrából. 
 3. Az egyes kultúrák soronként vannak felsorolva
-4. Mindegyik növénykultúrához tartozik terület és termésmennyiség minden évben
+4. Minden kultúránál meg kell vizsgálni, az adott évben (oszlopban) van-e hozzá megfelelő érték, akár a hektárt, akár a tonnát tekintve.
+5. A kiolvasott adatokat json-ban kell visszaadni
 
 ## 1.4 - TÁRGYÉVI ADATOK (KULTÚRÁK)
 A tárgyévi kultúrák adatai a "17 Diverzifikáció összesítése" modulban találhatók:

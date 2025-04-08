@@ -101,10 +101,16 @@ export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string)
       document_id: farmData.documentId,
       word_document_url: farmData.wordDocumentUrl,
       claude_response_url: farmData.claudeResponseUrl,
-      processing_id: farmData.processingId
+      processing_id: farmData.processingId,
+      historical_years: farmData.historicalYears || farmData.historicalData
     };
     
-    console.log("Saving detailed SAPS extraction data:", extractionData);
+    console.log("Saving detailed SAPS extraction data:", {
+      farm_id: extractionData.farm_id,
+      document_id: extractionData.document_id,
+      applicant_name: extractionData.applicant_name,
+      historical_years_count: extractionData.historical_years?.length || 0
+    });
     
     // Save the extraction results to ensure we have all metadata in one place
     const { error: extractionError } = await supabase
