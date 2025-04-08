@@ -6,6 +6,7 @@ import AdminLoanList from "./AdminLoanList";
 import AdminCustomerList from "./AdminCustomerList";
 import AdminMarketPrices from "./AdminMarketPrices";
 import DeleteUser from "./DeleteUser";
+import AdminClaudeResponses from "./AdminClaudeResponses";
 
 interface AdminDashboardProps {
   isAdmin: boolean;
@@ -32,10 +33,11 @@ const AdminDashboard = ({ isAdmin, isFinanceOfficer }: AdminDashboardProps) => {
         onValueChange={setActiveTab}
         className="space-y-4"
       >
-        <TabsList className="grid grid-cols-4 max-w-2xl">
+        <TabsList className="grid grid-cols-5 max-w-3xl">
           <TabsTrigger value="customers">Ügyfelek</TabsTrigger>
           <TabsTrigger value="loans">Hitelkérelmek</TabsTrigger>
           <TabsTrigger value="market">Piaci árak</TabsTrigger>
+          <TabsTrigger value="claude">Claude válaszok</TabsTrigger>
           {isAdmin && <TabsTrigger value="tools">Admin eszközök</TabsTrigger>}
         </TabsList>
         
@@ -49,6 +51,10 @@ const AdminDashboard = ({ isAdmin, isFinanceOfficer }: AdminDashboardProps) => {
         
         <TabsContent value="market">
           <AdminMarketPrices isAdmin={isAdmin} isFinanceOfficer={isFinanceOfficer} />
+        </TabsContent>
+        
+        <TabsContent value="claude">
+          <AdminClaudeResponses isAdmin={isAdmin} isFinanceOfficer={isFinanceOfficer} />
         </TabsContent>
         
         {isAdmin && (
