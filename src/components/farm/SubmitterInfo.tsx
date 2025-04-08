@@ -1,65 +1,55 @@
 
 import { Card, CardContent } from "@/components/ui/card";
-import { User, Calendar, FileText, UserCheck } from "lucide-react";
+import { Label } from "@/components/ui/label";
 
 interface SubmitterInfoProps {
-  submitterName?: string | null;
-  submitterId?: string | null;
-  applicantId?: string | null;
-  submissionDate?: string | null;
+  submitterName?: string;
+  submitterId?: string;
+  applicantId?: string;
+  submissionDate?: string;
+  documentId?: string;
+  documentYear?: string;
 }
 
-const SubmitterInfo = ({ 
+export const SubmitterInfo = ({ 
   submitterName, 
   submitterId, 
-  applicantId,
-  submissionDate
+  applicantId, 
+  submissionDate,
+  documentId,
+  documentYear
 }: SubmitterInfoProps) => {
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="space-y-4">
-          <div className="flex items-start gap-3">
-            <User className="h-5 w-5 text-primary mt-0.5" />
-            <div>
-              <div className="text-sm font-medium text-muted-foreground">Beadó neve:</div>
-              <div className="font-semibold">
-                {submitterName || "Nem elérhető"}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <FileText className="h-5 w-5 text-primary mt-0.5" />
-            <div>
-              <div className="text-sm font-medium text-muted-foreground">Beadó azonosítószáma:</div>
-              <div className="font-semibold">
-                {submitterId || "Nem elérhető"}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <UserCheck className="h-5 w-5 text-primary mt-0.5" />
-            <div>
-              <div className="text-sm font-medium text-muted-foreground">Kérelmező azonosítószáma:</div>
-              <div className="font-semibold">
-                {applicantId || "Nem elérhető"}
-              </div>
-            </div>
-          </div>
-
-          {submissionDate && (
-            <div className="flex items-start gap-3">
-              <Calendar className="h-5 w-5 text-primary mt-0.5" />
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Beadás időpontja:</div>
-                <div className="font-semibold">
-                  {submissionDate}
-                </div>
-              </div>
-            </div>
-          )}
+    <Card className="overflow-hidden">
+      <CardContent className="p-6 grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-muted-foreground">Beadó neve</Label>
+          <div className="font-medium">{submitterName || "N/A"}</div>
+        </div>
+        
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-muted-foreground">Beadó ügyfél-azonosító száma</Label>
+          <div className="font-medium">{submitterId || "N/A"}</div>
+        </div>
+        
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-muted-foreground">Kérelmező ügyfél-azonosító száma</Label>
+          <div className="font-medium">{applicantId || "N/A"}</div>
+        </div>
+        
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-muted-foreground">Iratazonosító</Label>
+          <div className="font-medium">{documentId || "N/A"}</div>
+        </div>
+        
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-muted-foreground">Egységes kérelem beadásának időpontja</Label>
+          <div className="font-medium">{submissionDate || "N/A"}</div>
+        </div>
+        
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-muted-foreground">Meghatározott tárgyév</Label>
+          <div className="font-medium">{documentYear || new Date().getFullYear().toString()}</div>
         </div>
       </CardContent>
     </Card>

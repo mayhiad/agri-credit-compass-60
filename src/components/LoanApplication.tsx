@@ -11,6 +11,7 @@ import FarmLocation from "@/components/FarmLocation";
 import ContractSigning from "@/components/ContractSigning";
 import LoanComplete from "@/components/LoanComplete";
 import { FarmData, UserData } from "@/types/farm";
+import FarmInfoDisplay from "@/components/farm/FarmInfoDisplay";
 
 const LoanApplication = () => {
   const location = useLocation();
@@ -75,7 +76,7 @@ const LoanApplication = () => {
         }
         return <FileUpload onComplete={handleFileUploadComplete} />;
       case 2:
-        return <FarmInfo 
+        return <FarmInfoDisplay 
           farmData={farmData!} 
           onComplete={handleNextStep} 
         />;

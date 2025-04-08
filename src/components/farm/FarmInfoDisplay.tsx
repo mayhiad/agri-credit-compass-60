@@ -1,13 +1,14 @@
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { FarmData } from "@/types/farm";
-import { ArrowRight } from "lucide-react";
-import FarmSummary from "./FarmSummary";
-import CultureTable from "./CultureTable";
-import BlocksAccordion from "./BlocksAccordion";
-import DocumentInfo from "./DocumentInfo";
+import { ArrowRight, Check, FileText, User, Calendar, MapPin, Layers } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SubmitterInfo from "./SubmitterInfo";
+import BlocksAccordion from "./BlocksAccordion";
+import CultureTable from "./CultureTable";
+import HistoricalCrops from "./HistoricalCrops";
 
 interface FarmInfoDisplayProps {
   farmData: FarmData;
@@ -15,6 +16,8 @@ interface FarmInfoDisplayProps {
 }
 
 export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoDisplayProps) => {
+  const [activeTab, setActiveTab] = useState("admin");
+  
   // Make sure farmData is properly defined before rendering
   if (!farmData) {
     return (
@@ -44,33 +47,108 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoDisplayProps) 
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Gazdasági adatok</CardTitle>
+        <CardTitle>Gazdasági adatok áttekintése</CardTitle>
         <CardDescription>
           Ellenőrizze a SAPS dokumentum alapján kinyert adatokat
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <SubmitterInfo 
-          submitterName={farmData.applicantName} 
-          submitterId={farmData.submitterId}
-          applicantId={farmData.applicantId}
-          submissionDate={farmData.submissionDate}
-        />
-        <FarmSummary farmData={farmData} />
-        <CultureTable farmData={farmData} />
-        <BlocksAccordion farmData={farmData} />
-        <DocumentInfo 
-          documentId={farmData.documentId} 
-          applicantName={farmData.applicantName} 
-          documentDate={farmData.documentDate || farmData.submissionDate || farmData.year}
-        />
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid grid-cols-4 mb-6">
+            <TabsTrigger value="admin">
+              <User className="h-4 w-4 mr-2" />
+              Adminisztrációs adatok
+            </TabsTrigger>
+            <TabsTrigger value="blocks">
+              <MapPin className="h-4 w-4 mr-2" />
+              Blokkazonosítók
+            </TabsTrigger>
+            <TabsTrigger value="historical">
+              <Calendar className="h-4 w-4 mr-2" />
+              Histórikus adatok
+            </TabsTrigger>
+            <TabsTrigger value="current">
+              <Layers className="h-4 w-4 mr-2" />
+              Tárgyévi adatok
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="admin" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl">Adminisztrációs adatok</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <SubmitterInfo 
+                  submitterName={farmData.applicantName} 
+                  submitterId={farmData.submitterId}
+                  applicantId={farmData.applicantId}
+                  submissionDate={farmData.submissionDate}
+                  documentId={farmData.documentId}
+                  documentYear={farmData.year}
+                />
+              </CardContent>
+              <CardFooter>
+                <Button onClick={() => setActiveTab("blocks")} className="w-full">
+                  Jóváhagyás
+                  <Check className="ml-2 h-4 w-4" />
+                </Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="blocks" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl">Blokkazonosítók</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <BlocksAccordion farmData={farmData} />
+              </CardContent>
+              <CardFooter>
+                <Button onClick={() => setActiveTab("historical")} className="w-full">
+                  Jóváhagyás
+                  <Check className="ml-2 h-4 w-4" />
+                </Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="historical" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl">Histórikus adatok</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <HistoricalCrops historicalData={farmData.historicalData || []} />
+              </CardContent>
+              <CardFooter>
+                <Button onClick={() => setActiveTab("current")} className="w-full">
+                  Jóváhagyás
+                  <Check className="ml-2 h-4 w-4" />
+                </Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="current" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl">Tárgyévi termelési adatok</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <CultureTable farmData={farmData} showPrices={false} showRevenue={false} />
+              </CardContent>
+              <CardFooter>
+                <Button onClick={onComplete} className="w-full">
+                  Tovább a hitelajánlatra
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </CardContent>
-      <CardFooter>
-        <Button onClick={onComplete} className="w-full">
-          Adatok megerősítése
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
-      </CardFooter>
     </Card>
   );
 };

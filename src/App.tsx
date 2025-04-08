@@ -12,6 +12,7 @@ import Admin from "./pages/Admin";
 import AdminAuth from "./pages/AdminAuth";
 import AdminCustomerDetail from "./pages/AdminCustomerDetail";
 import AdminLoanDetail from "./pages/AdminLoanDetail";
+import AdminMarketPrices from "./pages/AdminMarketPrices";
 import LoanApplication from "./components/LoanApplication";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -76,6 +77,7 @@ const App = () => {
             <Route path="/admin/auth" element={<AdminAuth />} />
             <Route path="/admin/customer/:customerId" element={<AdminCustomerDetail />} />
             <Route path="/admin/loan/:loanId" element={<AdminLoanDetail />} />
+            <Route path="/admin/market-prices" element={<AdminMarketPrices />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

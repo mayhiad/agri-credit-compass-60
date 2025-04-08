@@ -10,11 +10,15 @@ export interface Culture {
 }
 
 export interface MarketPrice {
+  id: string;
   culture: string;
   averageYield: number;
   price: number;
   trend: number;
-  lastUpdated: string | Date;
+  last_updated: string | Date;
+  region: string;
+  year: string;
+  is_forecast: boolean;
 }
 
 export interface HistoricalCrop {
