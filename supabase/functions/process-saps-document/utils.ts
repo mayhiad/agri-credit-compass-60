@@ -1,41 +1,34 @@
 
-// Constants and Utility functions for document processing
-
-// Standard API and processing configuration
+// Constants
 export const CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
 export const CLAUDE_MODEL = "claude-3-opus-20240229";
-export const MAX_IMAGES_PER_REQUEST = 20; // Claude maximum per request
+export const MAX_IMAGES_PER_REQUEST = 20;
 
-// Document formats that are accepted by the system
-export const ACCEPTED_FILE_TYPES = [
-  'application/pdf',
-  'image/png',
-  'image/jpeg',
-  'image/jpg'
-];
+/**
+ * Checks if an image format is supported by Claude
+ */
+export function isImageFormatSupported(format: string): boolean {
+  const supportedFormats = ['.jpg', '.jpeg', '.png'];
+  return supportedFormats.some(fmt => format.toLowerCase().endsWith(fmt));
+}
 
-// Check if an image format is supported
-export const isImageFormatSupported = (fileType: string) => {
-  return ['image/png', 'image/jpeg', 'image/jpg'].includes(fileType);
-};
-
-// Split imageUrls into batches of MAX_IMAGES_PER_REQUEST
-export function splitIntoBatches<T>(items: T[], batchSize: number): T[][] {
-  if (!items || !items.length) return [];
-  
+/**
+ * Splits an array into batches of specified size
+ */
+export function splitIntoBatches<T>(array: T[], batchSize: number): T[][] {
   const batches: T[][] = [];
-  for (let i = 0; i < items.length; i += batchSize) {
-    batches.push(items.slice(i, i + batchSize));
+  for (let i = 0; i < array.length; i += batchSize) {
+    batches.push(array.slice(i, i + batchSize));
   }
   return batches;
 }
 
-// Create the prompt for Claude that's sent with each image batch
+/**
+ * Creates a prompt for Claude to analyze SAPS documents
+ */
 export function createClaudePrompt(): string {
   return `
-# Mezőgazdasági dokumentum elemzési feladat
-
-A feltöltött mezőgazdasági dokumentum(ok)ból (jellemzően egységes kérelem, támogatási igénylés, stb.) azonosíts és gyűjts ki meghatározott adatokat, majd strukturáld azokat a megadott formátumban.
+A következő feladat: a feltöltött mezőgazdasági dokumentum(ok)ból (jellemzően egységes kérelem, támogatási igénylés, stb.) azonosíts és gyűjts ki meghatározott adatokat, majd strukturáld azokat a megadott formátumban.
 
 A dokumentumban keresd és azonosítsd az alábbi információkat:
 
@@ -100,7 +93,6 @@ Az összegyűjtött adatokat két formátumban add vissza:
 
 2. MÁSODJÁRA pedig valid JSON formátumban, a következő struktúrában:
 
-\`\`\`json
 {
   "adminisztracios_adatok": {
     "beado_nev": "",
@@ -114,20 +106,18 @@ Az összegyűjtött adatokat két formátumban add vissza:
     {"kod": "", "terulet_ha": 0.0}
   ],
   "historikus_adatok": {
-    "evek": [], // A dokumentumban szereplő évek listája, pl. [2016, 2017, 2018, 2019, 2020]
+    "evek": [],
     "kulturak": [
       {
         "nev": "",
         "kod": "",
         "adatok": [
           {"ev": 0, "terulet_ha": 0.0, "termesmenny_t": 0.0}
-          // Minden adatot a dokumentumban szereplő évszámokkal adj meg
         ]
       }
     ],
     "osszesitesek": [
       {"ev": 0, "osszes_terulet_ha": 0.0, "osszes_termeny_t": 0.0}
-      // Minden adatot a dokumentumban szereplő évszámokkal adj meg
     ]
   },
   "targyevi_adatok": {
@@ -140,11 +130,5 @@ Az összegyűjtött adatokat két formátumban add vissza:
       "osszes_mezogazdasagi_terulet_ha": 0.0
     }
   }
-}
-\`\`\`
-
-Ha bizonyos adatok nem találhatók a dokumentumban, hagyd üresen a megfelelő mezőket. 
-Törekedj a legnagyobb pontosságra és alaposságra az adatok kinyerésében. 
-Különösen figyelj a számadatok pontosságára, és a kultúrák/növények pontos nevére, hasznosítási kódjára.
-`;
+}`;
 }

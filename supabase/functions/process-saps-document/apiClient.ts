@@ -1,6 +1,6 @@
 
 // Claude API client
-import { CLAUDE_API_URL, CLAUDE_MODEL } from "./utils.ts";
+import { CLAUDE_API_URL, CLAUDE_MODEL, isImageFormatSupported } from "./utils.ts";
 
 /**
  * Sends a request to the Claude API
@@ -43,15 +43,21 @@ export async function sendClaudeRequest(
     
     while (retryCount <= maxRetries) {
       try {
+        console.log(`API request attempt ${retryCount + 1}/${maxRetries + 1}`);
+        
         const response = await fetch(CLAUDE_API_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "x-api-key": claudeApiKey,
-            "anthropic-version": "2023-06-01"
+            "anthropic-version": "2023-06-01",
+            "Connection": "keep-alive"
           },
           body: JSON.stringify(payload)
         });
+        
+        // Log response status
+        console.log(`Claude API response status: ${response.status}`);
         
         // Check for overloaded error specifically
         if (response.status === 529) {
@@ -86,25 +92,34 @@ export async function sendClaudeRequest(
           }
         }
         
+        // Handle other error responses
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`❌ Claude API error: ${response.status} - ${errorText}`);
-          
-          // Try to extract more meaningful error information
           try {
-            const errorJson = JSON.parse(errorText);
-            const errorMessage = errorJson.error?.message || errorJson.error || errorText;
-            throw new Error(`Claude API error: ${response.status} - ${errorMessage}`);
-          } catch (parseError) {
+            // Try to parse error response as JSON first
+            const errorJson = await response.json();
+            console.error(`❌ Claude API error: ${response.status} - ${JSON.stringify(errorJson)}`);
+            throw new Error(`Claude API error: ${response.status} - ${errorJson.error?.message || JSON.stringify(errorJson)}`);
+          } catch (jsonError) {
+            // Fallback to text if not JSON
+            const errorText = await response.text();
+            console.error(`❌ Claude API error: ${response.status} - ${errorText}`);
             throw new Error(`Claude API error: ${response.status} - ${errorText}`);
           }
         }
         
-        const result = await response.json();
-        console.log(`✅ Claude API response received. Content type: ${result.content?.[0]?.type}, length: ${result.content?.[0]?.text?.length || 0} chars`);
-        
-        return result;
+        // Try to parse the successful response
+        try {
+          const result = await response.json();
+          console.log(`✅ Claude API response received. Content type: ${result.content?.[0]?.type}, length: ${result.content?.[0]?.text?.length || 0} chars`);
+          
+          return result;
+        } catch (parseError) {
+          console.error(`❌ Failed to parse Claude API response: ${parseError.message}`);
+          throw new Error(`Failed to parse Claude API response: ${parseError.message}`);
+        }
       } catch (fetchError) {
+        console.error(`❌ Network error during API request: ${fetchError.message}`);
+        
         // If it's any other error besides the retry logic, throw immediately
         if (retryCount >= maxRetries || 
             (!fetchError.message.includes("529") && !fetchError.message.includes("429"))) {

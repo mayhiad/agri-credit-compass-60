@@ -19,16 +19,20 @@ export function processImages(imageUrls: string[]) {
       
       // Check for image format
       const path = url.pathname.toLowerCase();
-      if (path.endsWith('.jpg') || path.endsWith('.jpeg') || path.endsWith('.png')) {
+      if (isImageFormatSupported(path)) {
         validImageUrls.push(imageUrl);
       } else {
         unsupportedFormatUrls.push(imageUrl);
+        console.log(`Unsupported image format: ${path}`);
       }
     } catch (error) {
       // URL is invalid
       invalidImageUrls.push(imageUrl);
+      console.log(`Invalid image URL: ${imageUrl}`);
     }
   }
+  
+  console.log(`Images processed: Valid: ${validImageUrls.length}, Invalid: ${invalidImageUrls.length}, Unsupported: ${unsupportedFormatUrls.length}`);
   
   return { validImageUrls, invalidImageUrls, unsupportedFormatUrls };
 }
