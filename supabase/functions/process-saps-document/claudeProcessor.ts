@@ -1,4 +1,3 @@
-
 import { batchArray, sortFilesByPageNumber } from "./utils.ts";
 
 export const processAllImageBatches = async (
@@ -242,7 +241,7 @@ For historical data ("historikus adatok"), look for tables showing crop data fro
    - Area data in hectares
    - Yield data in tons
 4. Often found in the first third of the document.
-5. May be under heading "Termésmenyiség megadása a mezőgazdasági termelést érintő időjárási és más természeti kockázatok kezelésére szolgáló rendszer keretében".
+5. May be under heading "Termésmennyiség megadása a mezőgazdasági termelést érintő időjárási és más természeti kockázatok kezelésére szolgáló rendszer keretében".
 6. Make sure to capture data for all crops, including those grown in smaller areas.
 7. Data is typically in tables with crops in rows and years in columns.
 8. Check for both area (ha) and yield (t) data for each crop and for each year listed.
