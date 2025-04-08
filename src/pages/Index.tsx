@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/App";
@@ -45,7 +46,7 @@ const Index = () => {
           transition={{ duration: 0.5 }}
         >
           <h1 className="text-6xl font-bold mb-6 text-primary">
-            agrFIx
+            agriFIx
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Nyújtsd be a hitelkérelmet mindössze 10 perc alatt, mi pedig 24 órán belül folyósítjuk a kért összeget!
