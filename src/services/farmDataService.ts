@@ -85,39 +85,38 @@ export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string)
       console.error("Error saving farm details:", detailsError);
     }
     
-    // 3. Save OCR information (if available)
-    if (farmData.ocrText || farmData.fileName || farmData.processingId) {
-      const rawData = {
-        farm_id: farmId,
-        ocr_text: farmData.ocrText,
-        file_name: farmData.fileName,
-        file_size: farmData.fileSize,
-        document_date: farmData.documentDate || farmData.submissionDate || farmData.year,
-        extracted_blocks: farmData.blockIds,
-        word_document_url: farmData.wordDocumentUrl,
-        claude_response_url: farmData.claudeResponseUrl,
-        processing_id: farmData.processingId
-      };
+    // 3. Create a comprehensive extraction result record with all SAPS metadata
+    const extractionData = {
+      farm_id: farmId,
+      applicant_name: farmData.applicantName,
+      submitter_id: farmData.submitterId,
+      applicant_id: farmData.applicantId,
+      submission_date: farmData.submissionDate,
+      year: farmData.year,
+      block_ids: farmData.blockIds,
+      ocr_text: farmData.ocrText,
+      file_name: farmData.fileName,
+      file_size: farmData.fileSize,
+      document_date: farmData.documentDate || farmData.submissionDate || farmData.year,
+      word_document_url: farmData.wordDocumentUrl,
+      claude_response_url: farmData.claudeResponseUrl,
+      processing_id: farmData.processingId
+    };
+    
+    console.log("Saving detailed SAPS extraction data:", extractionData);
+    
+    // Save the extraction results to ensure we have all metadata in one place
+    const { error: extractionError } = await supabase
+      .from('document_extraction_results')
+      .insert({
+        user_id: userId,
+        extracted_data: extractionData,
+        processing_status: 'completed',
+        ocr_log_id: farmData.processingId || '00000000-0000-0000-0000-000000000000'
+      });
       
-      console.log("Saving OCR information:", rawData);
-      
-      // Don't let this block the operation if it fails
-      try {
-        const { error: ocrError } = await supabase
-          .from('document_extraction_results')
-          .insert({
-            user_id: userId,
-            extracted_data: rawData,
-            processing_status: 'completed',
-            ocr_log_id: '00000000-0000-0000-0000-000000000000' // Placeholder since we don't have the actual log ID
-          });
-          
-        if (ocrError) {
-          console.warn("Warning: Could not save OCR information:", ocrError);
-        }
-      } catch (ocrSaveError) {
-        console.warn("Error saving OCR information:", ocrSaveError);
-      }
+    if (extractionError) {
+      console.warn("Warning: Could not save extraction data:", extractionError);
     }
     
     // 4. Save each culture

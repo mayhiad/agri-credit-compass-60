@@ -51,28 +51,25 @@ export const fetchFarmData = async (userId: string): Promise<{
       console.error("Hiba a kultúrák lekérésekor:", culturesError);
     }
 
-    // Fetch user profile to get the name if available
-    const { data: userProfile, error: profileError } = await supabase
-      .from('profiles')
-      .select('first_name, last_name')
-      .eq('id', userId)
-      .single();
+    // Fetch extra farm metadata from document_extraction_results if available
+    const { data: extractionResults, error: extractionError } = await supabase
+      .from('document_extraction_results')
+      .select('extracted_data')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+      
+    if (extractionError) {
+      console.error("Hiba az SAPS adatok lekérésekor:", extractionError);
+    }
     
-    if (profileError && profileError.code !== 'PGRST116') {
-      console.error("Hiba a felhasználói profil lekérésekor:", profileError);
+    // Get extracted farm metadata if available
+    let extractedMetadata = null;
+    if (extractionResults && extractionResults.length > 0 && extractionResults[0].extracted_data?.farm_id === farm.id) {
+      extractedMetadata = extractionResults[0].extracted_data;
     }
-
-    // Determine applicant name - use from farm data first, then profile, then fallback
-    let applicantName = farm.applicant_name;
-    if (!applicantName && userProfile && (userProfile.first_name || userProfile.last_name)) {
-      applicantName = `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim();
-    }
-    if (!applicantName) {
-      // Fallback to a more user-friendly default than userId
-      applicantName = "Ismeretlen felhasználó";
-    }
-
-    // Build market price data
+    
+    // Build market price data - no fallbacks, only real data or empty array
     const marketPriceData = farmDetails?.market_prices && 
       Array.isArray(farmDetails.market_prices) ? 
       farmDetails.market_prices.map((price: any) => ({
@@ -83,8 +80,9 @@ export const fetchFarmData = async (userId: string): Promise<{
         lastUpdated: new Date(price.lastUpdated || new Date().toISOString())
       })) : [];
     
-    // Build farm data
+    // Build farm data with NO fallbacks, only real data or N/A
     const farmData: FarmData = {
+      // Core farm data
       hectares: farm.hectares,
       cultures: cultures?.map(culture => ({
         name: culture.name,
@@ -92,15 +90,32 @@ export const fetchFarmData = async (userId: string): Promise<{
         estimatedRevenue: culture.estimated_revenue
       })) || [],
       totalRevenue: farm.total_revenue,
-      region: farm.region || "Ismeretlen régió",
-      documentId: farm.document_id || `SAPS-2023-${userId.substring(0, 6)}`,
-      applicantName: applicantName,
-      submitterId: farm.submitter_id || "Ismeretlen azonosító",
-      applicantId: farm.applicant_id || "Ismeretlen azonosító",
-      submissionDate: farm.submission_date || "Ismeretlen dátum",
-      year: farm.year || new Date().getFullYear().toString(),
-      blockIds: farm.block_ids || [`K-${userId.substring(0, 4)}`, `L-${userId.substring(4, 8)}`],
-      marketPrices: marketPriceData as MarketPrice[]
+      region: farm.region || "N/A",
+      
+      // Document data - only use real data from database, no fallbacks
+      documentId: farm.document_id || "N/A",
+      applicantName: "N/A",
+      submitterId: "N/A",
+      applicantId: "N/A",
+      submissionDate: "N/A",
+      year: "N/A",
+      blockIds: [],
+      marketPrices: marketPriceData as MarketPrice[],
+      
+      // Extra metadata from document extraction if available
+      ...(extractedMetadata && {
+        applicantName: extractedMetadata.applicant_name || "N/A",
+        submitterId: extractedMetadata.submitter_id || "N/A",
+        applicantId: extractedMetadata.applicant_id || "N/A",
+        submissionDate: extractedMetadata.submission_date || "N/A",
+        year: extractedMetadata.year || "N/A",
+        blockIds: extractedMetadata.block_ids || [],
+        processingId: extractedMetadata.processing_id,
+        claudeResponseUrl: extractedMetadata.claude_response_url,
+        fileName: extractedMetadata.file_name,
+        fileSize: extractedMetadata.file_size,
+        documentDate: extractedMetadata.document_date
+      })
     };
     
     return { data: farmData, error: null };
