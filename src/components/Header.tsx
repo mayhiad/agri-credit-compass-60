@@ -15,7 +15,7 @@ const Header = () => {
     try {
       await supabase.auth.signOut();
       toast.success("Sikeres kijelentkezés");
-      navigate("/");
+      navigate("/"); // Ensure we redirect to the landing page
     } catch (error) {
       console.error("Sign out error:", error);
       toast.error("Hiba történt a kijelentkezés során");

@@ -19,6 +19,7 @@ const CreditOfferCard = ({ totalRevenue, approvedAmount, currentYear = new Date(
   const calculatedAmount = approvedAmount || Math.round(totalRevenue * 0.2);
   
   const handleApplyClick = () => {
+    // Navigate to loan application page with the pre-approved amount in state
     navigate("/loan-application", { 
       state: { 
         preApprovedAmount: calculatedAmount,

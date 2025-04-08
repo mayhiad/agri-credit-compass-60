@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,17 +21,18 @@ export interface LoanSettings {
   duration: number; // months
   paymentFrequency: "quarterly" | "biannual" | "annual";
   apr: number;
+  totalRepayment: number;
 }
 
 export const LoanTerms = ({ approvedAmount = 1000000, onComplete, onSubmit }: LoanTermsProps) => {
   const [amount, setAmount] = useState(approvedAmount);
   const [duration, setDuration] = useState(12); // default 12 months (1 year)
-  const [paymentFrequency, setPaymentFrequency] = useState<"quarterly" | "biannual" | "annual">("annual");
+  const [paymentFrequency, setPaymentFrequency] = useState<"quarterly" | "biannual" | "annual">("quarterly");
   
   // Set up min, max, and step values for the slider
-  const minAmount = 200000; // Minimum loan amount
+  const minAmount = 100000; // Minimum loan amount
   const maxAmount = approvedAmount; // Maximum is the approved amount
-  const step = 200000; // 200,000 Ft increments
+  const step = 100000; // 100,000 Ft increments
 
   // Adjust amount to fit step increments on component mount
   useEffect(() => {
@@ -38,6 +40,16 @@ export const LoanTerms = ({ approvedAmount = 1000000, onComplete, onSubmit }: Lo
     const roundedAmount = Math.round(approvedAmount / step) * step;
     setAmount(roundedAmount);
   }, [approvedAmount, step]);
+  
+  // Validate and update payment frequency when duration changes
+  useEffect(() => {
+    // If duration is less than payment frequency, adjust payment frequency
+    if (duration === 3 && (paymentFrequency === "biannual" || paymentFrequency === "annual")) {
+      setPaymentFrequency("quarterly");
+    } else if (duration === 6 && paymentFrequency === "annual") {
+      setPaymentFrequency("biannual");
+    }
+  }, [duration, paymentFrequency]);
   
   // Handle slider value change
   const handleSliderChange = (value: number[]) => {
@@ -63,7 +75,7 @@ export const LoanTerms = ({ approvedAmount = 1000000, onComplete, onSubmit }: Lo
       case "quarterly": return 16;
       case "biannual": return 17;
       case "annual": return 18;
-      default: return 18;
+      default: return 16;
     }
   };
   
@@ -72,23 +84,36 @@ export const LoanTerms = ({ approvedAmount = 1000000, onComplete, onSubmit }: Lo
   // Calculate payment info
   const getNumberOfPayments = (): number => {
     switch (paymentFrequency) {
-      case "quarterly": return duration / 3;
-      case "biannual": return duration / 6;
-      case "annual": return duration / 12;
+      case "quarterly": return Math.floor(duration / 3);
+      case "biannual": return Math.floor(duration / 6);
+      case "annual": return Math.floor(duration / 12);
       default: return 1;
     }
   };
   
   const numberOfPayments = getNumberOfPayments();
-  const paymentAmount = calculatePayment(amount, apr, numberOfPayments);
   
+  // Calculate total repayment amount
+  const calculateTotalRepayment = (principal: number, annualInterestRate: number, durationMonths: number): number => {
+    // Convert annual rate to decimal and adjust for the period
+    const rate = annualInterestRate / 100;
+    // Calculate interest
+    const interest = principal * rate * (durationMonths / 12);
+    // Total repayment is principal plus interest
+    return principal + interest;
+  };
+  
+  const totalRepayment = calculateTotalRepayment(amount, apr, duration);
+  const paymentAmount = numberOfPayments > 0 ? Math.ceil(totalRepayment / numberOfPayments) : 0;
+
   const handleSubmit = () => {
     if (onSubmit) {
       onSubmit({
         amount,
         duration,
         paymentFrequency,
-        apr
+        apr,
+        totalRepayment
       });
     }
     
@@ -103,6 +128,16 @@ export const LoanTerms = ({ approvedAmount = 1000000, onComplete, onSubmit }: Lo
       case "annual": return "év";
       default: return "";
     }
+  };
+
+  // Check if payment frequency option should be disabled based on duration
+  const isPaymentFrequencyDisabled = (frequency: "quarterly" | "biannual" | "annual"): boolean => {
+    if (duration === 3) {
+      return frequency === "biannual" || frequency === "annual";
+    } else if (duration === 6) {
+      return frequency === "annual";
+    }
+    return false;
   };
   
   return (
@@ -188,17 +223,25 @@ export const LoanTerms = ({ approvedAmount = 1000000, onComplete, onSubmit }: Lo
                 <span className="text-xs text-green-600 font-semibold ml-1">(16% THM)</span>
               </Label>
             </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="biannual" id="biannual" />
-              <Label htmlFor="biannual" className="flex items-center gap-1.5 cursor-pointer">
+            <div className={`flex items-center space-x-2 ${isPaymentFrequencyDisabled("biannual") ? "opacity-50" : ""}`}>
+              <RadioGroupItem 
+                value="biannual" 
+                id="biannual" 
+                disabled={isPaymentFrequencyDisabled("biannual")} 
+              />
+              <Label htmlFor="biannual" className={`flex items-center gap-1.5 ${isPaymentFrequencyDisabled("biannual") ? "cursor-not-allowed" : "cursor-pointer"}`}>
                 <CalendarClock className="h-4 w-4" />
                 <span>Féléves törlesztés</span>
                 <span className="text-xs text-amber-600 font-semibold ml-1">(17% THM)</span>
               </Label>
             </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="annual" id="annual" />
-              <Label htmlFor="annual" className="flex items-center gap-1.5 cursor-pointer">
+            <div className={`flex items-center space-x-2 ${isPaymentFrequencyDisabled("annual") ? "opacity-50" : ""}`}>
+              <RadioGroupItem 
+                value="annual" 
+                id="annual" 
+                disabled={isPaymentFrequencyDisabled("annual")} 
+              />
+              <Label htmlFor="annual" className={`flex items-center gap-1.5 ${isPaymentFrequencyDisabled("annual") ? "cursor-not-allowed" : "cursor-pointer"}`}>
                 <CalendarClock className="h-4 w-4" />
                 <span>Éves törlesztés</span>
                 <span className="text-xs text-red-600 font-semibold ml-1">(18% THM)</span>
@@ -225,6 +268,10 @@ export const LoanTerms = ({ approvedAmount = 1000000, onComplete, onSubmit }: Lo
               <span>Törlesztések száma:</span>
               <span className="font-medium">{numberOfPayments}</span>
             </div>
+            <div className="flex justify-between pt-3 mt-3 border-t text-primary">
+              <span className="font-semibold">Teljes visszafizetendő összeg:</span>
+              <span className="font-bold">{formatCurrency(totalRepayment)}</span>
+            </div>
           </div>
         </div>
       </CardContent>
@@ -237,12 +284,5 @@ export const LoanTerms = ({ approvedAmount = 1000000, onComplete, onSubmit }: Lo
     </Card>
   );
 };
-
-// Helper function for calculating payment amount
-function calculatePayment(amount: number, apr: number, numberOfPayments: number): number {
-  const interest = (apr / 100) * amount;
-  const totalAmount = amount + interest;
-  return Math.ceil(totalAmount / numberOfPayments);
-}
 
 export default LoanTerms;

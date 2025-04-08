@@ -1,5 +1,6 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import FileUpload from "@/components/FileUpload";
 import Steps from "@/components/Steps";
 import CreditScore from "@/components/CreditScore";
@@ -12,11 +13,40 @@ import LoanComplete from "@/components/LoanComplete";
 import { FarmData, UserData } from "@/types/farm";
 
 const LoanApplication = () => {
+  const location = useLocation();
   const [step, setStep] = useState(1);
   const [farmData, setFarmData] = useState<FarmData | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loanAmount, setLoanAmount] = useState(0);
-  const [paymentFrequency, setPaymentFrequency] = useState("monthly");
+  const [paymentFrequency, setPaymentFrequency] = useState("quarterly");
+  const [preApprovedAmount, setPreApprovedAmount] = useState<number | undefined>(undefined);
+  const [totalRevenue, setTotalRevenue] = useState<number | undefined>(undefined);
+  
+  // Get preApprovedAmount and totalRevenue from location state if available
+  useEffect(() => {
+    if (location.state) {
+      const { preApprovedAmount, totalRevenue } = location.state as { 
+        preApprovedAmount?: number;
+        totalRevenue?: number;
+      };
+      
+      if (preApprovedAmount) {
+        setPreApprovedAmount(preApprovedAmount);
+      }
+      
+      if (totalRevenue) {
+        setTotalRevenue(totalRevenue);
+        
+        // If we have revenue data, we can create a minimal farmData object
+        if (!farmData) {
+          setFarmData({
+            totalRevenue: totalRevenue,
+            cultures: []
+          });
+        }
+      }
+    }
+  }, [location.state]);
   
   const handleFileUploadComplete = (data: FarmData) => {
     setFarmData(data);
@@ -35,6 +65,12 @@ const LoanApplication = () => {
   const renderStep = () => {
     switch (step) {
       case 1:
+        // If we already have farm data from state, skip to step 2
+        if (farmData && totalRevenue) {
+          // Automatically move to next step if we have the data
+          setTimeout(() => setStep(2), 0);
+          return <div className="text-center p-8">Adatok betöltése...</div>;
+        }
         return <FileUpload onComplete={handleFileUploadComplete} />;
       case 2:
         return <FarmInfo 
@@ -51,12 +87,12 @@ const LoanApplication = () => {
       case 5:
         return <CreditScore 
           farmData={farmData!}
-          creditLimit={farmData?.totalRevenue ? Math.round(farmData.totalRevenue * 0.7) : 0}
+          creditLimit={preApprovedAmount || (farmData?.totalRevenue ? Math.round(farmData.totalRevenue * 0.7) : 0)}
           onComplete={handleNextStep} 
         />;
       case 6:
         return <LoanTerms 
-          approvedAmount={farmData?.totalRevenue ? Math.round(farmData.totalRevenue * 0.7) : 1000000}
+          approvedAmount={preApprovedAmount || (farmData?.totalRevenue ? Math.round(farmData.totalRevenue * 0.7) : 1000000)}
           onComplete={handleNextStep}
           onSubmit={handleLoanTermsSubmit}
         />;

@@ -12,6 +12,7 @@ import Admin from "./pages/Admin";
 import AdminAuth from "./pages/AdminAuth";
 import AdminCustomerDetail from "./pages/AdminCustomerDetail";
 import AdminLoanDetail from "./pages/AdminLoanDetail";
+import LoanApplication from "./components/LoanApplication";
 import { supabase } from "@/integrations/supabase/client";
 
 const queryClient = new QueryClient();
@@ -68,7 +69,7 @@ const App = () => {
               user ? <Navigate to="/dashboard" /> : <Auth />
             } />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/loan-application" element={<Index />} />
+            <Route path="/loan-application" element={<LoanApplication />} />
             
             {/* Admin Routes */}
             <Route path="/admin" element={<Admin />} />
