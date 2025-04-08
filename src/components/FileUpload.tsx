@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -66,11 +67,35 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         details: "A feltöltött dokumentum Claude AI elemzése folyamatban..."
       });
       
-      const farmData = await processSapsDocument(file, user, setProcessingStatus);
-      
-      onComplete(farmData);
-      toast.success("SAPS dokumentum sikeresen feldolgozva");
-      
+      // Add diagnostic information in console
+      console.log("Starting document processing with user:", user.id);
+      console.log("File details:", {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: new Date(file.lastModified).toISOString()
+      });
+
+      try {
+        // Use a longer timeout for large files
+        const farmData = await processSapsDocument(file, user, setProcessingStatus);
+        
+        onComplete(farmData);
+        toast.success("SAPS dokumentum sikeresen feldolgozva");
+      } catch (processingError) {
+        console.error("Részletes SAPS feldolgozási hiba:", processingError);
+        
+        // Handle network errors more specifically
+        if (processingError.message === "Failed to fetch") {
+          setError("Hálózati hiba történt a szerverrel való kommunikáció során. Kérjük ellenőrizze az internetkapcsolatot és próbálja újra.");
+          toast.error("Hálózati kapcsolati hiba");
+        } else {
+          setError(processingError instanceof Error ? processingError.message : "Ismeretlen hiba történt a feldolgozás során");
+          toast.error("Hiba történt a dokumentum feldolgozása során");
+        }
+        
+        setProcessingStatus(null);
+      }
     } catch (error) {
       console.error("SAPS feldolgozási hiba:", error);
       setError(error instanceof Error ? error.message : "Ismeretlen hiba történt a feldolgozás során");

@@ -47,6 +47,12 @@ export const processSapsDocument = async (
   
   // Call our Supabase Edge Function to convert PDF to images
   try {
+    console.log("Calling convert-pdf-to-images edge function...");
+    
+    // Create a custom AbortController with a timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 360000); // 6 minute timeout for large files
+    
     const convertResponse = await fetch(
       'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/convert-pdf-to-images',
       {
@@ -55,9 +61,9 @@ export const processSapsDocument = async (
           'Authorization': `Bearer ${session.access_token}`,
         },
         body: convertFormData,
-        signal: AbortSignal.timeout(300000), // 5 minute timeout for large files
+        signal: controller.signal
       }
-    );
+    ).finally(() => clearTimeout(timeoutId));
     
     if (!convertResponse.ok) {
       const errorText = await convertResponse.text();
@@ -70,7 +76,9 @@ export const processSapsDocument = async (
         errorData = { error: errorText || "Ismeretlen hiba történt" };
       }
       
-      throw new Error(errorData.error || "Hiba a dokumentum konvertálása közben");
+      const errorMessage = errorData.error || "Hiba a dokumentum konvertálása közben";
+      console.error(`PDF konvertálási hiba részletei: ${errorMessage}`);
+      throw new Error(errorMessage);
     }
     
     const convertData = await convertResponse.json();
@@ -116,6 +124,12 @@ export const processSapsDocument = async (
       userId: user.id
     };
     
+    console.log("Calling process-saps-document edge function with payload:", payload);
+    
+    // Create a custom AbortController with an even longer timeout for AI processing
+    const aiController = new AbortController();
+    const aiTimeoutId = setTimeout(() => aiController.abort(), 600000); // 10 minute timeout
+    
     // Call the process-saps-document endpoint
     const processResponse = await fetch(
       'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-saps-document',
@@ -126,9 +140,9 @@ export const processSapsDocument = async (
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(300000), // 5 minute timeout
+        signal: aiController.signal
       }
-    );
+    ).finally(() => clearTimeout(aiTimeoutId));
     
     if (!processResponse.ok) {
       const errorText = await processResponse.text();
@@ -141,7 +155,9 @@ export const processSapsDocument = async (
         errorData = { error: errorText || "Ismeretlen hiba történt" };
       }
       
-      throw new Error(errorData.error || "Hiba a dokumentum feldolgozása során");
+      const errorMessage = errorData.error || "Hiba a dokumentum feldolgozása során";
+      console.error(`Claude feldolgozási hiba részletei: ${errorMessage}`);
+      throw new Error(errorMessage);
     }
     
     const processResult = await processResponse.json();
@@ -266,6 +282,14 @@ export const processSapsDocument = async (
     
   } catch (error) {
     console.error("SAPS feltöltési hiba:", error);
+    
+    // Check for network errors specifically
+    if (error.name === 'AbortError') {
+      throw new Error("A kérés időtúllépés miatt megszakadt. A dokumentum túl nagy lehet vagy a szerver túlterhelt.");
+    } else if (error.message === 'Failed to fetch') {
+      throw new Error("Hálózati hiba - Nem sikerült kapcsolódni a szerverhez. Ellenőrizze az internetkapcsolatot.");
+    }
+    
     throw error;
   }
 };
