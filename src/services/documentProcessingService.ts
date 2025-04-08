@@ -71,7 +71,7 @@ export const checkApiConnectivity = async (): Promise<{ connected: boolean; deta
   }
 };
 
-// Add function to view Claude response
+// Meglévő függvény a Claude válasz megtekintéséhez
 export const getClaudeResponseForOcrLog = async (ocrLogId: string): Promise<string | null> => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
