@@ -26,7 +26,7 @@ const DashboardHistorical = () => {
       try {
         setIsLoading(true);
         
-        // Pass user id and farm data (null for now, will be implemented later)
+        // Pass user id and farm id (null for now, will be implemented later)
         const rawData = await fetchHistoricalData(null, user.id);
         
         // Convert HistoricalYear[] to HistoricalFarmData[]

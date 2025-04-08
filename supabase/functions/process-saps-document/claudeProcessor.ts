@@ -48,100 +48,486 @@ export async function processImageBatchWithClaude(
     const messageContent = [
       {
         type: "text",
-        text: `FONTOS! OLVASD VÉGIG ÉS KÖVESD PONTOSAN AZ UTASÍTÁSOKAT!
+        text: `UNIVERZÁLIS SAPS PDF ADATKINYERÉSI PROMPT
 
-FELADAT:
-Egy SAPS típusú támogatási kérelem PDF dokumentumból kell strukturált adatokat kinyerned. Az adatok elhelyezkedése a dokumentum _számozott részeiben_ található.
+FONTOS! A dokumentum tartalmát és formáját nem ismerjük előre. Ezért az adatok előfordulhatnak bármelyik oldalón, táblázatban, szövegben, esetleg szkennelt képen. A feladat az, hogy teljes körűen és alaposan kinyerjük a strukturált mezőgazdasági támogatási adatokat a dokumentumból.
 
-🔍 KERESENDŐ ADATOK:
+🔍 KERESENDŐ ADATTÍPUSOK (TELJES LISTA)
 
-1. **A gazdálkodó neve**
-   - A dokumentum 2. részében ("2 Beadó adatai") található
-   - Magyar névformátum: vezetéknév + keresztnév
-   - Általában az első oldalon szerepel
+1. Gazdálkodó neve
 
-2. **A dokumentum azonosítója (irányítószám vagy „Iratazonosító")**
-   - Az 1. részben ("1 Adminisztrációs adatok") keresd
-   - Formátum: 10 számjegyű szám
+Magyar személynév (vezetéknév + keresztnév)
 
-3. **A régió (megye) neve**
-   - Ha megtalálható, a címekből vagy területi adatokból következtethető (elhagyható, ha nincs)
+Általában az első oldalon vagy az „Beadó adatai" részben szerepel
 
-4. **Egységes kérelem beadásának időpontja**
-   - Pontosan szerepel az 1. részben ("1 Adminisztrációs adatok")
-   - Formátum: ÉÉÉÉ-HH-NN HH:mm
+2. Dokumentum azonosítója
 
-5. **Blokkszámok**
-   - A dokumentumban "Blokk:" vagy "Blokk azonosító:" előtaggal szerepelnek
-   - Ezeket listában gyűjtsd ki
+„Iratazonosító" vagy hasonló mező melletti hosszú számsor vagy kód
 
-6. **Aktuális évi kultúrák és területük**
-   - A 14. részben ("14 Területek összesítése hasznosítási adatok szerint") található
-   - Csak bevételtermelő kultúrákat vegyél figyelembe (ne szerepeljen legelő, pihentetés, stb.)
-   - Kultúra megnevezése + terület hektárban
+Lehet adminisztratív szakaszban, fejlécben vagy láblécben
 
-7. **Teljes igényelt terület az adott évre**
-   - A 13. részben ("13 Területek összesítése támogatási jogcímek és AKG célprogramok szerint") szerepel
-   - Ez az év összes hektárja
+3. Regió / megye / település
 
-8. **Histórikus gazdálkodási adatok az elmúlt 5 évből**
-   - A 11. rész ("11 Kárenyhítés / Biztosítási díjtámogatás") tartalmazza
-   - Külön gyűjtsd ki minden évre:
-     - Kultúrák neve
-     - Terület hektárban
-     - Termésátlag (ha szerepel)
-     - Ár (aktuális magyar piaci ár alapján, pl. búza 80–100 ezer Ft/t)
-     - Árbevétel = hektár × termésátlag × ár
+Cím, területi azonosító vagy helyrajzi adatok alapján meghatározható
 
-📌 KÖVETELMÉNYEK:
-- Minden számértéknek pozitívnak kell lennie
-- Ha valamit nem találsz meg egyértelműen, hagyd ki vagy adj vissza üres struktúrát
-- Ne találj ki vagy generálj adatot!
-- Az árak és termésátlagok reálisan becsülhetők, de csak akkor, ha van hozzá alap
+Megyei vagy járási nevek keresendők
 
-📦 VÁLASZ FORMÁTUMA: JSON
+4. Kérelem beadásának időpontja
+
+Formátum: éééé-hh-nn óó:pp
+
+Gyakran az első oldalon, vagy fejlécben szerepel
+
+5. Blokkok / blokkazonosítók
+
+„Blokk:" vagy „Blokkazonosító:" előtaggal ellátott kódok (pl. CXU7UL18)
+
+Bármely oldalon fellelhetőek, általában több oldalas felsorolásban
+
+6. Aktuális évi kultúrák és területek
+
+Minden olyan kultúra, amelyet az adott évben termelésre használnak (pl. őszi búzát, napraforgót, stb.)
+
+Kultúra neve + terület (ha)
+
+Gyakran táblázatban szerepel, de előfordulhat szövegben is
+
+NE szerepeltess: legelő, pihentetett, ugarolt, zöldugar, zöldtrágyanövény, állandó gyep
+
+7. Aktuális év teljes igényelt területe
+
+A fenti kultúrák területének összege hektárban
+
+Gyakran szerepel táblázat alsó sorában, „összesítvény" ként
+
+8. Histórikus adatok az elmúlt 5 évre
+
+Kultúra neve
+
+Minden évre: terület (ha), termés (t), termésátlag (t/ha), piaci ár (Ft/t), árbevétel (Ft)
+
+Lehet mátrix formájú táblázatban vagy felsorolva
+
+Árbevétel számítása: ha × t/ha × Ft/t
+
+📊 PIACI ÁRAK REFERENCIA (Ft/t)
+
+Ezeket az éves átlagárakat használd histórikus kalkulációhoz, ha az adott évre vonatkozó ár nem szerepel a dokumentumban.
+
+Termény
+
+2016
+
+2017
+
+2018
+
+2019
+
+2020
+
+2021
+
+2022
+
+2023
+
+Kukorica
+
+42k
+
+44k
+
+46k
+
+45k
+
+47k
+
+65k
+
+95k
+
+70k
+
+Őszi búzá
+
+44k
+
+46k
+
+48k
+
+47k
+
+49k
+
+68k
+
+100k
+
+72k
+
+Tavaszi árpa
+
+43k
+
+45k
+
+47k
+
+46k
+
+48k
+
+66k
+
+95k
+
+69k
+
+Napraforgó
+
+98k
+
+100k
+
+102k
+
+101k
+
+103k
+
+160k
+
+200k
+
+160k
+
+Repce
+
+110k
+
+112k
+
+114k
+
+113k
+
+115k
+
+160k
+
+220k
+
+180k
+
+Szója
+
+90k
+
+92k
+
+94k
+
+93k
+
+95k
+
+125k
+
+165k
+
+130k
+
+Zab
+
+38k
+
+40k
+
+42k
+
+41k
+
+43k
+
+60k
+
+90k
+
+70k
+
+Cirok
+
+40k
+
+42k
+
+44k
+
+43k
+
+45k
+
+55k
+
+85k
+
+60k
+
+Őszi durumbúzá
+
+50k
+
+52k
+
+54k
+
+53k
+
+55k
+
+75k
+
+110k
+
+80k
+
+Rozs
+
+40k
+
+42k
+
+44k
+
+43k
+
+45k
+
+55k
+
+80k
+
+60k
+
+Tritikálé
+
+41k
+
+43k
+
+45k
+
+44k
+
+46k
+
+60k
+
+85k
+
+65k
+
+Lucerna (széna)
+
+25k
+
+27k
+
+29k
+
+28k
+
+30k
+
+35k
+
+45k
+
+38k
+
+Cukorrépa
+
+10k
+
+11k
+
+12k
+
+11.5k
+
+12.5k
+
+14k
+
+17k
+
+15k
+
+Burgonya
+
+60k
+
+65k
+
+70k
+
+68k
+
+75k
+
+95k
+
+120k
+
+85k
+
+Szemescirok
+
+40k
+
+42k
+
+44k
+
+43k
+
+45k
+
+55k
+
+75k
+
+58k
+
+Őszi árpa
+
+42k
+
+44k
+
+46k
+
+45k
+
+47k
+
+65k
+
+90k
+
+68k
+
+Komló
+
+1M
+
+1.05M
+
+1.1M
+
+1.08M
+
+1.15M
+
+1.2M
+
+1.3M
+
+1.25M
+
+Mák
+
+200k
+
+210k
+
+220k
+
+215k
+
+225k
+
+270k
+
+320k
+
+280k
+
+Lenmag
+
+100k
+
+102k
+
+104k
+
+103k
+
+105k
+
+130k
+
+160k
+
+135k
+
+✅ KIMENET FORMÁTUMA
+
+Az alábbi JSON szerkezetet kövesd. Üres mezőt csak akkor hagyj benne, ha az adat nem állapítható meg a dokumentumból.
+
 {
-  "applicantName": "...",
-  "documentId": "...",
-  "submissionDateTime": "2021-05-11 09:01",
+  "applicantName": "",
+  "documentId": "",
+  "submissionDateTime": "",
   "region": "",
-  "blockIds": ["BLOKK:...", "BLOKK:..."],
+  "blockIds": [],
   "currentYear": {
-    "year": "2021",
-    "totalHectares": 123.45,
+    "year": "",
+    "totalHectares": null,
     "cultures": [
       {
-        "name": "Kukorica",
-        "hectares": 45.6,
-        "yieldPerHectare": 8.2,
-        "pricePerTon": 72000,
-        "estimatedRevenue": 26913600
+        "name": "",
+        "hectares": null,
+        "yieldPerHectare": null,
+        "pricePerTon": null,
+        "estimatedRevenue": null
       }
     ],
-    "totalRevenue": 63291975
+    "totalRevenue": null
   },
   "historicalData": [
     {
-      "year": "2020",
-      "totalHectares": 200.5,
+      "year": "",
+      "totalHectares": null,
       "crops": [
         {
-          "name": "Búza",
-          "hectares": 77.85,
-          "yield": 5.5,
-          "pricePerTon": 85000,
-          "revenue": 36378375
+          "name": "",
+          "hectares": null,
+          "yield": null,
+          "pricePerTon": null,
+          "revenue": null
         }
       ],
-      "totalRevenue": 200000
+      "totalRevenue": null
     }
-    // stb.
-  ]
+  ],
+  "dataUnavailable": false
 }
 
-⚠️ FIGYELEM:
-- TILOS kitalált adatokat használni!
-- Ha valami nem elérhető: "dataUnavailable": true legyen a visszatérésben.`
+⚠️ FIGYELMEZTETÉSEK
+
+Ne generálj adatot, csak akkor adj meg értéket, ha biztosan azonosítottad.
+
+Értelmezd a táblázatokat, mátrixokat is.
+
+OCR-ből vagy szkennelt képből származó információkat is vedd figyelembe.
+
+Ha valami bizonytalan, jelezd a dataUnavailable mezőben.
+
+Ez az univerzális prompt használható bármilyen SAPS típusú támogatási kérelem PDF feldolgozásához.`
       }
     ];
     
