@@ -67,11 +67,16 @@ export const fetchFarmData = async (userId: string): Promise<{
     
     if (extractionResults && extractionResults.length > 0) {
       // First try to find a result that matches the farm_id
-      const matchingResult = extractionResults.find(result => 
-        result.extracted_data && 
-        typeof result.extracted_data === 'object' && 
-        result.extracted_data.farm_id === farm.id
-      );
+      const matchingResult = extractionResults.find(result => {
+        if (result.extracted_data && 
+            typeof result.extracted_data === 'object' && 
+            !Array.isArray(result.extracted_data)) {
+          // Safely check if farm_id exists and matches
+          return 'farm_id' in result.extracted_data && 
+                 result.extracted_data.farm_id === farm.id;
+        }
+        return false;
+      });
       
       if (matchingResult) {
         extractedMetadata = matchingResult.extracted_data;
@@ -82,6 +87,8 @@ export const fetchFarmData = async (userId: string): Promise<{
         for (const result of extractionResults) {
           if (result.extracted_data && 
               typeof result.extracted_data === 'object' && 
+              !Array.isArray(result.extracted_data) &&
+              'document_id' in result.extracted_data && 
               result.extracted_data.document_id === farm.document_id) {
             extractedMetadata = result.extracted_data;
             console.log("Found extraction result matching document_id:", farm.document_id);
@@ -91,9 +98,13 @@ export const fetchFarmData = async (userId: string): Promise<{
       }
       
       // If still no match, use the most recent extraction result
-      if (!extractedMetadata) {
-        extractedMetadata = extractionResults[0].extracted_data;
-        console.log("Using most recent extraction result as fallback");
+      if (!extractedMetadata && extractionResults[0].extracted_data) {
+        // Make sure it's a proper object before using it
+        if (typeof extractionResults[0].extracted_data === 'object' && 
+            !Array.isArray(extractionResults[0].extracted_data)) {
+          extractedMetadata = extractionResults[0].extracted_data;
+          console.log("Using most recent extraction result as fallback");
+        }
       }
     }
 
@@ -132,14 +143,14 @@ export const fetchFarmData = async (userId: string): Promise<{
     };
     
     // Add extracted metadata if available
-    if (extractedMetadata) {
+    if (extractedMetadata && typeof extractedMetadata === 'object' && !Array.isArray(extractedMetadata)) {
       // We've extracted these fields from the document, so use them
       farmData.applicantName = extractedMetadata.applicant_name || "N/A";
       farmData.submitterId = extractedMetadata.submitter_id || "N/A";
       farmData.applicantId = extractedMetadata.applicant_id || "N/A";
       farmData.submissionDate = extractedMetadata.submission_date || "N/A";
       farmData.year = extractedMetadata.year || "N/A";
-      farmData.blockIds = extractedMetadata.block_ids || [];
+      farmData.blockIds = Array.isArray(extractedMetadata.block_ids) ? extractedMetadata.block_ids : [];
       
       // Add any additional metadata fields
       farmData.processingId = extractedMetadata.processing_id;
