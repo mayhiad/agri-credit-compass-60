@@ -28,7 +28,10 @@ const Header = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-1 md:space-x-4 overflow-x-auto pb-1">
             <Link to="/" className="mr-6 shrink-0">
-              <span className="font-bold text-primary text-lg">Agrár-Hitel</span>
+              <span className="font-bold text-xl">
+                <span className="text-primary">agri</span>
+                <span className="text-blue-600">FIx</span>
+              </span>
             </Link>
             
             {user && (
