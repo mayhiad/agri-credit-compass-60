@@ -54,11 +54,13 @@ export interface FarmData {
   marketPrices?: MarketPrice[];
   documentDate?: string;
   parcels?: any[];
-  batchId?: string;  // Added for batch processing
-  pageCount?: number; // Added to track document pages
-  processingStatus?: string; // Added to track processing status
-  submissionDate?: string; // Added for document submission date
-  historicalData?: HistoricalYear[]; // Added for historical crop data
+  batchId?: string;  
+  pageCount?: number; 
+  processingStatus?: string;
+  submissionDate?: string;
+  historicalData?: HistoricalYear[];
+  processingId?: string; // Added for tracking processing
+  claudeResponseUrl?: string; // Added for Claude response URL
 }
 
 export interface UserData {
