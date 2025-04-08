@@ -1,3 +1,4 @@
+
 import { batchArray, sortFilesByPageNumber } from "./utils.ts";
 
 export const processAllImageBatches = async (
@@ -9,8 +10,11 @@ export const processAllImageBatches = async (
   // Maximum number of images to process in a batch
   const MAX_BATCH_SIZE = 20;
   
+  // Sort images by page number to ensure we process in page order
+  const sortedImageUrls = [...imageUrls];
+  
   // Split images into batches
-  const batches = batchArray(imageUrls, MAX_BATCH_SIZE);
+  const batches = batchArray(sortedImageUrls, MAX_BATCH_SIZE);
   console.log(`🧩 Split ${imageUrls.length} images into ${batches.length} batches for processing`);
   
   // Process each batch sequentially
@@ -37,7 +41,7 @@ export const processAllImageBatches = async (
     totalPages: imageUrls.length
   };
   
-  // Process batches sequentially
+  // Process batches sequentially in order (1-20, 21-40, etc.)
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
     console.log(`⏳ Processing batch ${i + 1}/${batches.length} with ${batch.length} images`);
@@ -185,9 +189,9 @@ async function processImageBatch(
     }
   }));
   
-  const systemPrompt = `You are an AI assistant specialized in extracting structured information from Hungarian SAPS (Single Area Payment Scheme) agricultural documents. Extract all information about the applicant, agriculture blocks, cultures, land areas, and historical crop data.
+  const systemPrompt = `Te egy mesterséges intelligencia asszisztens vagy, aki magyar SAPS (Egységes Területalapú Támogatás) mezőgazdasági dokumentumokból strukturált adatok kinyerésére specializálódott. Feladatod a kérelmezőről, a mezőgazdasági blokkokról, kultúrákról, földterületekről és historikus növénytermesztési adatokról az összes információ kinyerése.
 
-IMPORTANT: Always return a valid JSON object with the following structure, using only these exact fields:
+FONTOS: Mindig az alábbi struktúrájú, érvényes JSON objektumot kell visszaadnod, kizárólag ezekkel a mezőkkel:
 {
   "applicantName": string,
   "submitterId": string,
@@ -219,45 +223,45 @@ IMPORTANT: Always return a valid JSON object with the following structure, using
   ]
 }
 
-SPECIFIC INSTRUCTIONS:
-1. Extract the applicant's name ("kérelmező neve") and ID numbers ("ügyfél-azonosító").
-2. Find all block IDs which look like alphanumeric codes (e.g., "C1N7J518").
-3. Extract all crop types ("kultúra") and their corresponding areas in hectares.
-4. The total hectares should be the sum of all culture areas.
-5. Find the submission date of the document ("Benyújtás dátuma") and the year it refers to ("Tárgyév").
-6. If you can't find certain information, use "N/A" for string values and 0 for numeric values.
-7. DON'T MAKE UP OR ESTIMATE DATA. If you're uncertain, use "N/A" or 0.
-8. Return ONLY the JSON object with no additional text or explanation.
-9. DO NOT USE placeholder data like "Szántóföldi kultúra" with 123.45 hectares. If you can't extract the real data, set cultures to an empty array.
+RÉSZLETES UTASÍTÁSOK:
 
-## HISTORICAL DATA EXTRACTION
-For historical data ("historikus adatok"), look for tables showing crop data from previous years:
+## 1.1 - ALAPADATOK
+Az alapadatok a SAPS dokumentum első oldalán találhatók mindig. Itt keresd:
+1. A kérelmező nevét ("kérelmező neve")
+2. Az ügyfél-azonosítót ("ügyfél-azonosító" vagy "regisztrációs szám")
+3. A dokumentumazonosítót
+4. A tárgyévet
+5. A benyújtás dátumát ("Benyújtás dátuma")
 
-1. Look for sections titled "Kárenyhtés", "Biztosítási díjtámogatás", or "Termésmennyiség megadása".
-2. Find tables that show multiple years side by side (in columns).
-3. These tables typically contain:
-   - Years (e.g., "2016 évi terület(ha)", "2016 évi termés(t)")
-   - Crop codes (e.g., KAL01, IND23) and names (e.g., Őszi búza, Napraforgó)
-   - Area data in hectares
-   - Yield data in tons
-4. Often found in the first third of the document.
-5. May be under heading "Termésmennyiség megadása a mezőgazdasági termelést érintő időjárási és más természeti kockázatok kezelésére szolgáló rendszer keretében".
-6. Make sure to capture data for all crops, including those grown in smaller areas.
-7. Data is typically in tables with crops in rows and years in columns.
-8. Check for both area (ha) and yield (t) data for each crop and for each year listed.
+## 1.2 - BLOKKOK
+A blokkok a "14 Területek összesítése hasznosítási adatok szerint" és a "16 EFA területek összesítése" között található "15 Területek összesítése blokkhasználat szerint" modulban találhatók. Ebben a részben:
+1. Keresd a blokkokat, melyek általában alfanumerikus kódok (pl. "C1N7J518")
+2. A blokkok mellett találhatók a területméretek hektárban
+3. Számold ki az összes blokk teljes területméretét (hektár) - ezt az értéket add meg a "hectares" mezőben
+4. A teljes hektárméret a blokkok mellett lévő értékek összege
 
-## 1.3 - Histórikus adatok:
+## 1.3 - HISTORIKUS ADATOK
+A historikus adatokat a "10 Változásvezetés" és a "12 Növényvédelmi szakirányító nyilatkozat" között található "11 Kárenyhítés/Biztosítási díjtámogatás" modulban keresd, azon belül a "Termésmennyiség megadása a mezőgazdasági termelést érintő időjárási és más természeti kockázatok kezelésére szolgáló rendszer keretében" részben:
+1. Ez a táblázat tartalmazza az elmúlt 5 év adatait
+2. Minden évhez tartozik terület (ha) és termés (t) adat
+3. Az egyes kultúrák soronként vannak felsorolva
+4. Mindegyik növénykultúrához tartozik terület és termésmennyiség minden évben
 
-| Kultúra | [Év1] |  | [Év2] |  | [Év3] |  | [Év4] |  | [Év5] |  |
-|---------|------|------|------|------|------|------|------|------|------|------|
-|         | ha | t | ha | t | ha | t | ha | t | ha | t |
-| [Kultúra1] | [érték] | [érték] | ... | ... | ... | ... | ... | ... | ... | ... |
-| ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| **Összesen** | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] |
+## 1.4 - TÁRGYÉVI ADATOK (KULTÚRÁK)
+A tárgyévi kultúrák adatai a "17 Diverzifikáció összesítése" modulban találhatók:
+1. Itt keresd a kultúrákat és a hozzájuk tartozó területeket hektárban (ha)
+2. Ezeket az adatokat a "cultures" tömbben add vissza
+3. Minden kultúrához tartozik egy név és egy területméret hektárban
 
-NOTE: These documents may be in Hungarian. Look for words like "kérelmező", "ügyfél-azonosító", "blokkazonosító", "hektár", "terület", "dátum", "benyújtás dátuma", "tárgyév", etc.`;
+EGYÉB UTASÍTÁSOK:
+1. Ha nem találsz bizonyos információkat, használj "N/A" értéket szöveges mezőknél és 0-t numerikus értékeknél.
+2. NE TALÁLJ KI VAGY BECSÜLJ ADATOKAT. Ha bizonytalan vagy, használj "N/A" vagy 0 értéket.
+3. KIZÁRÓLAG a JSON objektumot add vissza, további szöveg vagy magyarázat nélkül.
+4. NE HASZNÁLJ helyőrző adatokat, mint például "Szántóföldi kultúra" 123.45 hektárral. Ha nem tudod kinyerni a valós adatokat, állíts be üres tömböt.
 
-  const userPrompt = `Extract all required information from these SAPS document pages. Remember to return ONLY a valid JSON object with the exact structure specified, containing all the information you can find about the applicant, blocks, land areas, cultures, submission date, year, and historical crop data.`;
+FONTOS: A dokumentum magyar nyelvű, ezért keresd ezeket a kulcsszavakat: "kérelmező", "ügyfél-azonosító", "blokkazonosító", "hektár", "terület", "tárgyév", "benyújtás dátuma", "kárenyhítés", stb.`;
+
+  const userPrompt = `Nyerd ki az összes szükséges információt ezekből a SAPS dokumentum oldalakból. Emlékezz, hogy KIZÁRÓLAG a megadott struktúrájú, érvényes JSON objektumot add vissza, amely tartalmazza az összes információt, amit találsz a kérelmezőről, blokkokról, földterületekről, kultúrákról, benyújtási dátumról, évről és historikus növénytermesztési adatokról.`;
   
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {

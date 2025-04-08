@@ -25,8 +25,30 @@ export const batchArray = <T>(array: T[], batchSize: number): T[][] => {
 export const sortFilesByPageNumber = (files: any[]): any[] => {
   return [...files].sort((a, b) => {
     // Extract page numbers from filenames (assumes format like "1_page.jpg", "2_page.jpg", etc.)
-    const aNum = parseInt(a.name.split('_')[0]) || 0;
-    const bNum = parseInt(b.name.split('_')[0]) || 0;
+    const aMatch = a.name.match(/^(\d+)_/);
+    const bMatch = b.name.match(/^(\d+)_/);
+    
+    const aNum = aMatch ? parseInt(aMatch[1]) : 0;
+    const bNum = bMatch ? parseInt(bMatch[1]) : 0;
+    
+    return aNum - bNum;
+  });
+};
+
+/**
+ * Sort image URLs by page number
+ * @param urls Array of image URLs with page numbers in the path
+ * @returns Sorted array of image URLs
+ */
+export const sortImageUrlsByPageNumber = (urls: string[]): string[] => {
+  return [...urls].sort((a, b) => {
+    // Extract page numbers from URLs
+    const aMatch = a.match(/\/(\d+)_/);
+    const bMatch = b.match(/\/(\d+)_/);
+    
+    const aNum = aMatch ? parseInt(aMatch[1]) : 0;
+    const bNum = bMatch ? parseInt(bMatch[1]) : 0;
+    
     return aNum - bNum;
   });
 };

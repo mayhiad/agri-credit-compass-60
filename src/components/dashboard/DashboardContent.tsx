@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutDashboard, Map, Tractor, Upload, History, Euro, FileText, Database, Blocks } from "lucide-react";
+import { Database, Blocks, Euro, History, Map, Upload } from "lucide-react";
 import { FarmData } from "@/types/farm";
 import DashboardOverview from "./DashboardOverview";
 import DashboardBlocks from "./DashboardBlocks";
@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/App";
 import { supabase } from "@/integrations/supabase/client";
 import DeleteFarmData from "./DeleteFarmData";
+import DashboardCrops from "./DashboardCrops";
 
 interface DashboardContentProps {
   farmData: FarmData;
@@ -100,9 +101,9 @@ const DashboardContent = ({ farmData, onFarmDataUpdate }: DashboardContentProps)
             <Blocks className="h-4 w-4 mr-2" />
             Blokkazonosítók
           </TabsTrigger>
-          <TabsTrigger value="currentYear">
+          <TabsTrigger value="cultures">
             <Euro className="h-4 w-4 mr-2" />
-            Aktuális bevétel
+            Növénykultúrák
           </TabsTrigger>
           <TabsTrigger value="historical">
             <History className="h-4 w-4 mr-2" />
@@ -126,11 +127,8 @@ const DashboardContent = ({ farmData, onFarmDataUpdate }: DashboardContentProps)
           <DashboardBlocks farmData={farmData} />
         </TabsContent>
         
-        <TabsContent value="currentYear">
-          <CurrentYearRevenue
-            cultures={preparedCultures}
-            totalRevenue={farmData.totalRevenue || 0}
-          />
+        <TabsContent value="cultures">
+          <DashboardCrops farmData={farmData} />
         </TabsContent>
         
         <TabsContent value="historical">
