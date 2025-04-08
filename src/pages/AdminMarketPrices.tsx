@@ -1,422 +1,290 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MarketPrice } from "@/types/farm";
-import { formatNumber } from "@/lib/utils";
-import { toast } from "sonner";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUp, ArrowDown, Minus, Trash, PlusCircle, Save } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { toast } from "sonner";
+import { formatCurrency } from "@/lib/utils";
 
-const AdminMarketPrices = () => {
-  const [marketPrices, setMarketPrices] = useState<MarketPrice[]>([]);
+export const AdminMarketPrices = () => {
+  const [marketPrices, setMarketPrices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRegion, setSelectedRegion] = useState("Magyarország");
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [regions, setRegions] = useState<string[]>([]);
-  const [years, setYears] = useState<string[]>([]);
   const [cultures, setCultures] = useState<string[]>([]);
-  const [editingPrice, setEditingPrice] = useState<Partial<MarketPrice> | null>(null);
+  const [newPrice, setNewPrice] = useState({
+    culture: "",
+    region: "",
+    price: 0,
+    averageYield: 0,
+    year: new Date().getFullYear().toString(),
+    is_forecast: true
+  });
 
   useEffect(() => {
-    const fetchUniqueValues = async () => {
-      try {
-        // Cultures without using distinct
-        const { data: culturesData, error: culturesError } = await supabase
-          .from('market_prices')
-          .select('culture');
-        
-        if (culturesError) {
-          console.error("Error fetching cultures:", culturesError);
-          return;
-        }
-        
-        // Extract unique culture values manually
-        const uniqueCultures = Array.from(
-          new Set(culturesData.map(item => item.culture as string))
-        ).filter(Boolean);
-        
-        setCultures(uniqueCultures);
-        
-        // Regions without using distinct
-        const { data: regionsData, error: regionsError } = await supabase
-          .from('market_prices')
-          .select('region');
-        
-        if (regionsError) {
-          console.error("Error fetching regions:", regionsError);
-          return;
-        }
-        
-        // Extract unique region values manually
-        const uniqueRegions = Array.from(
-          new Set(regionsData.map(item => item.region as string))
-        ).filter(Boolean);
-        
-        setRegions(uniqueRegions);
-      } catch (error) {
-        console.error("Error fetching unique values:", error);
-      }
-    };
-    
-    fetchUniqueValues();
-  }, [supabase]);
+    loadMarketPrices();
+    loadRegionsAndCultures();
+  }, []);
 
-  useEffect(() => {
-    fetchMarketPrices();
-  }, [selectedRegion, selectedYear]);
-
-  const fetchMarketPrices = async () => {
-    setLoading(true);
+  const loadMarketPrices = async () => {
     try {
-      // Fetch years if not already loaded
-      if (years.length === 0) {
-        const { data: yearsData } = await supabase
-          .from('market_prices')
-          .select('year')
-          .distinct();
-        
-        if (yearsData) {
-          const uniqueYears = [...new Set(yearsData.map(item => item.year))];
-          setYears(uniqueYears);
-          
-          // If current year isn't in the list, add it
-          const currentYear = new Date().getFullYear().toString();
-          if (!uniqueYears.includes(currentYear)) {
-            setYears(prev => [...prev, currentYear]);
-          }
-        }
-      }
-
-      // Then fetch prices for the selected region and year
-      const { data: pricesData, error } = await supabase
+      setLoading(true);
+      const { data, error } = await supabase
         .from('market_prices')
         .select('*')
-        .eq('region', selectedRegion)
-        .eq('year', selectedYear);
-      
-      if (error) throw error;
-      
-      if (pricesData) {
-        // Map database fields to our MarketPrice interface
-        const transformedPrices = pricesData.map(price => ({
-          id: price.id,
-          culture: price.culture,
-          averageYield: price.average_yield,
-          price: price.price,
-          trend: price.trend,
-          last_updated: price.last_updated,
-          region: price.region,
-          year: price.year,
-          is_forecast: price.is_forecast
-        }));
-        
-        setMarketPrices(transformedPrices);
+        .order('culture', { ascending: true });
+
+      if (error) {
+        throw error;
       }
+
+      setMarketPrices(data || []);
     } catch (error) {
-      console.error("Error fetching market prices:", error);
-      toast.error("Hiba történt az árak betöltése során");
+      console.error("Error loading market prices:", error);
+      toast.error("Nem sikerült betölteni a piaci árakat");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEdit = (price: MarketPrice) => {
-    setEditingPrice(price);
-  };
-
-  const handleDelete = async (id: string) => {
+  const loadRegionsAndCultures = async () => {
     try {
-      const { error } = await supabase
+      // Load unique regions
+      const { data: regionData, error: regionError } = await supabase
         .from('market_prices')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      
-      setMarketPrices(prices => prices.filter(price => price.id !== id));
-      toast.success("Ár sikeresen törölve");
+        .select('region');
+
+      if (regionError) throw regionError;
+
+      // Get unique regions
+      const uniqueRegions = [...new Set(regionData?.map(item => item.region))];
+      setRegions(uniqueRegions as string[]);
+
+      // Load cultures from the cultures table
+      const { data: cultureData, error: cultureError } = await supabase
+        .from('cultures')
+        .select('name');
+
+      if (cultureError) throw cultureError;
+
+      // Get unique culture names
+      const uniqueCultures = [...new Set(cultureData?.map(item => item.name))];
+      setCultures(uniqueCultures as string[]);
     } catch (error) {
-      console.error("Error deleting price:", error);
-      toast.error("Hiba történt az ár törlése során");
+      console.error("Error loading regions and cultures:", error);
     }
   };
 
-  const handleSaveEdit = async () => {
-    if (!editingPrice) return;
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setNewPrice({ ...newPrice, [name]: value });
+  };
+
+  const handleSelectChange = (name: string, value: string) => {
+    setNewPrice({ ...newPrice, [name]: value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     
     try {
-      // Map our interface back to database field names
       const { error } = await supabase
         .from('market_prices')
-        .upsert({
-          id: editingPrice.id,
-          culture: editingPrice.culture,
-          average_yield: editingPrice.averageYield,
-          price: editingPrice.price,
-          trend: editingPrice.trend || 0,
-          region: editingPrice.region || selectedRegion,
-          year: editingPrice.year || selectedYear,
-          is_forecast: editingPrice.is_forecast || false,
+        .insert({
+          culture: newPrice.culture,
+          region: newPrice.region,
+          price: parseFloat(newPrice.price.toString()),
+          average_yield: parseFloat(newPrice.averageYield.toString()),
+          year: newPrice.year,
+          is_forecast: newPrice.is_forecast,
+          trend: 0,
           last_updated: new Date().toISOString()
         });
-      
-      if (error) throw error;
-      
-      // Update local state
-      fetchMarketPrices();
-      setEditingPrice(null);
-      toast.success("Ár sikeresen mentve");
-    } catch (error) {
-      console.error("Error saving price:", error);
-      toast.error("Hiba történt az ár mentése során");
-    }
-  };
 
-  const handleCreateBulk = async () => {
-    try {
-      // Example default values
-      const defaultCrops = [
-        { culture: "Búza", price: 85000, averageYield: 5.5, trend: 0 },
-        { culture: "Kukorica", price: 75000, averageYield: 8.2, trend: 0 },
-        { culture: "Napraforgó", price: 160000, averageYield: 3.2, trend: 0 },
-        { culture: "Árpa", price: 78000, averageYield: 5.0, trend: 0 },
-        { culture: "Repce", price: 170000, averageYield: 3.2, trend: 0 },
-        { culture: "Szója", price: 150000, averageYield: 2.8, trend: 0 }
-      ];
-      
-      // Convert to database field names
-      const bulkData = defaultCrops.map(crop => ({
-        culture: crop.culture,
-        average_yield: crop.averageYield,
-        price: crop.price,
-        trend: crop.trend,
-        region: selectedRegion,
-        year: selectedYear,
-        is_forecast: false,
-        last_updated: new Date().toISOString()
-      }));
-      
-      const { error } = await supabase
-        .from('market_prices')
-        .insert(bulkData);
-      
       if (error) throw error;
       
-      fetchMarketPrices();
-      toast.success("Alapértelmezett árak sikeresen hozzáadva");
+      toast.success("Új piaci ár sikeresen hozzáadva");
+      loadMarketPrices();
+      
+      // Reset form
+      setNewPrice({
+        culture: "",
+        region: "",
+        price: 0,
+        averageYield: 0,
+        year: new Date().getFullYear().toString(),
+        is_forecast: true
+      });
     } catch (error) {
-      console.error("Error creating bulk prices:", error);
-      toast.error("Hiba történt az árak létrehozása során");
+      console.error("Error saving market price:", error);
+      toast.error("Nem sikerült menteni a piaci árat");
     }
   };
 
   return (
     <div className="container mx-auto py-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>Piaci árak kezelése</CardTitle>
-          <CardDescription>
-            Itt kezelheti a különböző régió és év szerinti piaci árakat, amelyek alapján a rendszer kiszámítja a hitelkereteket.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 mb-6">
-            <div className="w-1/2">
-              <Select
-                value={selectedRegion}
-                onValueChange={setSelectedRegion}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Válassz régiót" />
-                </SelectTrigger>
-                <SelectContent>
-                  {regions.map(region => (
-                    <SelectItem key={region} value={region}>
-                      {region}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-1/2">
-              <Select
-                value={selectedYear}
-                onValueChange={setSelectedYear}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Válassz évet" />
-                </SelectTrigger>
-                <SelectContent>
-                  {years.map(year => (
-                    <SelectItem key={year} value={year}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          {loading ? (
-            <div className="text-center py-12">Adatok betöltése...</div>
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Növény</TableHead>
-                    <TableHead className="text-right">Átlaghozam (t/ha)</TableHead>
-                    <TableHead className="text-right">Ár (Ft/t)</TableHead>
-                    <TableHead className="text-center">Trend</TableHead>
-                    <TableHead className="text-right">Utolsó frissítés</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {marketPrices.length === 0 ? (
+      <h1 className="text-3xl font-bold mb-6">Piaci árak kezelése</h1>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Jelenlegi piaci árak</CardTitle>
+              <CardDescription>Az összes régióra és növénykultúrára vonatkozó árak</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-4">Betöltés...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-4">
-                        Nincs adat a kiválasztott régióra és évre
-                      </TableCell>
+                      <TableHead>Növénykultúra</TableHead>
+                      <TableHead>Régió</TableHead>
+                      <TableHead>Év</TableHead>
+                      <TableHead className="text-right">Ár (Ft/t)</TableHead>
+                      <TableHead className="text-right">Átlaghozam (t/ha)</TableHead>
+                      <TableHead>Típus</TableHead>
                     </TableRow>
-                  ) : (
-                    marketPrices.map(price => (
+                  </TableHeader>
+                  <TableBody>
+                    {marketPrices.map((price) => (
                       <TableRow key={price.id}>
                         <TableCell>{price.culture}</TableCell>
-                        <TableCell className="text-right">{formatNumber(price.averageYield, 1)}</TableCell>
-                        <TableCell className="text-right">{formatNumber(price.price, 0)}</TableCell>
-                        <TableCell className="text-center">
-                          {price.trend > 0 ? (
-                            <ArrowUp className="inline text-green-600" />
-                          ) : price.trend < 0 ? (
-                            <ArrowDown className="inline text-red-600" />
-                          ) : (
-                            <Minus className="inline text-gray-600" />
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {new Date(price.last_updated).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(price)}
-                            >
-                              Szerkesztés
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleDelete(price.id)}
-                            >
-                              <Trash className="h-4 w-4" />
-                            </Button>
-                          </div>
+                        <TableCell>{price.region}</TableCell>
+                        <TableCell>{price.year}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(price.price)}</TableCell>
+                        <TableCell className="text-right">{price.average_yield} t/ha</TableCell>
+                        <TableCell>
+                          <Badge variant={price.is_forecast ? "outline" : "default"}>
+                            {price.is_forecast ? "Előrejelzés" : "Tény"}
+                          </Badge>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-              
-              <div className="mt-6 flex justify-between">
-                <Button
-                  variant="outline"
-                  onClick={() => setEditingPrice({})}
-                >
-                  <PlusCircle className="h-4 w-4 mr-2" />
-                  Új ár hozzáadása
-                </Button>
-                {marketPrices.length === 0 && (
-                  <Button
-                    variant="default"
-                    onClick={handleCreateBulk}
+                    ))}
+                    {marketPrices.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-4">
+                          Nincsenek piaci árak az adatbázisban
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+        
+        <div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Új piaci ár hozzáadása</CardTitle>
+              <CardDescription>Adjon meg egy új piaci árat</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="culture">Növénykultúra</Label>
+                  <Select 
+                    onValueChange={(value) => handleSelectChange("culture", value)} 
+                    value={newPrice.culture}
                   >
-                    Alapértelmezett árak létrehozása
-                  </Button>
-                )}
-              </div>
-            </>
-          )}
-          
-          {editingPrice && (
-            <Card className="mt-6 border-2 border-primary/10">
-              <CardHeader>
-                <CardTitle>
-                  {editingPrice.id ? 'Ár szerkesztése' : 'Új ár hozzáadása'}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Növény</label>
-                    <Input
-                      value={editingPrice.culture || ''}
-                      onChange={e => setEditingPrice({...editingPrice, culture: e.target.value})}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Átlaghozam (t/ha)</label>
-                    <Input
-                      type="number"
-                      value={editingPrice.averageYield || ''}
-                      onChange={e => setEditingPrice({...editingPrice, averageYield: parseFloat(e.target.value)})}
-                      className="mt-1"
-                      step="0.1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Ár (Ft/t)</label>
-                    <Input
-                      type="number"
-                      value={editingPrice.price || ''}
-                      onChange={e => setEditingPrice({...editingPrice, price: parseFloat(e.target.value)})}
-                      className="mt-1"
-                      step="1000"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Trend</label>
-                    <Select
-                      value={(editingPrice.trend || 0).toString()}
-                      onValueChange={value => setEditingPrice({...editingPrice, trend: parseInt(value)})}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">Növekvő ár</SelectItem>
-                        <SelectItem value="0">Stagnáló ár</SelectItem>
-                        <SelectItem value="-1">Csökkenő ár</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Válasszon növénykultúrát" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cultures.map((culture) => (
+                        <SelectItem key={culture} value={culture}>
+                          {culture}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="mt-4 flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setEditingPrice(null)}
+                
+                <div className="space-y-2">
+                  <Label htmlFor="region">Régió</Label>
+                  <Select 
+                    onValueChange={(value) => handleSelectChange("region", value)} 
+                    value={newPrice.region}
                   >
-                    Mégsem
-                  </Button>
-                  <Button
-                    onClick={handleSaveEdit}
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    Mentés
-                  </Button>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Válasszon régiót" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {regions.map((region) => (
+                        <SelectItem key={region} value={region}>
+                          {region}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-        </CardContent>
-      </Card>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="price">Ár (Ft/tonna)</Label>
+                  <Input
+                    id="price"
+                    name="price"
+                    type="number"
+                    value={newPrice.price}
+                    onChange={handleInputChange}
+                    min="0"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="averageYield">Átlaghozam (tonna/ha)</Label>
+                  <Input
+                    id="averageYield"
+                    name="averageYield"
+                    type="number"
+                    value={newPrice.averageYield}
+                    onChange={handleInputChange}
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="year">Év</Label>
+                  <Input
+                    id="year"
+                    name="year"
+                    value={newPrice.year}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Típus</Label>
+                  <Select 
+                    onValueChange={(value) => handleSelectChange("is_forecast", value === "true")} 
+                    value={newPrice.is_forecast.toString()}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Előrejelzés</SelectItem>
+                      <SelectItem value="false">Tény adat</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </form>
+            </CardContent>
+            <CardFooter>
+              <Button className="w-full" onClick={handleSubmit}>
+                Hozzáadás
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 };
