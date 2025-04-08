@@ -71,7 +71,33 @@ export const checkApiConnectivity = async (): Promise<{ connected: boolean; deta
   }
 };
 
-// New function to test Claude API specifically
+// Add function to view Claude response
+export const getClaudeResponseForOcrLog = async (ocrLogId: string): Promise<string | null> => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error("Nincs érvényes felhasználói munkamenet");
+    }
+    
+    const { data, error } = await supabase
+      .from('document_ocr_logs')
+      .select('claude_response_url')
+      .eq('id', ocrLogId)
+      .maybeSingle();
+    
+    if (error) {
+      console.error("Claude válasz URL lekérdezési hiba:", error);
+      return null;
+    }
+    
+    return data?.claude_response_url || null;
+  } catch (error) {
+    console.error("Hiba a Claude válasz URL lekérdezése során:", error);
+    return null;
+  }
+};
+
+// New function to test connectivity specifically to the Claude processing endpoint
 export const testClaudeApiConnectivity = async (): Promise<{ connected: boolean; details?: string }> => {
   try {
     console.log("🔍 Testing Claude API connectivity...");

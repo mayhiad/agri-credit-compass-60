@@ -1,4 +1,3 @@
-
 import { supabase, getErrorDetails } from "./openaiClient.ts";
 
 // Egyszerű PDF és Excel dokumentum szöveg kinyerése
@@ -210,6 +209,74 @@ export async function logExtractionResult(ocrLogId: string, userId: string, extr
     return data.id;
   } catch (error) {
     console.error(`❌ Váratlan hiba az AI feldolgozási eredmények mentése során: ${getErrorDetails(error)}`);
+    return null;
+  }
+}
+
+// Nyers Claude válasz mentése szöveges dokumentumként
+export async function saveRawClaudeResponse(
+  rawResponse: string, 
+  originalFileName: string, 
+  userId: string,
+  ocrLogId: string
+): Promise<string | null> {
+  try {
+    console.log(`📄 Claude nyers válasz mentése egyszerű szöveges formátumban...`);
+    
+    // Validáljuk a Supabase kliens állapotát
+    if (!supabase || !supabase.storage) {
+      console.error("❌ Supabase kliens nem elérhető vagy nincs inicializálva");
+      return null;
+    }
+    
+    // Generálunk egy egyedi fájl nevet
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const cleanFileName = originalFileName.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/\.pdf$/i, '');
+    const responseFileName = `claude-response-${cleanFileName}-${timestamp}.txt`;
+    const storagePath = `claude-responses/${userId}/${responseFileName}`;
+    
+    console.log(`📁 Claude válasz tárolási útvonal: ${storagePath}`);
+    
+    // Mentjük a szöveges fájlt a storage-ba
+    const textEncoder = new TextEncoder();
+    const fileBuffer = textEncoder.encode(rawResponse);
+    
+    const { data, error } = await supabase.storage
+      .from('dokumentumok')
+      .upload(storagePath, fileBuffer, {
+        contentType: 'text/plain',
+        upsert: false
+      });
+    
+    if (error) {
+      console.error("❌ Hiba a Claude válasz mentése során:", error.message);
+      return null;
+    }
+    
+    // Generáljuk a publikus URL-t
+    const { data: { publicUrl } } = supabase.storage
+      .from('dokumentumok')
+      .getPublicUrl(storagePath);
+    
+    console.log(`�� Claude válasz sikeresen mentve: ${publicUrl}`);
+    
+    // Frissítsük az OCR logunkat a Claude válasz URL-jével
+    if (ocrLogId) {
+      const { error: updateError } = await supabase
+        .from('document_ocr_logs')
+        .update({
+          claude_response_url: publicUrl
+        })
+        .eq('id', ocrLogId);
+      
+      if (updateError) {
+        console.error("❌ OCR log frissítése sikertelen:", updateError.message);
+      }
+    }
+    
+    return publicUrl;
+  } catch (error) {
+    console.error(`❌ Váratlan hiba a Claude válasz mentése során: ${getErrorDetails(error)}`);
     return null;
   }
 }

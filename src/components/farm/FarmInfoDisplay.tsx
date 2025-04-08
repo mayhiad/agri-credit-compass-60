@@ -1,223 +1,200 @@
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { FarmData } from "@/types/farm";
-import { ArrowRight, Check, FileText, User, Calendar, MapPin, Layers, RotateCcw } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import SubmitterInfo from "./SubmitterInfo";
-import BlocksAccordion from "./BlocksAccordion";
-import CultureTable from "./CultureTable";
-import HistoricalCrops from "./HistoricalCrops";
+import { FarmData } from "@/types/farm";
+import FarmSummary from "@/components/farm/FarmSummary";
+import DocumentInfo from "@/components/farm/DocumentInfo";
+import SubmitterInfo from "@/components/farm/SubmitterInfo";
+import CultureTable from "@/components/farm/CultureTable";
+import BlocksAccordion from "@/components/farm/BlocksAccordion";
+import HistoricalCrops from "@/components/farm/HistoricalCrops";
+import CreditOfferCard from "@/components/farm/CreditOfferCard";
+import CurrentYearRevenue from "@/components/farm/CurrentYearRevenue";
+import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CircleAlert } from "lucide-react";
+import { diagnoseFarmData, getClaudeResponseUrl } from "@/services/sapsProcessor";
+import { useEffect } from "react";
+import { toast } from "sonner";
 
 interface FarmInfoDisplayProps {
   farmData: FarmData;
   onComplete: () => void;
-  onBackToDashboard?: () => void;
+  onBackToDashboard: () => void;
 }
 
-export const FarmInfoDisplay = ({ farmData, onComplete, onBackToDashboard }: FarmInfoDisplayProps) => {
-  const [activeTab, setActiveTab] = useState("admin");
+const FarmInfoDisplay: React.FC<FarmInfoDisplayProps> = ({ 
+  farmData, 
+  onComplete,
+  onBackToDashboard
+}) => {
+  const [currentTab, setCurrentTab] = useState("administration");
+  const [claudeResponseUrl, setClaudeResponseUrl] = useState<string | null>(null);
+  const navigate = useNavigate();
   
-  // Check if we have meaningful data or mostly N/A values
-  const hasIncompleteData = !farmData?.applicantName && 
-                          !farmData?.submitterId && 
-                          !farmData?.applicantId && 
-                          !farmData?.documentId;
+  // Diagnostic check for data quality
+  const diagnosis = diagnoseFarmData(farmData);
   
-  // Make sure farmData is properly defined before rendering
-  if (!farmData) {
-    return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Gazdasági adatok</CardTitle>
-          <CardDescription>
-            Hiányzó vagy hibás gazdasági adatok
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="py-8 text-center text-muted-foreground">
-            <p>Nem található érvényes gazdasági adat.</p>
-            <p className="text-sm mt-2">Kérjük, töltse fel újra a SAPS dokumentumot.</p>
-          </div>
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          {onBackToDashboard && (
-            <Button variant="outline" onClick={onBackToDashboard}>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Vissza az irányítópultra
-            </Button>
-          )}
-          <Button onClick={onComplete} className="ml-auto">
-            Folytatás
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </CardFooter>
-      </Card>
-    );
-  }
+  // Fetch Claude response URL if available
+  useEffect(() => {
+    const fetchClaudeResponseUrl = async () => {
+      if (farmData.ocrLogId) {
+        const url = await getClaudeResponseUrl(farmData.ocrLogId);
+        setClaudeResponseUrl(url);
+      }
+    };
+    
+    fetchClaudeResponseUrl();
+  }, [farmData.ocrLogId]);
+  
+  const handleNextTab = () => {
+    if (currentTab === "administration") {
+      setCurrentTab("blocks");
+    } else if (currentTab === "blocks") {
+      setCurrentTab("history");
+    } else if (currentTab === "history") {
+      setCurrentTab("current");
+    } else if (currentTab === "current") {
+      onComplete();
+    }
+  };
+  
+  const handleLoanApplication = () => {
+    navigate("/loan-application", { 
+      state: { 
+        preApprovedAmount: farmData.totalRevenue ? Math.round(farmData.totalRevenue * 0.7) : 0,
+        totalRevenue: farmData.totalRevenue || 0 
+      } 
+    });
+  };
   
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Gazdasági adatok áttekintése</CardTitle>
-        <CardDescription>
-          Ellenőrizze a SAPS dokumentum alapján kinyert adatokat
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {hasIncompleteData && (
-          <Alert variant="warning" className="bg-amber-50 border-amber-200 mb-4">
-            <AlertTitle className="text-amber-800">Hiányos adatok</AlertTitle>
-            <AlertDescription className="text-amber-700">
-              A dokumentumból nem sikerült minden fontos adatot kiolvasni. Ellenőrizze az adatokat, vagy próbálkozzon egy másik dokumentum feltöltésével.
-            </AlertDescription>
-          </Alert>
-        )}
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-6">Gazdaság adatainak áttekintése</h1>
+      
+      {!diagnosis.isValid && (
+        <Alert variant="destructive" className="mb-6">
+          <CircleAlert className="h-4 w-4" />
+          <AlertTitle>Figyelmeztetés</AlertTitle>
+          <AlertDescription>
+            {diagnosis.message} Az adatok hiányosak, de folytathatja a hiteligénylést a meglévő adatok alapján, 
+            vagy visszatérhet a kezdőlapra.
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {claudeResponseUrl && (
+        <Alert className="mb-6">
+          <AlertTitle>Claude AI válasz elérhető</AlertTitle>
+          <AlertDescription>
+            <p>Megtekintheti a nyers adatokat, amelyeket a Claude AI azonosított a dokumentumból:</p>
+            <Button 
+              variant="outline" 
+              className="mt-2"
+              onClick={() => window.open(claudeResponseUrl, '_blank')}
+            >
+              Claude válasz megtekintése
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      <Tabs value={currentTab} onValueChange={setCurrentTab} className="mb-8">
+        <TabsList className="grid grid-cols-4 w-full">
+          <TabsTrigger value="administration">Adminisztratív adatok</TabsTrigger>
+          <TabsTrigger value="blocks">Blokkazonosítók</TabsTrigger>
+          <TabsTrigger value="history">Korábbi évek</TabsTrigger>
+          <TabsTrigger value="current">Aktuális adatok</TabsTrigger>
+        </TabsList>
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-4 mb-6">
-            <TabsTrigger value="admin">
-              <User className="h-4 w-4 mr-2" />
-              Adminisztrációs adatok
-            </TabsTrigger>
-            <TabsTrigger value="blocks">
-              <MapPin className="h-4 w-4 mr-2" />
-              Blokkazonosítók
-            </TabsTrigger>
-            <TabsTrigger value="historical">
-              <Calendar className="h-4 w-4 mr-2" />
-              Histórikus adatok
-            </TabsTrigger>
-            <TabsTrigger value="current">
-              <Layers className="h-4 w-4 mr-2" />
-              Tárgyévi adatok
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="admin" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl">Adminisztrációs adatok</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <SubmitterInfo 
-                  submitterName={farmData.applicantName} 
-                  submitterId={farmData.submitterId}
-                  applicantId={farmData.applicantId}
-                  submissionDate={farmData.submissionDate}
-                  documentId={farmData.documentId}
-                  documentYear={farmData.year}
+        <TabsContent value="administration">
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <DocumentInfo 
+                documentId={farmData.documentId} 
+                submissionDate={farmData.submissionDate}
+                year={farmData.year}
+              />
+              <SubmitterInfo 
+                applicantName={farmData.applicantName}
+                submitterId={farmData.submitterId}
+                applicantId={farmData.applicantId}
+                region={farmData.region}
+              />
+            </div>
+            <div>
+              <FarmSummary 
+                hectares={farmData.hectares || 0} 
+                cultures={farmData.cultures?.length || 0}
+                blocksCount={farmData.blockIds?.length || 0}
+                totalRevenue={farmData.totalRevenue || 0}
+              />
+              <div className="mt-6">
+                <CreditOfferCard 
+                  farmData={farmData}
+                  onApply={handleLoanApplication}
                 />
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                {onBackToDashboard && hasIncompleteData && (
-                  <Button variant="outline" onClick={onBackToDashboard}>
-                    <RotateCcw className="mr-2 h-4 w-4" />
-                    Vissza az irányítópultra
-                  </Button>
-                )}
-                <Button onClick={() => setActiveTab("blocks")} className={hasIncompleteData ? "ml-auto" : "w-full"}>
-                  Jóváhagyás
-                  <Check className="ml-2 h-4 w-4" />
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="blocks" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl">Blokkazonosítók</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <BlocksAccordion farmData={farmData} />
-                {(!farmData.blockIds || farmData.blockIds.length === 0) && (
-                  <Alert className="bg-amber-50 border-amber-200">
-                    <AlertDescription className="text-amber-800">
-                      A dokumentumból nem sikerült blokkazonosítókat kiolvasni. 
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                {onBackToDashboard && hasIncompleteData && (
-                  <Button variant="outline" onClick={onBackToDashboard}>
-                    <RotateCcw className="mr-2 h-4 w-4" />
-                    Vissza az irányítópultra
-                  </Button>
-                )}
-                <Button onClick={() => setActiveTab("historical")} className={hasIncompleteData ? "ml-auto" : "w-full"}>
-                  Jóváhagyás
-                  <Check className="ml-2 h-4 w-4" />
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="historical" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl">Histórikus adatok</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <HistoricalCrops historicalData={farmData.historicalData || []} />
-                {(!farmData.historicalData || farmData.historicalData.length === 0) && (
-                  <Alert className="bg-amber-50 border-amber-200">
-                    <AlertDescription className="text-amber-800">
-                      A dokumentumból nem sikerült historikus adatokat kiolvasni.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                {onBackToDashboard && hasIncompleteData && (
-                  <Button variant="outline" onClick={onBackToDashboard}>
-                    <RotateCcw className="mr-2 h-4 w-4" />
-                    Vissza az irányítópultra
-                  </Button>
-                )}
-                <Button onClick={() => setActiveTab("current")} className={hasIncompleteData ? "ml-auto" : "w-full"}>
-                  Jóváhagyás
-                  <Check className="ml-2 h-4 w-4" />
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="current" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl">Tárgyévi termelési adatok</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <CultureTable farmData={farmData} showPrices={false} showRevenue={false} />
-                {(!farmData.cultures || farmData.cultures.length === 0) && (
-                  <Alert className="bg-amber-50 border-amber-200">
-                    <AlertDescription className="text-amber-800">
-                      A dokumentumból nem sikerült tárgyévi termelési adatokat kiolvasni.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                {onBackToDashboard && hasIncompleteData && (
-                  <Button variant="outline" onClick={onBackToDashboard}>
-                    <RotateCcw className="mr-2 h-4 w-4" />
-                    Vissza az irányítópultra
-                  </Button>
-                )}
-                <Button onClick={onComplete} className={hasIncompleteData ? "ml-auto" : "w-full"}>
-                  Tovább a hitelajánlatra
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-between mt-8">
+            <Button variant="outline" onClick={onBackToDashboard}>
+              Vissza a kezdőlapra
+            </Button>
+            <Button onClick={handleNextTab}>
+              Tovább a blokkazonosítókhoz
+            </Button>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="blocks">
+          <BlocksAccordion blockIds={farmData.blockIds || []} />
+          <div className="flex justify-between mt-8">
+            <Button variant="outline" onClick={() => setCurrentTab("administration")}>
+              Vissza az adminisztratív adatokhoz
+            </Button>
+            <Button onClick={handleNextTab}>
+              Tovább a korábbi évekhez
+            </Button>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="history">
+          <HistoricalCrops historicalData={farmData.historicalData || []} />
+          <div className="flex justify-between mt-8">
+            <Button variant="outline" onClick={() => setCurrentTab("blocks")}>
+              Vissza a blokkazonosítókhoz
+            </Button>
+            <Button onClick={handleNextTab}>
+              Tovább az aktuális adatokhoz
+            </Button>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="current">
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <CultureTable cultures={farmData.cultures || []} />
+            </div>
+            <div>
+              <CurrentYearRevenue 
+                totalRevenue={farmData.totalRevenue || 0}
+                hectares={farmData.hectares || 0}
+              />
+            </div>
+          </div>
+          <div className="flex justify-between mt-8">
+            <Button variant="outline" onClick={() => setCurrentTab("history")}>
+              Vissza a korábbi évekhez
+            </Button>
+            <Button onClick={handleLoanApplication}>
+              Tovább a hitelajánlathoz
+            </Button>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 };
 

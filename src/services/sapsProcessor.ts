@@ -129,3 +129,33 @@ export const diagnoseFarmData = (farmData: FarmData): {
     message
   };
 };
+
+// Add new function to check for Claude response URL
+export const getClaudeResponseUrl = async (ocrLogId: string): Promise<string | null> => {
+  try {
+    // Get the Supabase instance
+    const { supabase } = await import("@/integrations/supabase/client");
+    
+    if (!ocrLogId) {
+      console.error("OCR log ID is missing");
+      return null;
+    }
+    
+    // Query the document_ocr_logs table to get the Claude response URL
+    const { data, error } = await supabase
+      .from('document_ocr_logs')
+      .select('claude_response_url')
+      .eq('id', ocrLogId)
+      .maybeSingle();
+    
+    if (error) {
+      console.error("Error fetching Claude response URL:", error);
+      return null;
+    }
+    
+    return data?.claude_response_url || null;
+  } catch (err) {
+    console.error("Error in getClaudeResponseUrl:", err);
+    return null;
+  }
+};
