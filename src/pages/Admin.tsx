@@ -53,7 +53,7 @@ const Admin = () => {
     try {
       await supabase.auth.signOut();
       toast.success("Sikeres kijelentkezés");
-      navigate("/");
+      navigate("/"); // Redirect to the landing page
     } catch (error) {
       console.error("Sign out error:", error);
       toast.error("Hiba történt a kijelentkezés során");
