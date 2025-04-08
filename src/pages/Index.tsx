@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/App";
@@ -29,7 +28,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header with login button */}
       <header className="w-full py-4 px-6 flex justify-end">
         <Link to="/auth">
           <Button variant="outline" size="sm" className="flex items-center gap-2">
@@ -39,9 +37,7 @@ const Index = () => {
         </Link>
       </header>
 
-      {/* Main content */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
-        {/* Logo and tagline */}
         <motion.div 
           className="text-center mb-16 max-w-3xl"
           initial={{ opacity: 0, y: 20 }}
@@ -49,14 +45,13 @@ const Index = () => {
           transition={{ duration: 0.5 }}
         >
           <h1 className="text-6xl font-bold mb-6 text-primary">
-            AgriFIX
+            agrFIx
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Nyújtsd be a hitelkérelmet mindössze 10 perc alatt, mi pedig 24 órán belül folyósítjuk a kért összeget!
           </p>
         </motion.div>
 
-        {/* Process flow */}
         <motion.div 
           className="w-full max-w-5xl mb-16 px-4"
           initial={{ opacity: 0 }}
@@ -67,7 +62,6 @@ const Index = () => {
           <Steps steps={loanProcessSteps} currentStep={0} />
         </motion.div>
 
-        {/* CTA */}
         <motion.div 
           className="text-center max-w-2xl"
           initial={{ opacity: 0, y: 20 }}
@@ -91,4 +85,3 @@ const Index = () => {
 };
 
 export default Index;
-
