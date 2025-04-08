@@ -30,27 +30,78 @@ serve(async (req) => {
     }
 
     // First, get the user by email
-    const { data: users, error: getUserError } = await supabase
-      .from("auth.users")
-      .select("id")
-      .eq("email", email)
-      .single();
-
+    console.log(`Looking for user with email: ${email}`);
+    const { data: userData, error: getUserError } = await supabase.auth.admin.listUsers();
+    
     if (getUserError) {
-      throw new Error(`Error fetching user: ${getUserError.message}`);
+      throw new Error(`Error fetching users: ${getUserError.message}`);
     }
 
-    if (!users) {
+    // Find the user with the matching email
+    const user = userData.users.find(u => u.email === email);
+    
+    if (!user) {
       throw new Error(`User with email ${email} not found`);
     }
 
-    // Delete the user
-    const { error: deleteError } = await supabase.auth.admin.deleteUser(users.id);
+    console.log(`Found user with ID: ${user.id}`);
+
+    // Delete the user's data from various tables if they exist
+    console.log("Cleaning up user data...");
+    
+    // Delete farm data (and cascading to cultures, farm_details, etc.)
+    const { error: farmsError } = await supabase
+      .from('farms')
+      .delete()
+      .eq('user_id', user.id);
+    
+    if (farmsError) {
+      console.error(`Error deleting farm data: ${farmsError.message}`);
+      // Continue with deletion even if this fails
+    }
+    
+    // Delete loans
+    const { error: loansError } = await supabase
+      .from('loans')
+      .delete()
+      .eq('user_id', user.id);
+    
+    if (loansError) {
+      console.error(`Error deleting loans: ${loansError.message}`);
+      // Continue with deletion even if this fails
+    }
+    
+    // Delete user roles
+    const { error: rolesError } = await supabase
+      .from('user_roles')
+      .delete()
+      .eq('user_id', user.id);
+    
+    if (rolesError) {
+      console.error(`Error deleting user roles: ${rolesError.message}`);
+      // Continue with deletion even if this fails
+    }
+    
+    // Delete profile
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', user.id);
+    
+    if (profileError) {
+      console.error(`Error deleting profile: ${profileError.message}`);
+      // Continue with deletion even if this fails
+    }
+
+    // Finally, delete the user from auth
+    console.log(`Deleting user with ID: ${user.id}`);
+    const { error: deleteError } = await supabase.auth.admin.deleteUser(user.id);
     
     if (deleteError) {
       throw new Error(`Error deleting user: ${deleteError.message}`);
     }
 
+    console.log(`Successfully deleted user with email: ${email}`);
     return new Response(
       JSON.stringify({ success: true, message: `User with email ${email} has been deleted` }),
       {
