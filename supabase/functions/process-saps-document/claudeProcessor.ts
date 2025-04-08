@@ -1,3 +1,4 @@
+
 import { batchArray } from "./utils.ts";
 
 export const processAllImageBatches = async (
@@ -19,12 +20,14 @@ export const processAllImageBatches = async (
     applicantName: "N/A",
     submitterId: "N/A",
     applicantId: "N/A",
-    region: "N/A",
+    documentId: "N/A",
     year: "N/A",
+    submissionDate: "N/A",
     hectares: 0,
     cultures: [],
     blockIds: [],
-    totalRevenue: 0
+    totalRevenue: 0,
+    historicalYears: []
   };
   
   let rawText = "";
@@ -73,12 +76,12 @@ export const processAllImageBatches = async (
           combinedResult.documentId = batchResult.data.documentId;
         }
         
-        if (batchResult.data.region && batchResult.data.region !== "N/A") {
-          combinedResult.region = batchResult.data.region;
-        }
-        
         if (batchResult.data.year && batchResult.data.year !== "N/A") {
           combinedResult.year = batchResult.data.year;
+        }
+        
+        if (batchResult.data.submissionDate && batchResult.data.submissionDate !== "N/A") {
+          combinedResult.submissionDate = batchResult.data.submissionDate;
         }
         
         if (batchResult.data.hectares && batchResult.data.hectares > 0) {
@@ -103,6 +106,22 @@ export const processAllImageBatches = async (
             }
           }
         }
+        
+        if (batchResult.data.historicalYears && batchResult.data.historicalYears.length > 0) {
+          // Combine historical years data
+          if (!combinedResult.historicalYears || combinedResult.historicalYears.length === 0) {
+            combinedResult.historicalYears = batchResult.data.historicalYears;
+          } else {
+            // Merge historical years data if we already have some
+            const existingYears = new Set(combinedResult.historicalYears.map((y: any) => y.year));
+            for (const yearData of batchResult.data.historicalYears) {
+              if (!existingYears.has(yearData.year)) {
+                combinedResult.historicalYears.push(yearData);
+                existingYears.add(yearData.year);
+              }
+            }
+          }
+        }
       }
       
       // If we have found all required information, we can stop processing
@@ -110,6 +129,8 @@ export const processAllImageBatches = async (
         combinedResult.applicantName !== "N/A" &&
         combinedResult.submitterId !== "N/A" &&
         combinedResult.applicantId !== "N/A" &&
+        combinedResult.submissionDate !== "N/A" &&
+        combinedResult.year !== "N/A" &&
         combinedResult.blockIds.length > 0 &&
         combinedResult.hectares > 0 &&
         combinedResult.cultures.length > 0;
@@ -161,7 +182,7 @@ async function processImageBatch(
     }
   }));
   
-  const systemPrompt = `You are an AI assistant specialized in extracting structured information from Hungarian SAPS (Single Area Payment Scheme) agricultural documents. Extract all information about the applicant, agriculture blocks, cultures, and land areas.
+  const systemPrompt = `You are an AI assistant specialized in extracting structured information from Hungarian SAPS (Single Area Payment Scheme) agricultural documents. Extract all information about the applicant, agriculture blocks, cultures, land areas, and historical crop data.
 
 IMPORTANT: Always return a valid JSON object with the following structure, using only these exact fields:
 {
@@ -169,8 +190,8 @@ IMPORTANT: Always return a valid JSON object with the following structure, using
   "submitterId": string,
   "applicantId": string,
   "documentId": string,
-  "region": string,
   "year": string,
+  "submissionDate": string,
   "hectares": number,
   "cultures": [
     {
@@ -178,7 +199,21 @@ IMPORTANT: Always return a valid JSON object with the following structure, using
       "hectares": number
     }
   ],
-  "blockIds": string[]
+  "blockIds": string[],
+  "historicalYears": [
+    {
+      "year": string,
+      "totalHectares": number,
+      "crops": [
+        {
+          "name": string,
+          "hectares": number,
+          "yield": number,
+          "totalYield": number
+        }
+      ]
+    }
+  ]
 }
 
 SPECIFIC INSTRUCTIONS:
@@ -186,13 +221,30 @@ SPECIFIC INSTRUCTIONS:
 2. Find all block IDs which look like alphanumeric codes (e.g., "C1N7J518").
 3. Extract all crop types ("kultúra") and their corresponding areas in hectares.
 4. The total hectares should be the sum of all culture areas.
-5. If you can't find certain information, use "N/A" for string values and 0 for numeric values.
-6. DON'T MAKE UP OR ESTIMATE DATA. If you're uncertain, use "N/A" or 0.
-7. Return ONLY the JSON object with no additional text or explanation.
+5. Find the submission date of the document and the year it refers to.
+6. If you can't find certain information, use "N/A" for string values and 0 for numeric values.
+7. DON'T MAKE UP OR ESTIMATE DATA. If you're uncertain, use "N/A" or 0.
+8. Return ONLY the JSON object with no additional text or explanation.
 
-NOTE: These documents may be in Hungarian. Look for words like "kérelmező", "ügyfél-azonosító", "blokkazonosító", "hektár", "terület", etc.`;
+## HISTORICAL DATA EXTRACTION
+For historical data ("historikus adatok"), look for tables showing crop data from previous years:
 
-  const userPrompt = `Extract all required information from these SAPS document pages. Remember to return ONLY a valid JSON object with the exact structure specified, containing all the information you can find about the applicant, blocks, land areas and cultures.`;
+1. Look for sections titled "Kárenyhtés", "Biztosítási díjtámogatás", or "Termésmennyiség megadása".
+2. Find tables that show multiple years side by side (in columns).
+3. These tables typically contain:
+   - Years (e.g., "2016 évi terület(ha)", "2016 évi termés(t)")
+   - Crop codes (e.g., KAL01, IND23) and names (e.g., Őszi búza, Napraforgó)
+   - Area data in hectares
+   - Yield data in tons
+4. Often found in the first third of the document.
+5. May be under heading "Termésmenyiség megadása a mezőgazdasági termelést érintő időjárási és más természeti kockázatok kezelésére szolgáló rendszer keretében".
+6. Make sure to capture data for all crops, including those grown in smaller areas.
+7. Data is typically in tables with crops in rows and years in columns.
+8. Check for both area (ha) and yield (t) data for each crop and for each year listed.
+
+NOTE: These documents may be in Hungarian. Look for words like "kérelmező", "ügyfél-azonosító", "blokkazonosító", "hektár", "terület", "dátum", "benyújtás dátuma", "tárgyév", etc.`;
+
+  const userPrompt = `Extract all required information from these SAPS document pages. Remember to return ONLY a valid JSON object with the exact structure specified, containing all the information you can find about the applicant, blocks, land areas, cultures, submission date, year, and historical crop data.`;
   
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {

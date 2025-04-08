@@ -72,11 +72,20 @@ export const saveHistoricalData = async (
     if (farmDetails) {
       // Farm details exists, update it
       const locationData = farmDetails.location_data || {};
-      locationData.historical_years = historicalData;
+      
+      // Convert location_data to object if it's a string
+      const updatedLocationData = typeof locationData === 'string' 
+        ? JSON.parse(locationData) 
+        : {...locationData};
+      
+      // Add historical years to location_data
+      updatedLocationData.historical_years = historicalData;
       
       const { error: updateError } = await supabase
         .from('farm_details')
-        .update({ location_data: locationData })
+        .update({ 
+          location_data: updatedLocationData 
+        })
         .eq('id', farmDetails.id);
         
       if (updateError) {
@@ -85,11 +94,13 @@ export const saveHistoricalData = async (
       }
     } else {
       // Farm details doesn't exist, create it
+      const newLocationData = { historical_years: historicalData };
+      
       const { error: insertError } = await supabase
         .from('farm_details')
         .insert({
           farm_id: farmId,
-          location_data: { historical_years: historicalData }
+          location_data: newLocationData
         });
         
       if (insertError) {

@@ -54,7 +54,8 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoDisplayProps) 
           submitterName={farmData.applicantName || "N/A"} 
           submitterId={farmData.submitterId || "N/A"}
           applicantId={farmData.applicantId || "N/A"}
-          submissionDate={farmData.submissionDate || farmData.documentDate || "N/A"}
+          submissionDate={farmData.submissionDate || "N/A"}
+          year={farmData.year || "N/A"}
         />
         <FarmSummary farmData={farmData} />
         <CultureTable farmData={farmData} />
@@ -62,7 +63,7 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoDisplayProps) 
         <DocumentInfo 
           documentId={farmData.documentId || "N/A"} 
           applicantName={farmData.applicantName || "N/A"} 
-          documentDate={farmData.documentDate || farmData.submissionDate || farmData.year || "N/A"}
+          documentDate={farmData.submissionDate || "N/A"}
         />
         
         {farmData.processingId && (

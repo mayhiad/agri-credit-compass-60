@@ -43,6 +43,7 @@ export interface FarmData {
   documentId?: string;
   region?: string;
   year?: string;
+  submissionDate?: string;
   hectares: number;
   cultures: Culture[];
   blockIds?: string[];
@@ -59,8 +60,8 @@ export interface FarmData {
   batchId?: string;  
   pageCount?: number; 
   processingStatus?: string;
-  submissionDate?: string;
   historicalData?: HistoricalYear[];
+  historicalYears?: HistoricalYear[];
   processingId?: string; // Added for tracking processing
   claudeResponseUrl?: string; // Added for Claude response URL
 }

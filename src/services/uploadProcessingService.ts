@@ -75,6 +75,11 @@ export const processSapsDocument = async (
     farmData.processingId = processResult.processingId;
     farmData.claudeResponseUrl = processResult.claudeResponseUrl;
     
+    // Handle historical data
+    if (farmData.historicalYears && farmData.historicalYears.length > 0) {
+      farmData.historicalData = farmData.historicalYears;
+    }
+    
     // Save the farm data to the database
     updateStatus({
       step: "Adatok mentése az adatbázisba",
