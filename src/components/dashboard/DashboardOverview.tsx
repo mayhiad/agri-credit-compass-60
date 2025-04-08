@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -157,8 +156,9 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
       {/* Card 4: Credit Offer - Full Width */}
       <div className="md:col-span-2 lg:col-span-3">
         <CreditOfferCard 
-          totalRevenue={totalRevenue} 
-          currentYear={displayYear}
+          farmData={farmData}
+          onApply={() => {}}
+          totalRevenue={totalRevenue}
         />
       </div>
     </div>

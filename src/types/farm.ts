@@ -1,7 +1,26 @@
+
 export interface Culture {
   name: string;
   hectares: number;
   estimatedRevenue?: number;
+  yieldPerHectare?: number;
+  pricePerTon?: number;
+}
+
+export interface HistoricalCrop {
+  name: string;
+  hectares: number;
+  yield: number;
+  totalYield?: number;
+  priceEUR?: number;
+  revenueEUR?: number;
+}
+
+export interface HistoricalYear {
+  year: string;
+  totalHectares: number;
+  crops: HistoricalCrop[];
+  totalRevenueEUR?: number;
 }
 
 export interface HistoricalData {
@@ -12,6 +31,7 @@ export interface HistoricalData {
 }
 
 export interface MarketPrice {
+  id?: string;
   culture: string;
   averageYield: number;
   price: number;
@@ -31,6 +51,7 @@ export interface BatchInfo {
 }
 
 export interface FarmData {
+  farmId?: string;
   documentId?: string;
   applicantName?: string;
   submitterId?: string;
@@ -42,10 +63,17 @@ export interface FarmData {
   region?: string;
   submissionDate?: string;
   year?: string;
-  historicalData?: HistoricalData[];
+  historicalData?: HistoricalYear[];
   marketPrices?: MarketPrice[];
   batchInfo?: BatchInfo;
-  ocrLogId?: string; // Add this new field to store the OCR log ID
+  ocrLogId?: string;
+  fileName?: string;
+  fileSize?: number;
+  batchId?: string;
+  pageCount?: number;
+  processingStatus?: string;
+  errorMessage?: string;
+  rawText?: string;
 }
 
 export interface UserData {

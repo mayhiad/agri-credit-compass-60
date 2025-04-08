@@ -130,6 +130,7 @@ const DashboardContent = ({ farmData, onFarmDataUpdate }: DashboardContentProps)
           <CurrentYearRevenue
             cultures={preparedCultures}
             totalRevenue={farmData.totalRevenue || 0}
+            hectares={farmData.hectares}
           />
         </TabsContent>
         
