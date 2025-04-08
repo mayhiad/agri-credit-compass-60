@@ -1,6 +1,7 @@
 
 import { FarmData } from "@/types/farm";
 import { supabase } from "@/integrations/supabase/client";
+import { Json } from "@/integrations/supabase/types";
 
 export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string): Promise<string | null> => {
   try {
@@ -86,7 +87,8 @@ export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string)
     }
     
     // 3. Create a comprehensive extraction result record with all SAPS metadata
-    const extractionData = {
+    // Convert the data to a format that can be safely stored as JSON
+    const extractionData = JSON.parse(JSON.stringify({
       farm_id: farmId,
       applicant_name: farmData.applicantName,
       submitter_id: farmData.submitterId,
@@ -103,7 +105,7 @@ export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string)
       claude_response_url: farmData.claudeResponseUrl,
       processing_id: farmData.processingId,
       historical_years: farmData.historicalYears || farmData.historicalData
-    };
+    }));
     
     console.log("Saving detailed SAPS extraction data:", {
       farm_id: extractionData.farm_id,
@@ -117,7 +119,7 @@ export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string)
       .from('document_extraction_results')
       .insert({
         user_id: userId,
-        extracted_data: extractionData,
+        extracted_data: extractionData as Json,
         processing_status: 'completed',
         ocr_log_id: farmData.processingId || '00000000-0000-0000-0000-000000000000'
       });

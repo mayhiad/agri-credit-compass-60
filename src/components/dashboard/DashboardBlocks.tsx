@@ -31,14 +31,14 @@ const DashboardBlocks = ({ farmData }: DashboardBlocksProps) => {
           <div>
             <CardTitle>Blokkazonosítók</CardTitle>
             <CardDescription>
-              {farmData.applicantName 
+              {farmData.applicantName && farmData.applicantName !== "N/A" 
                 ? `${farmData.applicantName} - ${farmData.documentId || "N/A"}`
                 : `SAPS dokumentum alapján rögzített blokkazonosítók - ${farmData.documentId || "N/A"}`}
             </CardDescription>
           </div>
           <Badge variant="outline" className="flex items-center gap-1 bg-amber-50 text-amber-700">
             <Calendar className="h-3.5 w-3.5" />
-            {displayYear}. évi adatok
+            {displayYear !== "N/A" ? `${displayYear}. évi adatok` : "Aktuális évi adatok"}
           </Badge>
         </div>
       </CardHeader>

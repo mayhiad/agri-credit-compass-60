@@ -1,4 +1,3 @@
-
 import { batchArray, sortFilesByPageNumber } from "./utils.ts";
 
 export const processAllImageBatches = async (
@@ -118,13 +117,28 @@ export const processAllImageBatches = async (
         }
         
         if (batchResult.data.historicalYears && batchResult.data.historicalYears.length > 0) {
+          // Ensure we're dealing with a properly formatted array of historical years
+          const validHistoricalYears = batchResult.data.historicalYears.map((yearData: any) => {
+            // Ensure the historical year has proper structure
+            return {
+              year: String(yearData.year || ''),
+              totalHectares: Number(yearData.totalHectares || 0),
+              crops: Array.isArray(yearData.crops) ? yearData.crops.map((crop: any) => ({
+                name: String(crop.name || ''),
+                hectares: Number(crop.hectares || 0),
+                yield: Number(crop.yield || 0),
+                totalYield: Number(crop.totalYield || 0)
+              })) : []
+            };
+          });
+          
           // Combine historical years data
           if (!combinedResult.historicalYears || combinedResult.historicalYears.length === 0) {
-            combinedResult.historicalYears = batchResult.data.historicalYears;
+            combinedResult.historicalYears = validHistoricalYears;
           } else {
             // Merge historical years data if we already have some
             const existingYears = new Set(combinedResult.historicalYears.map((y: any) => y.year));
-            for (const yearData of batchResult.data.historicalYears) {
+            for (const yearData of validHistoricalYears) {
               if (!existingYears.has(yearData.year)) {
                 combinedResult.historicalYears.push(yearData);
                 existingYears.add(yearData.year);
@@ -319,6 +333,20 @@ FONTOS: A dokumentum magyar nyelvű, ezért keresd ezeket a kulcsszavakat: "kér
           extractedData.cultures = extractedData.cultures.filter(
             (culture: any) => !(culture.name === "Szántóföldi kultúra" && culture.hectares === 123.45)
           );
+        }
+        
+        // Make sure historical years have the right structure
+        if (extractedData.historicalYears && Array.isArray(extractedData.historicalYears)) {
+          extractedData.historicalYears = extractedData.historicalYears.map((yearData: any) => ({
+            year: String(yearData.year || ''),
+            totalHectares: Number(yearData.totalHectares || 0),
+            crops: Array.isArray(yearData.crops) ? yearData.crops.map((crop: any) => ({
+              name: String(crop.name || ''),
+              hectares: Number(crop.hectares || 0),
+              yield: Number(crop.yield || 0),
+              totalYield: Number(crop.totalYield || 0)
+            })) : []
+          }));
         }
       } else {
         console.warn(`⚠️ No JSON object found in Claude response`);
