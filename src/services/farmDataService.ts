@@ -64,18 +64,23 @@ export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string)
       
       // Only insert if no prices exist for this region and year
       if (!existingPrices || existingPrices.length === 0) {
+        // Transform market prices to match database schema
+        const marketPricesToInsert = farmData.marketPrices.map(price => ({
+          culture: price.culture,
+          average_yield: price.averageYield,
+          price: price.price,
+          trend: price.trend,
+          region: farmData.region,
+          year: year,
+          is_forecast: price.is_forecast,
+          last_updated: typeof price.last_updated === 'string' 
+            ? price.last_updated 
+            : price.last_updated.toISOString()
+        }));
+        
         const { error: pricesError } = await supabase
           .from('market_prices')
-          .insert(farmData.marketPrices.map(price => ({
-            culture: price.culture,
-            average_yield: price.averageYield,
-            price: price.price,
-            trend: price.trend,
-            region: farmData.region,
-            year: year,
-            is_forecast: price.is_forecast,
-            last_updated: price.last_updated
-          })));
+          .insert(marketPricesToInsert);
         
         if (pricesError) {
           console.error("Error saving market prices:", pricesError);

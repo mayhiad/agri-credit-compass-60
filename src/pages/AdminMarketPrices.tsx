@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -18,7 +17,52 @@ const AdminMarketPrices = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [regions, setRegions] = useState<string[]>([]);
   const [years, setYears] = useState<string[]>([]);
+  const [cultures, setCultures] = useState<string[]>([]);
   const [editingPrice, setEditingPrice] = useState<Partial<MarketPrice> | null>(null);
+
+  useEffect(() => {
+    const fetchUniqueValues = async () => {
+      try {
+        // Cultures without using distinct
+        const { data: culturesData, error: culturesError } = await supabase
+          .from('market_prices')
+          .select('culture');
+        
+        if (culturesError) {
+          console.error("Error fetching cultures:", culturesError);
+          return;
+        }
+        
+        // Extract unique culture values manually
+        const uniqueCultures = Array.from(
+          new Set(culturesData.map(item => item.culture as string))
+        ).filter(Boolean);
+        
+        setCultures(uniqueCultures);
+        
+        // Regions without using distinct
+        const { data: regionsData, error: regionsError } = await supabase
+          .from('market_prices')
+          .select('region');
+        
+        if (regionsError) {
+          console.error("Error fetching regions:", regionsError);
+          return;
+        }
+        
+        // Extract unique region values manually
+        const uniqueRegions = Array.from(
+          new Set(regionsData.map(item => item.region as string))
+        ).filter(Boolean);
+        
+        setRegions(uniqueRegions);
+      } catch (error) {
+        console.error("Error fetching unique values:", error);
+      }
+    };
+    
+    fetchUniqueValues();
+  }, [supabase]);
 
   useEffect(() => {
     fetchMarketPrices();
@@ -27,24 +71,6 @@ const AdminMarketPrices = () => {
   const fetchMarketPrices = async () => {
     setLoading(true);
     try {
-      // Fetch regions first if not already loaded
-      if (regions.length === 0) {
-        const { data: regionsData } = await supabase
-          .from('market_prices')
-          .select('region')
-          .distinct();
-        
-        if (regionsData) {
-          const uniqueRegions = [...new Set(regionsData.map(item => item.region))];
-          setRegions(uniqueRegions);
-          
-          // If Magyarország isn't in the list, add it
-          if (!uniqueRegions.includes("Magyarország")) {
-            setRegions(prev => [...prev, "Magyarország"]);
-          }
-        }
-      }
-
       // Fetch years if not already loaded
       if (years.length === 0) {
         const { data: yearsData } = await supabase

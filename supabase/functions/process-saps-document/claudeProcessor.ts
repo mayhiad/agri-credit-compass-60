@@ -1,4 +1,3 @@
-
 // Claude AI processor for document extraction
 import { encode as base64Encode } from "https://deno.land/std@0.82.0/encoding/base64.ts";
 import { supabase } from "./openaiClient.ts";
@@ -76,10 +75,42 @@ A dokumentumban keresd és azonosítsd az alábbi információkat:
    - Hasznosítási kódok szerinti bontás (pl. KAL01, IND23 stb.)
    - Összesítő adatokat (szántóterület, állandó gyep, összes mezőgazdasági terület)
 
-KÉRLEK, MINDIG ÍRD KI RENDESEN A NÖVÉNYKULTÚRÁT A HASZNOSÍTÁSI KÓD MELLETT (pl. KAL01 - Őszi búza)!
+Az adatokat az alábbi struktúrában várom:
 
-Az adatgyűjtés során vedd figyelembe:
-- A dokumentum számos oldalból állhat, minden releváns adatot keress meg
+# 1. Gazdasági adatok áttekintése
+
+## 1.1 - Adminisztrációs adatok
+- Beadó neve: 
+- Beadó ügyfél-azonosító száma:
+- Kérelmező ügyfél-azonosító száma:
+- Iratazonosító:
+- Egységes kérelem beadásának időpontja:
+- Meghatározott tárgyév:
+
+## 1.2 - Blokkazonosítók:
+[Blokklistát ide, mérettel együtt (ha)]
+
+## 1.3 - Histórikus adatok:
+
+| Kultúra | [Év1] |  | [Év2] |  | [Év3] |  | [Év4] |  | [Év5] |  |
+|---------|------|------|------|------|------|------|------|------|------|------|
+|         | ha | t | ha | t | ha | t | ha | t | ha | t |
+| [Kultúra1] | [érték] | [érték] | ... | ... | ... | ... | ... | ... | ... | ... |
+| ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| **Összesen** | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] | [összeg] |
+
+## 1.4 - Tárgyévi termelési adatok:
+- [Kultúra1]: [terület] ha ([százalék]%)
+- [Kultúra2]: [terület] ha ([százalék]%)
+...
+
+**Összesített területadatok:**
+- Összes szántóterület: [terület] ha
+- Állandó gyep: [terület] ha ([százalék]%)
+- Összes mezőgazdasági terület: [terület] ha
+
+Figyelj az alábbiakra:
+- A dokumentum számos oldalból állhat (akár 20-50 oldal), minden releváns adatot keress meg
 - Az adatok különböző részeken lehetnek, teljes pontossággal olvasd be őket
 - Hasznosítási kódokra figyelj (pl. KAL01=Őszi búza, IND23=Napraforgó, KAL21=Kukorica, stb.)
 - A növénykultúrák nevét mindig pontosan írd ki a kód mellett
@@ -87,48 +118,7 @@ Az adatgyűjtés során vedd figyelembe:
 - A blokkazonosítók listája általában a "Területek összesítése blokkhasználat szerint" résznél található
 - Számolj területi összesítéseket és ellenőrizd a konzisztenciát
 - Ahol az adott évre vagy kultúrára nincs adat, használj "-" jelölést
-- Ellenőrizd az adatok pontosságát (tizedesjegyek, mértékegységek)
-
-Az eredményt az alábbi JSON formátumban várom:
-
-{
-  "applicantName": "A beadó neve",
-  "submitterId": "Beadó ügyfél-azonosító száma",
-  "applicantId": "Kérelmező ügyfél-azonosító száma",
-  "documentId": "Iratazonosító",
-  "submissionDate": "Beadás időpontja (év/hónap/nap, óra:perc)",
-  "year": "Tárgyév",
-  "region": "Régió/megye",
-  "hectares": 123.45,
-  "cultures": [
-    {
-      "name": "KAL01 - Őszi búza",
-      "hectares": 45.6
-    }
-  ],
-  "blockIds": [
-    {
-      "id": "L12AB-C",
-      "size": 10.5
-    }
-  ],
-  "historicalData": [
-    {
-      "year": "2022",
-      "totalHectares": 120.5,
-      "crops": [
-        {
-          "name": "Őszi búza",
-          "hectares": 45.6,
-          "yield": 5.2,
-          "totalYield": 237.12
-        }
-      ]
-    }
-  ]
-}
-
-NE GENERÁLJ SEMMILYEN HAMIS ADATOT! Ha nem találod az információt, inkább hagyd üresen az adott mezőt a JSON-ban.`
+- Ellenőrizd az adatok pontosságát (tizedesjegyek, mértékegységek)`
       }
     ];
     

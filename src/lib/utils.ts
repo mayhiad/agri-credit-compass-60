@@ -17,3 +17,15 @@ export function formatNumber(value: number | undefined | null, fractionDigits: n
     maximumFractionDigits: fractionDigits,
   }).format(value);
 }
+
+// Add formatCurrency function that was missing
+export function formatCurrency(value: number | undefined | null, currency: string = "Ft", fractionDigits: number = 0): string {
+  if (value === undefined || value === null) {
+    return "-";
+  }
+  
+  return new Intl.NumberFormat('hu-HU', { 
+    minimumFractionDigits: 0,
+    maximumFractionDigits: fractionDigits,
+  }).format(value) + " " + currency;
+}

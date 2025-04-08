@@ -50,8 +50,23 @@ export const fetchFarmData = async (userId: string): Promise<{ data: FarmData | 
       hectares: farmData.hectares,
       cultures: farmData.cultures || [],
       totalRevenue: farmData.total_revenue,
-      marketPrices: marketPricesData as MarketPrice[] || [],  // Type assertion to match our interface
+      marketPrices: [] // Initialize empty array
     };
+    
+    // Transform database market prices to match our interface
+    if (marketPricesData && marketPricesData.length > 0) {
+      transformedFarmData.marketPrices = marketPricesData.map(price => ({
+        id: price.id,
+        culture: price.culture,
+        averageYield: price.average_yield,
+        price: price.price,
+        trend: price.trend,
+        last_updated: price.last_updated,
+        region: price.region,
+        year: price.year,
+        is_forecast: price.is_forecast
+      }));
+    }
     
     // If we don't have market prices from the database, we generate some
     if (!transformedFarmData.marketPrices || transformedFarmData.marketPrices.length === 0) {
