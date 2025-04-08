@@ -7,7 +7,7 @@ import {
   logOcrResult,
   logExtractionResult
 } from "./fileUtils.ts";
-import { processAllImageBatches } from "./claudeProcessor.ts";
+import { processDocumentWithClaude } from "./claudeProcessor.ts";
 
 // Dokumentum feldolgozása Claude AI segítségével
 export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileName: string, userId: string) {
@@ -26,13 +26,8 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
     
     // Dokumentum feldolgozása Claude-dal
     console.log(`🤖 Dokumentum feldolgozása Claude AI-val...`);
-    const result = await processAllImageBatches(
-      [storagePath || fileName], // Ideiglenesen csak egy kép/dokumentum
-      userId,
-      'single-document', // Ideiglenesen egy batch ID
-      crypto.randomUUID() // Generálunk egy egyedi processing ID-t
-    );
-    console.log(`✅ Claude feldolgozás eredménye:`, result ? "success" : "failed");
+    const result = await processDocumentWithClaude(fileBuffer, fileName);
+    console.log(`✅ Claude feldolgozás eredménye:`, result);
     
     // OCR eredmény mentése az adatbázisba
     const ocrLogId = await logOcrResult(
@@ -53,13 +48,10 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
     // AI feldolgozás indításának naplózása az adatbázisba
     const processingTime = Date.now() - processingStart;
     if (ocrLogId) {
-      // A JSON adatot szerializáljuk, hogy biztosan érvényes legyen a JSON típus
-      const safeData = JSON.parse(JSON.stringify(result.data || { status: 'processing' }));
-      
       await logExtractionResult(
         ocrLogId,
         userId,
-        safeData,
+        result.data || { status: 'processing' },
         result.data ? 'completed' : 'in_progress',
         processingTime,
         undefined, // nincs thread_id a Claude esetén

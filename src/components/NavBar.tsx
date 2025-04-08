@@ -19,7 +19,7 @@ const NavBar = ({ onSignOut }: NavBarProps) => {
             <Link to="/" className="flex-shrink-0">
               <h1 className="text-xl font-bold">
                 <span className="text-black">agri</span>
-                <span className="text-blue-600">FI</span>
+                <span className="text-primary">FI</span>
                 <span className="text-black">x</span>
               </h1>
             </Link>

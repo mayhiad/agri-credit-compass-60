@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableCaption, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -81,9 +80,7 @@ const DashboardHistorical = ({}: DashboardHistoricalProps) => {
           </div>
           <Badge variant="outline" className="flex items-center gap-1 bg-amber-50 text-amber-700">
             <Calendar className="h-3.5 w-3.5" />
-            {historyData.length > 0 ? 
-              `${historyData[0].year}-${historyData[historyData.length-1].year}` : 
-              "2022-2023"}
+            2022-2023
           </Badge>
         </div>
       </CardHeader>

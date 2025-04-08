@@ -31,14 +31,14 @@ const DashboardBlocks = ({ farmData }: DashboardBlocksProps) => {
           <div>
             <CardTitle>Blokkazonosítók</CardTitle>
             <CardDescription>
-              {farmData.applicantName && farmData.applicantName !== "N/A" 
+              {farmData.applicantName 
                 ? `${farmData.applicantName} - ${farmData.documentId || "N/A"}`
                 : `SAPS dokumentum alapján rögzített blokkazonosítók - ${farmData.documentId || "N/A"}`}
             </CardDescription>
           </div>
           <Badge variant="outline" className="flex items-center gap-1 bg-amber-50 text-amber-700">
             <Calendar className="h-3.5 w-3.5" />
-            {displayYear !== "N/A" ? `${displayYear}. évi adatok` : "Aktuális évi adatok"}
+            {displayYear}. évi adatok
           </Badge>
         </div>
       </CardHeader>
@@ -71,7 +71,7 @@ const DashboardBlocks = ({ farmData }: DashboardBlocksProps) => {
             {farmData.hectares && (
               <div className="mt-6 pt-6 border-t">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Blokkok összesített mérete:</span>
+                  <span className="text-sm text-muted-foreground">A blokkazonosítók alatt részletezett területméretek összege:</span>
                   <span className="font-medium">
                     {typeof farmData.hectares === 'number' 
                       ? farmData.hectares.toFixed(2).replace('.', ',') + " ha" 

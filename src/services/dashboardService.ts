@@ -1,15 +1,12 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { FarmData, MarketPrice, HistoricalYear } from "@/types/farm";
-import { Json } from "@/integrations/supabase/types";
+import { FarmData, MarketPrice } from "@/types/farm";
 
 export const fetchFarmData = async (userId: string): Promise<{
   data: FarmData | null;
   error: string | null;
 }> => {
   try {
-    console.log("Fetching farm data for user:", userId);
-    
     // Fetch user-specific farm data from Supabase
     const { data: farms, error: farmError } = await supabase
       .from('farms')
@@ -28,24 +25,20 @@ export const fetchFarmData = async (userId: string): Promise<{
 
     // If no farm data, return
     if (!farms || farms.length === 0) {
-      console.log("No farm data found for user:", userId);
       return { data: null, error: null };
     }
 
     const farm = farms[0]; // Get the first (most recent) farm
-    console.log("Found farm data:", farm.id);
 
     // Fetch detailed market prices
     const { data: farmDetails, error: marketPricesError } = await supabase
       .from('farm_details')
-      .select('market_prices, location_data')
+      .select('market_prices')
       .eq('farm_id', farm.id)
       .single();
 
     if (marketPricesError && marketPricesError.code !== 'PGRST116') {
       console.error("Hiba a piaci árak lekérésekor:", marketPricesError);
-    } else {
-      console.log("Found farm details:", farmDetails ? "yes" : "no");
     }
 
     // Fetch cultures
@@ -56,8 +49,6 @@ export const fetchFarmData = async (userId: string): Promise<{
 
     if (culturesError) {
       console.error("Hiba a kultúrák lekérésekor:", culturesError);
-    } else {
-      console.log(`Found ${cultures?.length || 0} cultures for farm ${farm.id}`);
     }
 
     // Fetch the most relevant document extraction result for this farm
@@ -69,12 +60,10 @@ export const fetchFarmData = async (userId: string): Promise<{
 
     if (extractionError) {
       console.error("Hiba az SAPS adatok lekérésekor:", extractionError);
-    } else {
-      console.log(`Found ${extractionResults?.length || 0} extraction results for user ${userId}`);
     }
     
     // Find the extraction result that matches the farm_id
-    let extractedMetadata: Record<string, any> | null = null;
+    let extractedMetadata = null;
     
     if (extractionResults && extractionResults.length > 0) {
       // First try to find a result that matches the farm_id
@@ -90,7 +79,7 @@ export const fetchFarmData = async (userId: string): Promise<{
       });
       
       if (matchingResult) {
-        extractedMetadata = matchingResult.extracted_data as Record<string, any>;
+        extractedMetadata = matchingResult.extracted_data;
         console.log("Found matching extraction result for farm:", farm.id);
       } else if (farm.document_id) {
         // If no direct farm_id match, try to match by document_id
@@ -101,7 +90,7 @@ export const fetchFarmData = async (userId: string): Promise<{
               !Array.isArray(result.extracted_data) &&
               'document_id' in result.extracted_data && 
               result.extracted_data.document_id === farm.document_id) {
-            extractedMetadata = result.extracted_data as Record<string, any>;
+            extractedMetadata = result.extracted_data;
             console.log("Found extraction result matching document_id:", farm.document_id);
             break;
           }
@@ -113,7 +102,7 @@ export const fetchFarmData = async (userId: string): Promise<{
         // Make sure it's a proper object before using it
         if (typeof extractionResults[0].extracted_data === 'object' && 
             !Array.isArray(extractionResults[0].extracted_data)) {
-          extractedMetadata = extractionResults[0].extracted_data as Record<string, any>;
+          extractedMetadata = extractionResults[0].extracted_data;
           console.log("Using most recent extraction result as fallback");
         }
       }
@@ -130,38 +119,9 @@ export const fetchFarmData = async (userId: string): Promise<{
         lastUpdated: new Date(price.lastUpdated || new Date().toISOString())
       })) : [];
     
-    // Historical data from farm_details if available
-    let historicalYears: HistoricalYear[] = [];
-    
-    if (farmDetails?.location_data && 
-      typeof farmDetails.location_data === 'object' && 
-      !Array.isArray(farmDetails.location_data) && 
-      farmDetails.location_data.historical_years) {
-      // Safely convert the historical years data to the correct type
-      const rawHistoricalYears = farmDetails.location_data.historical_years;
-      if (Array.isArray(rawHistoricalYears)) {
-        historicalYears = rawHistoricalYears.map((yearData: any) => ({
-          year: String(yearData.year || ''),
-          totalHectares: Number(yearData.totalHectares || yearData.hectares || 0),
-          crops: Array.isArray(yearData.crops) ? yearData.crops.map((crop: any) => ({
-            name: String(crop.name || ''),
-            hectares: Number(crop.hectares || 0),
-            yield: Number(crop.yield || 0),
-            totalYield: Number(crop.totalYield || 0),
-            priceEUR: crop.priceEUR !== undefined ? Number(crop.priceEUR) : undefined,
-            revenueEUR: crop.revenueEUR !== undefined ? Number(crop.revenueEUR) : undefined
-          })) : [],
-          totalRevenueEUR: yearData.totalRevenueEUR !== undefined ? Number(yearData.totalRevenueEUR) : undefined,
-          totalRevenue: yearData.totalRevenue !== undefined ? Number(yearData.totalRevenue) : undefined,
-          hectares: yearData.hectares !== undefined ? Number(yearData.hectares) : undefined
-        }));
-      }
-    }
-    
     // Build farm data with NO fallbacks, only real data or N/A
     const farmData: FarmData = {
       // Core farm data
-      farmId: farm.id,
       hectares: farm.hectares,
       cultures: cultures?.map(culture => ({
         name: culture.name,
@@ -180,13 +140,10 @@ export const fetchFarmData = async (userId: string): Promise<{
       year: "N/A",
       blockIds: [],
       marketPrices: marketPriceData as MarketPrice[],
-      historicalYears: historicalYears,
     };
     
     // Add extracted metadata if available
-    if (extractedMetadata) {
-      console.log("Adding extracted metadata to farm data");
-      
+    if (extractedMetadata && typeof extractedMetadata === 'object' && !Array.isArray(extractedMetadata)) {
       // We've extracted these fields from the document, so use them
       farmData.applicantName = extractedMetadata.applicant_name || "N/A";
       farmData.submitterId = extractedMetadata.submitter_id || "N/A";
@@ -207,36 +164,7 @@ export const fetchFarmData = async (userId: string): Promise<{
         documentId: farm.document_id, 
         applicantName: farmData.applicantName
       });
-
-      // Also make sure we have the latest historicalYears data if available in the extraction
-      if (Array.isArray(extractedMetadata.historical_years) && extractedMetadata.historical_years.length > 0) {
-        // Convert the historical years data from the extraction result
-        farmData.historicalYears = extractedMetadata.historical_years.map((yearData: any) => ({
-          year: String(yearData.year || ''),
-          totalHectares: Number(yearData.totalHectares || yearData.hectares || 0),
-          crops: Array.isArray(yearData.crops) ? yearData.crops.map((crop: any) => ({
-            name: String(crop.name || ''),
-            hectares: Number(crop.hectares || 0),
-            yield: Number(crop.yield || 0),
-            totalYield: Number(crop.totalYield || 0),
-            priceEUR: crop.priceEUR !== undefined ? Number(crop.priceEUR) : undefined,
-            revenueEUR: crop.revenueEUR !== undefined ? Number(crop.revenueEUR) : undefined
-          })) : [],
-          totalRevenueEUR: yearData.totalRevenueEUR !== undefined ? Number(yearData.totalRevenueEUR) : undefined,
-          totalRevenue: yearData.totalRevenue !== undefined ? Number(yearData.totalRevenue) : undefined,
-          hectares: yearData.hectares !== undefined ? Number(yearData.hectares) : undefined
-        }));
-        console.log(`Added ${extractedMetadata.historical_years.length} historical years from extracted metadata`);
-      }
     }
-    
-    console.log("Final farm data:", {
-      farmId: farmData.farmId,
-      applicantName: farmData.applicantName,
-      blockIds: farmData.blockIds?.length || 0,
-      cultures: farmData.cultures?.length || 0,
-      historicalYears: farmData.historicalYears?.length || 0
-    });
     
     return { data: farmData, error: null };
   } catch (error) {

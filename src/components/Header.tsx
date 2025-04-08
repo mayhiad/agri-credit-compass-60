@@ -31,7 +31,7 @@ const Header = () => {
             <Link to="/" className="mr-6 shrink-0">
               <span className="font-bold text-xl">
                 <span className="text-black">agri</span>
-                <span className="text-blue-600">FI</span>
+                <span className="text-primary">FI</span>
                 <span className="text-black">x</span>
               </span>
             </Link>
