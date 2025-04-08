@@ -9,7 +9,7 @@ import AdminDashboard from "@/components/admin/AdminDashboard";
 import { useAuth } from "@/App";
 
 const Admin = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [isFinanceOfficer, setIsFinanceOfficer] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
@@ -51,12 +51,8 @@ const Admin = () => {
 
   const handleSignOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
+      await signOut();
       toast.success("Sikeres kijelentkezés");
-      // Force navigation to the landing page
-      window.location.href = "/";
     } catch (error) {
       console.error("Sign out error:", error);
       toast.error("Hiba történt a kijelentkezés során");

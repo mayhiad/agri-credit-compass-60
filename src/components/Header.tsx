@@ -1,23 +1,17 @@
 
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/App";
 import { FileText, LayoutDashboard, Settings, LogOut, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 
 const Header = () => {
-  const { user, session } = useAuth();
-  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   
   const handleSignOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
+      await signOut();
       toast.success("Sikeres kijelentkezés");
-      // Force navigation to the landing page
-      window.location.href = "/";
     } catch (error) {
       console.error("Sign out error:", error);
       toast.error("Hiba történt a kijelentkezés során");

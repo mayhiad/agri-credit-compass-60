@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -22,12 +23,14 @@ export type AuthContextType = {
   session: any | null;
   user: any | null;
   loading: boolean;
+  signOut: () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextType>({
   session: null,
   user: null,
-  loading: true
+  loading: true,
+  signOut: async () => {}
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -36,6 +39,24 @@ const App = () => {
   const [session, setSession] = useState<any | null>(null);
   const [user, setUser] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Centralized sign out function to ensure consistent behavior
+  const signOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // Clear auth state
+      setSession(null);
+      setUser(null);
+      
+      // Force a full page reload to ensure clean state
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Sign out error:", error);
+      throw error;
+    }
+  };
 
   // Initialize auth and set up listener for auth changes
   useEffect(() => {
@@ -59,7 +80,7 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthContext.Provider value={{ session, user, loading }}>
+      <AuthContext.Provider value={{ session, user, loading, signOut }}>
         <Toaster />
         <Sonner />
         <BrowserRouter>

@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LogOut, Menu, X } from "lucide-react";
+import { useAuth } from "@/App";
+import { toast } from "sonner";
 
 interface NavBarProps {
   onSignOut?: () => void;
@@ -10,6 +12,21 @@ interface NavBarProps {
 
 const NavBar = ({ onSignOut }: NavBarProps) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { signOut } = useAuth();
+  
+  const handleSignOut = async () => {
+    try {
+      if (onSignOut) {
+        onSignOut();
+      } else {
+        await signOut();
+        toast.success("Sikeres kijelentkezés");
+      }
+    } catch (error) {
+      console.error("Sign out error:", error);
+      toast.error("Hiba történt a kijelentkezés során");
+    }
+  };
   
   return (
     <nav className="bg-white border-b shadow-sm">
@@ -39,12 +56,10 @@ const NavBar = ({ onSignOut }: NavBarProps) => {
           
           <div className="hidden md:block">
             <div className="ml-4 flex items-center md:ml-6">
-              {onSignOut && (
-                <Button variant="ghost" size="sm" onClick={onSignOut}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Kijelentkezés
-                </Button>
-              )}
+              <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Kijelentkezés
+              </Button>
             </div>
           </div>
           
@@ -84,21 +99,19 @@ const NavBar = ({ onSignOut }: NavBarProps) => {
             </Link>
           </div>
           <div className="pt-4 pb-3 border-t border-gray-200">
-            {onSignOut && (
-              <div className="px-2">
-                <Button 
-                  variant="ghost" 
-                  className="w-full flex justify-start" 
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    onSignOut();
-                  }}
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Kijelentkezés
-                </Button>
-              </div>
-            )}
+            <div className="px-2">
+              <Button 
+                variant="ghost" 
+                className="w-full flex justify-start" 
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  handleSignOut();
+                }}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Kijelentkezés
+              </Button>
+            </div>
           </div>
         </div>
       )}
