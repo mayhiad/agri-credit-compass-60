@@ -61,6 +61,7 @@ const LoanApplication = () => {
   const handleLoanTermsSubmit = (loanSettings: any) => {
     setLoanAmount(loanSettings.amount);
     setPaymentFrequency(loanSettings.paymentFrequency);
+    handleNextStep(); // Automatically advance to the next step after submission
   };
   
   const renderStep = () => {

@@ -18,7 +18,10 @@ const CreditOfferCard = ({ totalRevenue, approvedAmount, currentYear = new Date(
   // Kiszámoljuk a megítélhető hitelösszeget (ha nincs explicit megadva)
   const calculatedAmount = approvedAmount || Math.round(totalRevenue * 0.2);
   
-  const handleApplyClick = () => {
+  const handleApplyClick = (e: React.MouseEvent) => {
+    // Prevent default to avoid page reload
+    e.preventDefault();
+    
     // Navigate to loan application page with the pre-approved amount in state
     navigate("/loan-application", { 
       state: { 
