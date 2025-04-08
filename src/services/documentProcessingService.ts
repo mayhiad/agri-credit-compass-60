@@ -71,11 +71,17 @@ export const checkApiConnectivity = async (): Promise<{ connected: boolean; deta
   }
 };
 
-// Meglévő függvény a Claude válasz megtekintéséhez
+/**
+ * Retrieves the Claude AI response URL for a given OCR log ID
+ * This URL points to a text file containing the raw response from Claude
+ */
 export const getClaudeResponseForOcrLog = async (ocrLogId: string): Promise<string | null> => {
   try {
+    console.log(`🔍 Claude válasz URL lekérdezése az OCR napló ID-hez: ${ocrLogId}`);
+    
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
+      console.error("❌ Nincs érvényes felhasználói munkamenet a Claude válasz lekérdezéséhez");
       throw new Error("Nincs érvényes felhasználói munkamenet");
     }
     
@@ -86,13 +92,19 @@ export const getClaudeResponseForOcrLog = async (ocrLogId: string): Promise<stri
       .maybeSingle();
     
     if (error) {
-      console.error("Claude válasz URL lekérdezési hiba:", error);
+      console.error("❌ Claude válasz URL lekérdezési hiba:", error);
       return null;
+    }
+    
+    if (!data?.claude_response_url) {
+      console.warn(`⚠️ Nincs Claude válasz URL az OCR napló ID-hez: ${ocrLogId}`);
+    } else {
+      console.log(`✅ Claude válasz URL sikeresen lekérdezve: ${data.claude_response_url}`);
     }
     
     return data?.claude_response_url || null;
   } catch (error) {
-    console.error("Hiba a Claude válasz URL lekérdezése során:", error);
+    console.error("❌ Hiba a Claude válasz URL lekérdezése során:", error);
     return null;
   }
 };

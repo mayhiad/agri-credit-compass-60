@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,9 +13,10 @@ import CurrentYearRevenue from "@/components/farm/CurrentYearRevenue";
 import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CircleAlert } from "lucide-react";
-import { diagnoseFarmData, getClaudeResponseUrl } from "@/services/sapsProcessor";
+import { diagnoseFarmData } from "@/services/sapsProcessor";
 import { useEffect } from "react";
 import { toast } from "sonner";
+import ClaudeResponseViewer from "@/components/farm/ClaudeResponseViewer";
 
 interface FarmInfoDisplayProps {
   farmData: FarmData;
@@ -30,23 +30,10 @@ const FarmInfoDisplay: React.FC<FarmInfoDisplayProps> = ({
   onBackToDashboard
 }) => {
   const [currentTab, setCurrentTab] = useState("administration");
-  const [claudeResponseUrl, setClaudeResponseUrl] = useState<string | null>(null);
   const navigate = useNavigate();
   
   // Diagnostic check for data quality
   const diagnosis = diagnoseFarmData(farmData);
-  
-  // Fetch Claude response URL if available
-  useEffect(() => {
-    const fetchClaudeResponseUrl = async () => {
-      if (farmData.ocrLogId) {
-        const url = await getClaudeResponseUrl(farmData.ocrLogId);
-        setClaudeResponseUrl(url);
-      }
-    };
-    
-    fetchClaudeResponseUrl();
-  }, [farmData.ocrLogId]);
   
   const handleNextTab = () => {
     if (currentTab === "administration") {
@@ -84,18 +71,14 @@ const FarmInfoDisplay: React.FC<FarmInfoDisplayProps> = ({
         </Alert>
       )}
       
-      {claudeResponseUrl && (
+      {farmData.ocrLogId && (
         <Alert className="mb-6">
           <AlertTitle>Claude AI válasz elérhető</AlertTitle>
           <AlertDescription>
             <p>Megtekintheti a nyers adatokat, amelyeket a Claude AI azonosított a dokumentumból:</p>
-            <Button 
-              variant="outline" 
-              className="mt-2"
-              onClick={() => window.open(claudeResponseUrl, '_blank')}
-            >
-              Claude válasz megtekintése
-            </Button>
+            <div className="mt-2">
+              <ClaudeResponseViewer ocrLogId={farmData.ocrLogId} />
+            </div>
           </AlertDescription>
         </Alert>
       )}
