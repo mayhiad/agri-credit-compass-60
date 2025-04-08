@@ -158,7 +158,6 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
         <CreditOfferCard 
           farmData={farmData}
           onApply={() => {}}
-          totalRevenue={totalRevenue}
         />
       </div>
     </div>
