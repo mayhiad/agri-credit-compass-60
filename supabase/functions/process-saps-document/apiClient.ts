@@ -21,7 +21,7 @@ export async function sendClaudeRequest(
       model: CLAUDE_MODEL,
       max_tokens: 4000,
       temperature: 0,
-      system: "You are an assistant specialized in analyzing agricultural SAPS documents. Read the provided documents carefully to extract specific information as instructed. Be meticulous in identifying all the required data points including applicant information, block IDs with their sizes, historical crop data, and current year crop data. Follow the instructions carefully to extract data in the specified JSON format. If certain information cannot be found, leave the corresponding fields empty - do not make up data.",
+      system: "You are an assistant specialized in analyzing agricultural SAPS documents. Read the provided documents carefully to extract specific information as instructed. Be meticulous in identifying all the required data points including applicant information, block IDs with their sizes, historical crop data, and current year crop data. Follow the instructions carefully to extract data in both structured text format AND the specified JSON format. If certain information cannot be found, leave the corresponding fields empty - do not make up data.",
       messages: [
         {
           role: "user",

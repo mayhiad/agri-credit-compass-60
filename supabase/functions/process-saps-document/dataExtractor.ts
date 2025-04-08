@@ -1,6 +1,7 @@
 
 // Data extraction helper for Claude responses
 import { supabase } from "./openaiClient.ts";
+import { FarmData } from "./types.ts";
 
 /**
  * Extracts structured data from Claude API response
@@ -15,13 +16,72 @@ export function extractDataFromClaudeResponse(result: any) {
     rawText = result.content[0].text;
     
     try {
-      // Try to extract JSON from the text response
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      // Try to find JSON data in the response
+      // We're looking for the second part of the response which should be JSON
+      const jsonMatch = rawText.match(/\{[\s\S]*"adminisztracios_adatok"[\s\S]*\}/);
       if (jsonMatch) {
-        extractedData = JSON.parse(jsonMatch[0]);
-        console.log(`✅ Data extracted: ${JSON.stringify(extractedData)}`);
+        const jsonData = jsonMatch[0];
+        try {
+          const magyarData = JSON.parse(jsonData);
+          
+          // Convert from Hungarian to English field names for our system
+          extractedData = {
+            applicantName: magyarData.adminisztracios_adatok?.beado_nev,
+            submitterId: magyarData.adminisztracios_adatok?.beado_ugyfel_azonosito,
+            applicantId: magyarData.adminisztracios_adatok?.kerelmezo_ugyfel_azonosito,
+            documentId: magyarData.adminisztracios_adatok?.iratazonosito,
+            submissionDate: magyarData.adminisztracios_adatok?.beadas_idopont,
+            year: magyarData.adminisztracios_adatok?.targyev,
+            region: null, // Not directly in the Hungarian format
+            hectares: magyarData.targyevi_adatok?.osszesitesek?.osszes_mezogazdasagi_terulet_ha || 0,
+            
+            // Convert Hungarian cultures to our format
+            cultures: (magyarData.targyevi_adatok?.kulturak || []).map(k => ({
+              name: k.nev ? (k.kod ? `${k.kod} - ${k.nev}` : k.nev) : (k.kod || "Ismeretlen"),
+              hectares: k.terulet_ha || 0,
+              estimatedRevenue: 0 // Will be calculated later
+            })),
+            
+            // Convert block IDs
+            blockIds: (magyarData.blokkazonositok || []).map(b => b.kod),
+            
+            // Convert historical data
+            historicalData: magyarData.historikus_adatok?.evek.map(ev => {
+              const yearData = {
+                year: ev.toString(),
+                totalHectares: 0,
+                crops: []
+              };
+              
+              // Get crops for this year
+              magyarData.historikus_adatok.kulturak.forEach(kultura => {
+                const evAdat = kultura.adatok.find(a => a.ev.toString() === ev.toString());
+                if (evAdat) {
+                  yearData.crops.push({
+                    name: kultura.nev,
+                    hectares: evAdat.terulet_ha || 0,
+                    yield: evAdat.termesmenny_t ? (evAdat.termesmenny_t / evAdat.terulet_ha) : 0,
+                    totalYield: evAdat.termesmenny_t || 0
+                  });
+                  yearData.totalHectares += evAdat.terulet_ha || 0;
+                }
+              });
+              
+              return yearData;
+            }),
+            
+            totalRevenue: 0 // Will be calculated later
+          };
+          
+          console.log(`✅ Structured data extracted from Hungarian JSON format`);
+        } catch (jsonParseError) {
+          console.error(`❌ Error parsing Hungarian JSON format: ${jsonParseError.message}`);
+          // If Hungarian format fails, try to fall back to English parsing
+          tryFallbackJsonExtraction(rawText, extractedData);
+        }
       } else {
-        console.warn(`⚠️ Could not extract JSON data from the response`);
+        console.warn(`⚠️ Could not extract Hungarian JSON format, trying fallback extraction`);
+        tryFallbackJsonExtraction(rawText, extractedData);
       }
     } catch (parseError) {
       console.error(`❌ JSON parsing error: ${parseError.message}`);
@@ -32,6 +92,23 @@ export function extractDataFromClaudeResponse(result: any) {
     extractedData,
     rawText
   };
+}
+
+// Helper function to try fallback JSON extraction (old format)
+function tryFallbackJsonExtraction(rawText, extractedData) {
+  // Try to extract JSON from the text response (fallback to original English format)
+  const fallbackJsonMatch = rawText.match(/\{[\s\S]*"applicantName"[\s\S]*\}/);
+  if (fallbackJsonMatch) {
+    try {
+      const parsedData = JSON.parse(fallbackJsonMatch[0]);
+      Object.assign(extractedData, parsedData);
+      console.log(`✅ Data extracted via fallback method`);
+    } catch (fallbackError) {
+      console.error(`❌ Fallback JSON parsing error: ${fallbackError.message}`);
+    }
+  } else {
+    console.warn(`⚠️ Could not extract any JSON data from the response`);
+  }
 }
 
 /**
@@ -120,21 +197,26 @@ export async function updateBatchStatus(
 /**
  * Create farm data structure from the extracted data
  */
-export function createFarmDataStructure(allExtractedData: any, foundUsefulData: boolean) {
-  return {
-    applicantName: allExtractedData.applicantName || null,
-    submitterId: allExtractedData.submitterId || null,
-    applicantId: allExtractedData.applicantId || null,
-    documentId: allExtractedData.documentId || null,
-    submissionDate: allExtractedData.submissionDate || null,
-    region: allExtractedData.region || null,
-    year: allExtractedData.year || new Date().getFullYear().toString(),
-    hectares: allExtractedData.hectares || 0,
-    cultures: allExtractedData.cultures || [],
-    blockIds: allExtractedData.blockIds?.map(block => block.id) || [],
+export function createFarmDataStructure(allExtractedData: any, foundUsefulData: boolean): FarmData {
+  // Make sure we have some valid data
+  const validData = allExtractedData && typeof allExtractedData === 'object';
+  
+  const farmData: FarmData = {
+    applicantName: validData ? allExtractedData.applicantName || null : null,
+    submitterId: validData ? allExtractedData.submitterId || null : null,
+    applicantId: validData ? allExtractedData.applicantId || null : null,
+    documentId: validData ? allExtractedData.documentId || null : null,
+    submissionDate: validData ? allExtractedData.submissionDate || null : null,
+    region: validData ? allExtractedData.region || null : null,
+    year: validData ? allExtractedData.year || new Date().getFullYear().toString() : new Date().getFullYear().toString(),
+    hectares: validData && typeof allExtractedData.hectares === 'number' ? allExtractedData.hectares : 0,
+    cultures: validData && Array.isArray(allExtractedData.cultures) ? allExtractedData.cultures : [],
+    blockIds: validData && Array.isArray(allExtractedData.blockIds) ? allExtractedData.blockIds : [],
     totalRevenue: 0, // We don't calculate revenue based on the AI output anymore
-    historicalData: allExtractedData.historicalData || [],
-    rawText: JSON.stringify(allExtractedData),
+    historicalData: validData && Array.isArray(allExtractedData.historicalData) ? allExtractedData.historicalData : [],
+    rawText: validData ? JSON.stringify(allExtractedData) : "{}",
     dataUnavailable: !foundUsefulData
   };
+  
+  return farmData;
 }
