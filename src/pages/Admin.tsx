@@ -51,9 +51,12 @@ const Admin = () => {
 
   const handleSignOut = async () => {
     try {
-      await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
       toast.success("Sikeres kijelentkezés");
-      navigate("/"); // Redirect to the landing page
+      // Force navigation to the landing page
+      window.location.href = "/";
     } catch (error) {
       console.error("Sign out error:", error);
       toast.error("Hiba történt a kijelentkezés során");
