@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { 
   Table, TableHeader, TableRow, TableHead, 
@@ -144,14 +145,14 @@ const AdminLoanList = ({ isAdmin, isFinanceOfficer }: AdminLoanListProps) => {
           
           <div className="w-full sm:w-64">
             <Select
-              value={statusFilter || ""}
-              onValueChange={(value) => setStatusFilter(value || null)}
+              value={statusFilter || "all"}
+              onValueChange={(value) => setStatusFilter(value === "all" ? null : value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Státusz szűrés" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Összes státusz</SelectItem>
+                <SelectItem value="all">Összes státusz</SelectItem>
                 <SelectItem value="pending">Jóváhagyásra vár</SelectItem>
                 <SelectItem value="kiutalásra vár">Kiutalásra vár</SelectItem>
                 <SelectItem value="kihelyezett hitelösszeg">Kihelyezett hitelösszeg</SelectItem>

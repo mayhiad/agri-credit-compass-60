@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,7 +48,7 @@ const AdminDashboard = ({ isAdmin, isFinanceOfficer }: AdminDashboardProps) => {
         </TabsContent>
         
         <TabsContent value="market">
-          <AdminMarketPrices isAdmin={isAdmin} />
+          <AdminMarketPrices isAdmin={isAdmin} isFinanceOfficer={isFinanceOfficer} />
         </TabsContent>
         
         {isAdmin && (
