@@ -22,26 +22,28 @@ export async function createAssistant() {
 Te egy SAPS (Egységes Területalapú Támogatási Rendszer) dokumentumokat elemző AI vagy.
 A dokumentumok gazdálkodók területalapú támogatási kérelmeit tartalmazzák.
 
-NAGYON FONTOS! OLVASD EL ALAPOSAN ÉS KÖVESD PONTOSAN AZ UTASÍTÁSOKAT!
+KRITIKUSAN FONTOS! OLVASD EL ALAPOSAN ÉS KÖVESD PONTOSAN AZ UTASÍTÁSOKAT!
 
-A FELADAT: A feltöltött SAPS dokumentumból ki kell nyerned a következő információkat:
-1. A gazdálkodó neve
-2. A dokumentum azonosítója
-3. A régió (megye) neve
-4. Az összes növénykultúra neve és területe hektárban
-5. Minden kultúrához reális termésátlag (t/ha) értéket és piaci árat (Ft/t) kell rendelned
+A FELADAT: A feltöltött SAPS dokumentumból ki kell nyerned a következő információkat PONTOS JSON FORMÁTUMBAN:
+1. A gazdálkodó neve (applicantName): A kérelmező teljes neve
+2. A dokumentum azonosítója (documentId): Ez általában egy egyedi szám vagy kód a dokumentumon
+3. A régió (region): Általában megye vagy régió megnevezése
+4. A dokumentum éve (year): Az év, amelyre a dokumentum vonatkozik
+5. Az összes növénykultúra neve és területe hektárban (cultures tömb)
+6. A teljes terület nagysága (hectares)
+7. Blokkidentifikátorok (blockIds)
 
-KÖVETELMÉNYEK:
-1. MINDEN SZÁMSZERŰ ÉRTÉKNEK NAGYOBBNAK KELL LENNIE NULLÁNÁL - ez különösen fontos a hektár, termésátlag és ár adatoknál!
-2. Ha a dokumentumból nem tudod kiolvasni a pontos hektárszámot egy kultúrához, akkor NE HASZNÁLJ KITALÁLT ADATOT, hanem hagyj ki azt a kultúrát.
-3. A termésátlag (yieldPerHectare) értékeknek reális magyar értékeknek kell lenniük (pl. búza: 5-6 t/ha, kukorica: 7-9 t/ha)
-4. A piaci áraknak (pricePerTon) aktuális magyarországi áraknak kell lenniük (pl. búza: ~80-90ezer Ft/t, kukorica: ~70-75ezer Ft/t)
+KÖTELEZŐEN BETARTANDÓ SZABÁLYOK:
+1. MINDEN SZÁMSZERŰ ÉRTÉK LEGYEN NAGYOBB NULLÁNÁL - különösen a hektár, termésátlag és ár adatoknál!
+2. Ha nem találsz pontos hektárszámot egy kultúrához, NE HASZNÁLJ KITALÁLT ADATOT, inkább hagyd ki azt a kultúrát
+3. A termésátlag (yieldPerHectare) értékek legyenek reális magyar értékek (pl. búza: 5-6 t/ha, kukorica: 7-9 t/ha)
+4. A piaci árak (pricePerTon) legyenek aktuális magyarországi árak (pl. búza: ~80-90 ezer Ft/t, kukorica: ~70-75 ezer Ft/t)
 5. Az árbevétel számítása: hektár × termésátlag × ár képlettel történik minden kultúrára
 6. A teljes árbevétel az összes kultúra árbevételének összege
-7. TILTOTT A RANDOM ADATOK GENERÁLÁSA! Csak valós, a dokumentumból kiolvasott vagy ahhoz kapcsolódó reális adatokat használj!
-8. Ha nem tudod kiolvasni az adatokat, akkor inkább hagyj üres adatstruktúrát, de NE adj meg kitalált értékeket!
+7. SZIGORÚAN TILOS KITALÁLT ADATOKAT GENERÁLNI! Csak olyan adatot adj meg, amit a dokumentumból ténylegesen ki tudsz olvasni!
+8. Ha nem tudsz kiolvasni egy értéket a dokumentumból, akkor hagyd null-ra vagy üres tömbre, de NE TALÁLJ KI adatokat!
 
-Az adatokat a következő JSON formátumban add vissza:
+Az adatokat a következő JSON formátumban KELL visszaadnod:
 {
   "applicantName": "A gazdálkodó neve",
   "documentId": "Dokumentum/kérelem azonosító",
@@ -68,11 +70,21 @@ Az adatokat a következő JSON formátumban add vissza:
   "totalRevenue": 63291975
 }
 
-FIGYELEM! Ne generálj véletlenszerű adatokat! Ha nem találod az információt a dokumentumban, akkor inkább használj üres listát vagy nullát, de ne találj ki adatokat!
+FONTOS! A válaszod KIZÁRÓLAG a fenti struktúrájú, valid JSON formátumban adhatod meg! Ne adj semmi más magyarázatot, csak a JSON objektumot! A JSON formátum kritikus, mivel közvetlenül bekerül a rendszerbe, ezért szigorúan érvényes JSON-nak kell lennie.
 
-FELDOLGOZÁSI ELŐFELTÉTEL: A dokumentumnak tartalmaznia kell legalább egy növénykultúrát és területadatot, különben nem feldolgozható.
+Ha nem találsz elég információt a dokumentumban, akkor inkább adj vissza részleges adatokat, de SOHA ne találj ki adatokat! Pl:
+{
+  "applicantName": "Kovács István",
+  "documentId": "SAPS-2023-01234",
+  "region": "Bács-Kiskun",
+  "year": "2023",
+  "hectares": 57.8,
+  "cultures": [],
+  "blockIds": [],
+  "totalRevenue": 0
+}
 
-HA NEM TUDOD KINYERNI A SZÜKSÉGES ADATOKAT, AZT JELEZD EGYÉRTELMŰEN, de adj vissza egy üres adatstruktúrát a megadott formátumban.`
+FELDOLGOZÁSI ELŐFELTÉTEL: A dokumentumnak tartalmaznia kell legalább a kérelmező nevét és a dokumentum azonosítóját, különben nem dolgozható fel.`
     });
 
     const ms = Date.now() - start;
@@ -110,29 +122,29 @@ export async function processDocumentText(threadId: string, assistantId: string,
     const message = await openai.beta.threads.messages.create(threadId, {
       role: "user",
       content: `
-NAGYON FONTOS! OLVASD EL ALAPOSAN ÉS KÖVESD PONTOSAN AZ UTASÍTÁSOKAT!
+KRITIKUSAN FONTOS! OLVASD EL ALAPOSAN ÉS KÖVESD PONTOSAN AZ UTASÍTÁSOKAT!
 
-Elemezd a következő SAPS dokumentumot és nyerd ki belőle a mezőgazdasági információkat:
+Elemezd a következő SAPS dokumentumot és nyerd ki belőle a mezőgazdasági információkat KIZÁRÓLAG JSON formátumban:
 
 ${documentText.substring(0, 25000)}
 
 A FELADAT: A dokumentumból ki kell nyerned a következő információkat:
-1. A gazdálkodó neve
-2. A dokumentum azonosítója
-3. A régió (megye) neve
-4. Az összes növénykultúra neve és területe hektárban
+1. A gazdálkodó neve (applicantName)
+2. A dokumentum azonosítója (documentId)
+3. A régió (megye) neve (region)
+4. Az összes növénykultúra neve és területe hektárban (cultures tömb)
 5. Minden kultúrához reális termésátlag (t/ha) értéket és piaci árat (Ft/t) kell rendelned
 
-KÖVETELMÉNYEK:
-1. MINDEN SZÁMSZERŰ ÉRTÉKNEK NAGYOBBNAK KELL LENNIE NULLÁNÁL - ez különösen fontos a hektár, termésátlag és ár adatoknál!
-2. Ha a dokumentumból nem tudod kiolvasni a pontos hektárszámot egy kultúrához, akkor NE HASZNÁLJ KITALÁLT ADATOT, hanem hagyj ki azt a kultúrát.
-3. A termésátlag (yieldPerHectare) értékeknek reális magyar értékeknek kell lenniük (pl. búza: 5-6 t/ha, kukorica: 7-9 t/ha)
-4. A piaci áraknak (pricePerTon) aktuális magyarországi áraknak kell lenniük (pl. búza: ~80-90ezer Ft/t, kukorica: ~70-75ezer Ft/t)
+SZIGORÚ KÖVETELMÉNYEK:
+1. MINDEN SZÁMSZERŰ ÉRTÉKNEK NAGYOBBNAK KELL LENNIE NULLÁNÁL - különösen a hektár, termésátlag és ár adatoknál!
+2. Ha nem találsz pontos hektárszámot egy kultúrához, NE HASZNÁLJ KITALÁLT ADATOT!
+3. A termésátlag (yieldPerHectare) értékek legyenek reális magyar értékek
+4. A piaci árak (pricePerTon) legyenek aktuális magyarországi árak
 5. Az árbevétel számítása: hektár × termésátlag × ár képlettel történik minden kultúrára
 6. A teljes árbevétel az összes kultúra árbevételének összege
-7. TILTOTT A RANDOM ADATOK GENERÁLÁSA! Csak valós, a dokumentumból kiolvasott vagy ahhoz kapcsolódó reális adatokat használj!
+7. SZIGORÚAN TILOS KITALÁLT ADATOKAT GENERÁLNI!
 
-Az adatokat a következő JSON formátumban add vissza:
+Az adatokat PONTOSAN a következő JSON formátumban add vissza, más formát nem fogadunk el:
 {
   "applicantName": "A gazdálkodó neve",
   "documentId": "Dokumentum/kérelem azonosító",
@@ -159,9 +171,7 @@ Az adatokat a következő JSON formátumban add vissza:
   "totalRevenue": 63291975
 }
 
-FIGYELEM! Ne generálj véletlenszerű adatokat! Ha nem találod az információt a dokumentumban, akkor inkább használj üres listát vagy nullát, de ne találj ki adatokat!
-
-HA NEM TUDSZ VALÓS ADATOKAT KINYERNI, AZT JELEZD EGYÉRTELMŰEN, de adj vissza egy üres adatstruktúrát a megadott formátumban.`
+Ne adj semmilyen egyéb magyarázatot vagy szöveget, KIZÁRÓLAG a JSON objektumot add vissza! A rendszer közvetlenül try-catch blokkban JSON.parse() függvénnyel fogja feldolgozni a válaszodat, ezért kritikusan fontos, hogy valid JSON legyen, semmilyen más szöveggel!`
     });
     console.log(`✅ Üzenet létrehozva: ${message.id}`);
     
@@ -170,30 +180,28 @@ HA NEM TUDSZ VALÓS ADATOKAT KINYERNI, AZT JELEZD EGYÉRTELMŰEN, de adj vissza 
     const run = await openai.beta.threads.runs.create(threadId, {
       assistant_id: assistantId,
       instructions: `
-NAGYON FONTOS! A FELDOLGOZÁST PONTOSAN ÉS PRECÍZEN VÉGEZD EL!
+KRITIKUSAN FONTOS! A VÁLASZODAT KIZÁRÓLAG VALID JSON FORMÁTUMBAN ADD MEG, SEMMILYEN MÁS SZÖVEGGEL!
 
-Elemezd a SAPS dokumentumot és olvasd ki belőle a gazdálkodási információkat.
+Elemezd a SAPS dokumentumot és add vissza a gazdálkodási információkat pontos JSON formátumban.
 
 A FELADAT: A dokumentumból ki kell nyerned a következő információkat:
-1. A gazdálkodó neve
-2. A dokumentum azonosítója
-3. A régió (megye) neve
+1. A gazdálkodó neve (applicantName)
+2. A dokumentum azonosítója (documentId)
+3. A régió (megye) neve (region)
 4. Az összes növénykultúra neve és területe hektárban
 5. Minden kultúrához reális termésátlag (t/ha) értéket és piaci árat (Ft/t) kell rendelned
 
 KÖVETELMÉNYEK:
-1. MINDEN SZÁMSZERŰ ÉRTÉKNEK NAGYOBBNAK KELL LENNIE NULLÁNÁL - ez különösen fontos a hektár, termésátlag és ár adatoknál!
-2. Ha a dokumentumból nem tudod kiolvasni a pontos hektárszámot egy kultúrához, akkor NE HASZNÁLJ KITALÁLT ADATOT, hanem hagyj ki azt a kultúrát.
-3. A termésátlag (yieldPerHectare) értékeknek reális magyar értékeknek kell lenniük (pl. búza: 5-6 t/ha, kukorica: 7-9 t/ha)
-4. A piaci áraknak (pricePerTon) aktuális magyarországi áraknak kell lenniük (pl. búza: ~80-90ezer Ft/t, kukorica: ~70-75ezer Ft/t)
-5. Az árbevétel számítása: hektár × termésátlag × ár képlettel történik minden kultúrára
-6. A teljes árbevétel az összes kultúra árbevételének összege
-7. TILTOTT A RANDOM ADATOK GENERÁLÁSA! Csak valós, a dokumentumból kiolvasott vagy ahhoz kapcsolódó reális adatokat használj!
+1. MINDEN SZÁMSZERŰ ÉRTÉKNEK NAGYOBBNAK KELL LENNIE NULLÁNÁL
+2. Ha nem találsz pontos hektárszámot egy kultúrához, inkább hagyd ki azt a kultúrát
+3. A termésátlag (yieldPerHectare) értékeknek reális magyar értékeknek kell lenniük
+4. A piaci áraknak (pricePerTon) aktuális magyarországi áraknak kell lenniük
+5. Az árbevétel számítása: hektár × termésátlag × ár minden kultúrára
+6. SZIGORÚAN TILOS RANDOM ADATOK GENERÁLÁSA! Inkább adj vissza hiányos JSON-t!
 
-Ha nem sikerül érvényes adatokat kinyerned, vagy nem biztos, hogy helyesek az adatok, akkor azt egyértelműen jelezd, és adj vissza egy üres adatstruktúrát vagy nullákat a kötelező mezőkben.
+FONTOS: A válaszod KIZÁRÓLAG egy valid JSON objektum legyen, minden más szöveg vagy magyarázat nélkül. A JSON-nek pontosan meg kell felelnie a megadott struktúrának.
 
-LEGFONTOSABB SZEMPONT: INKÁBB SEMMILYEN ADAT, MINT HIBÁS VAGY KITALÁLT ADAT!
-`
+Ha egyáltalán nem sikerül kinyerned az adatokat, akkor is valid JSON-t adj vissza, csak üres vagy null értékekkel.`
     });
     
     const runTime = Date.now() - runStart;

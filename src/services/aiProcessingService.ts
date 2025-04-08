@@ -11,6 +11,7 @@ export const processDocumentWithAI = async (file: File, user: any): Promise<{
   data?: FarmData;
   status?: string;
   batchInfo?: any;
+  rawClaudeResponse?: string;
 } | null> => {
   try {
     if (!user) {
@@ -116,12 +117,20 @@ export const processDocumentWithAI = async (file: File, user: any): Promise<{
       console.warn("Claude feldolgozási figyelmeztetés:", processResult.data.errorMessage);
     }
     
+    // Save the raw Claude response for debugging and improvement
+    let rawClaudeResponse = null;
+    if (processResult.rawResponse) {
+      rawClaudeResponse = processResult.rawResponse;
+      console.log("Claude nyers válasz mentve");
+    }
+    
     // Claude feldolgozás már a visszatérő adatban van
     return { 
       ocrLogId: processResult.ocrLogId,
       data: processResult.data,
       status: processResult.status || 'completed',
-      batchInfo: processResult.batchInfo
+      batchInfo: processResult.batchInfo,
+      rawClaudeResponse: rawClaudeResponse
     };
   } catch (error) {
     console.error("Dokumentum feldolgozási hiba:", error);
