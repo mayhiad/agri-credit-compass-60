@@ -7,9 +7,6 @@ verify_jwt = true
 [functions.delete-user]
 verify_jwt = true
 
-[functions.get-thread-results]
-verify_jwt = true
-
 [functions.process-document-with-vision]
 verify_jwt = true
 
