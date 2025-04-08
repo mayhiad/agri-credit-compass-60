@@ -1,17 +1,41 @@
-// Utility functions for processing SAPS documents with Claude
-import { FarmData } from "./types.ts";
 
-// Constants for Claude API
+// Constants and Utility functions for document processing
+
+// Standard API and processing configuration
 export const CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
 export const CLAUDE_MODEL = "claude-3-opus-20240229";
-export const MAX_IMAGES_PER_REQUEST = 20;
+export const MAX_IMAGES_PER_REQUEST = 20; // Claude maximum per request
 
-/**
- * Create prompt for Claude to extract data from SAPS documents
- */
-export function createClaudePrompt() {
+// Document formats that are accepted by the system
+export const ACCEPTED_FILE_TYPES = [
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/jpg'
+];
+
+// Check if an image format is supported
+export const isImageFormatSupported = (fileType: string) => {
+  return ['image/png', 'image/jpeg', 'image/jpg'].includes(fileType);
+};
+
+// Split imageUrls into batches of MAX_IMAGES_PER_REQUEST
+export function splitIntoBatches<T>(items: T[], batchSize: number): T[][] {
+  if (!items || !items.length) return [];
+  
+  const batches: T[][] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    batches.push(items.slice(i, i + batchSize));
+  }
+  return batches;
+}
+
+// Create the prompt for Claude that's sent with each image batch
+export function createClaudePrompt(): string {
   return `
-A következő feladat: a feltöltött mezőgazdasági dokumentum(ok)ból (jellemzően egységes kérelem, támogatási igénylés, stb.) azonosíts és gyűjts ki meghatározott adatokat, majd strukturáld azokat a megadott formátumban.
+# Mezőgazdasági dokumentum elemzési feladat
+
+A feltöltött mezőgazdasági dokumentum(ok)ból (jellemzően egységes kérelem, támogatási igénylés, stb.) azonosíts és gyűjts ki meghatározott adatokat, majd strukturáld azokat a megadott formátumban.
 
 A dokumentumban keresd és azonosítsd az alábbi információkat:
 
@@ -76,6 +100,7 @@ Az összegyűjtött adatokat két formátumban add vissza:
 
 2. MÁSODJÁRA pedig valid JSON formátumban, a következő struktúrában:
 
+\`\`\`json
 {
   "adminisztracios_adatok": {
     "beado_nev": "",
@@ -116,38 +141,10 @@ Az összegyűjtött adatokat két formátumban add vissza:
     }
   }
 }
+\`\`\`
+
+Ha bizonyos adatok nem találhatók a dokumentumban, hagyd üresen a megfelelő mezőket. 
+Törekedj a legnagyobb pontosságra és alaposságra az adatok kinyerésében. 
+Különösen figyelj a számadatok pontosságára, és a kultúrák/növények pontos nevére, hasznosítási kódjára.
 `;
-}
-
-/**
- * Splits an array into batches of a given size
- */
-export function splitIntoBatches(array: any[], batchSize: number): any[][] {
-  const batches = [];
-  for (let i = 0; i < array.length; i += batchSize) {
-    batches.push(array.slice(i, i + batchSize));
-  }
-  return batches;
-}
-
-/**
- * Convert document data to Farm data structure
- */
-export function convertToFarmData(data: any): FarmData {
-  return {
-    applicantName: data.applicantName || null,
-    submitterId: data.submitterId || null,
-    applicantId: data.applicantId || null,
-    documentId: data.documentId || null,
-    submissionDate: data.submissionDate || null,
-    year: data.year || new Date().getFullYear().toString(),
-    region: data.region || null,
-    hectares: data.hectares || 0,
-    cultures: data.cultures || [],
-    blockIds: data.blockIds || [],
-    totalRevenue: data.totalRevenue || 0,
-    rawText: JSON.stringify(data),
-    dataUnavailable: data.dataUnavailable || false,
-    errorMessage: data.errorMessage || null
-  };
 }
