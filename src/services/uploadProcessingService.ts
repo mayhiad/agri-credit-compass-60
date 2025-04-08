@@ -75,17 +75,6 @@ export const processSapsDocument = async (
     farmData.processingId = processResult.processingId;
     farmData.claudeResponseUrl = processResult.claudeResponseUrl;
     
-    // Validate farm data
-    const isDataValid = 
-      farmData.applicantName && farmData.applicantName !== "N/A" &&
-      farmData.submitterId && farmData.submitterId !== "N/A" &&
-      farmData.applicantId && farmData.applicantId !== "N/A";
-      
-    if (!isDataValid) {
-      // All fields are N/A values - no useful data extracted
-      farmData.errorMessage = "Nem sikerült kinyerni a kulcsadatokat a dokumentumból. A Claude AI nem talált érvényes adatokat.";
-    }
-    
     // Save the farm data to the database
     updateStatus({
       step: "Adatok mentése az adatbázisba",

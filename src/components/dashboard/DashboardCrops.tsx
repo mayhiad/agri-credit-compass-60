@@ -11,35 +11,18 @@ interface DashboardCropsProps {
 }
 
 const DashboardCrops = ({ farmData }: DashboardCropsProps) => {
-  // Használjuk a marketPrices adatokat, ha rendelkezésre állnak
+  // Use market prices data if available, otherwise display N/A
   const marketPrices = farmData.marketPrices
     ? Object.fromEntries(farmData.marketPrices.map(price => [price.culture, price.price]))
-    : {
-        "Őszi búza": 85000,
-        "Kukorica": 72000,
-        "Napraforgó": 170000,
-        "Őszi káposztarepce": 190000,
-        "Őszi árpa": 70000,
-        "Tavaszi árpa": 73000
-      };
+    : {};
   
-  // Átlagos hozam számítása kultúránként
+  // Average yield calculation by culture
   const averageYields = farmData.marketPrices
     ? Object.fromEntries(farmData.marketPrices.map(price => [price.culture, price.averageYield]))
-    : {
-        "Őszi búza": 5.5,
-        "Kukorica": 8.0,
-        "Napraforgó": 3.1,
-        "Őszi káposztarepce": 3.3,
-        "Őszi árpa": 5.2,
-        "Tavaszi árpa": 4.8
-      };
+    : {};
   
-  // Ellenőrizzük, hogy a cultures rendelkezik-e a megfelelő adatokkal
-  const isValidCultures = farmData.cultures && farmData.cultures.length > 0 && 
-    farmData.cultures.every(c => typeof c.name === 'string' && 
-    typeof c.hectares === 'number' && 
-    typeof c.estimatedRevenue === 'number');
+  // Check if the cultures have the required data
+  const isValidCultures = farmData.cultures && farmData.cultures.length > 0;
   
   // Current year if not specified
   const displayYear = farmData.year || new Date().getFullYear().toString();
@@ -52,8 +35,8 @@ const DashboardCrops = ({ farmData }: DashboardCropsProps) => {
             <CardTitle>Növénykultúrák</CardTitle>
             <CardDescription>
               {farmData.applicantName 
-                ? `${farmData.applicantName} - ${farmData.documentId || ""}`
-                : `SAPS dokumentum alapján rögzített növénykultúrák - ${farmData.documentId || ""}`}
+                ? `${farmData.applicantName} - ${farmData.documentId || "N/A"}`
+                : `SAPS dokumentum alapján rögzített növénykultúrák - ${farmData.documentId || "N/A"}`}
             </CardDescription>
           </div>
           <Badge variant="outline" className="flex items-center gap-1 bg-amber-50 text-amber-700">
@@ -77,25 +60,43 @@ const DashboardCrops = ({ farmData }: DashboardCropsProps) => {
               </TableHeader>
               <TableBody>
                 {farmData.cultures.map((culture, idx) => {
-                  const price = marketPrices[culture.name] || 100000;
-                  const yield_per_ha = averageYields[culture.name] || 4.5;
+                  const price = marketPrices[culture.name] || "N/A";
+                  const yield_per_ha = averageYields[culture.name] || "N/A";
                   
                   return (
                     <TableRow key={idx}>
-                      <TableCell>{culture.name}</TableCell>
-                      <TableCell className="text-right">{culture.hectares.toFixed(2).replace('.', ',')}</TableCell>
+                      <TableCell>{culture.name || "N/A"}</TableCell>
+                      <TableCell className="text-right">
+                        {typeof culture.hectares === 'number' 
+                          ? culture.hectares.toFixed(2).replace('.', ',') 
+                          : "N/A"}
+                      </TableCell>
                       <TableCell className="text-right">{yield_per_ha}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(price)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(culture.estimatedRevenue)}</TableCell>
+                      <TableCell className="text-right">
+                        {typeof price === 'number' ? formatCurrency(price) : price}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {typeof culture.estimatedRevenue === 'number' 
+                          ? formatCurrency(culture.estimatedRevenue) 
+                          : "N/A"}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
                 <TableRow>
                   <TableCell className="font-medium">Összesen</TableCell>
-                  <TableCell className="text-right font-medium">{farmData.hectares.toFixed(2).replace('.', ',')} ha</TableCell>
+                  <TableCell className="text-right font-medium">
+                    {typeof farmData.hectares === 'number' 
+                      ? farmData.hectares.toFixed(2).replace('.', ',') + " ha" 
+                      : "N/A"}
+                  </TableCell>
                   <TableCell className="text-right"></TableCell>
                   <TableCell className="text-right"></TableCell>
-                  <TableCell className="text-right font-medium">{formatCurrency(farmData.totalRevenue)}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    {typeof farmData.totalRevenue === 'number' 
+                      ? formatCurrency(farmData.totalRevenue) 
+                      : "N/A"}
+                  </TableCell>
                 </TableRow>
               </TableBody>
             </Table>

@@ -51,19 +51,35 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoDisplayProps) 
       </CardHeader>
       <CardContent className="space-y-6">
         <SubmitterInfo 
-          submitterName={farmData.applicantName} 
-          submitterId={farmData.submitterId}
-          applicantId={farmData.applicantId}
-          submissionDate={farmData.submissionDate}
+          submitterName={farmData.applicantName || "N/A"} 
+          submitterId={farmData.submitterId || "N/A"}
+          applicantId={farmData.applicantId || "N/A"}
+          submissionDate={farmData.submissionDate || farmData.documentDate || "N/A"}
         />
         <FarmSummary farmData={farmData} />
         <CultureTable farmData={farmData} />
         <BlocksAccordion farmData={farmData} />
         <DocumentInfo 
-          documentId={farmData.documentId} 
-          applicantName={farmData.applicantName} 
-          documentDate={farmData.documentDate || farmData.submissionDate || farmData.year}
+          documentId={farmData.documentId || "N/A"} 
+          applicantName={farmData.applicantName || "N/A"} 
+          documentDate={farmData.documentDate || farmData.submissionDate || farmData.year || "N/A"}
         />
+        
+        {farmData.processingId && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-sm font-medium text-blue-800">Feldolgozási azonosító: {farmData.processingId}</p>
+            {farmData.claudeResponseUrl && (
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-sm text-blue-600">Claude AI válasz</span>
+                <Button variant="outline" size="sm" asChild>
+                  <a href={farmData.claudeResponseUrl} target="_blank" rel="noopener noreferrer">
+                    Megtekintés
+                  </a>
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
       <CardFooter>
         <Button onClick={onComplete} className="w-full">

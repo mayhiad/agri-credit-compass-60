@@ -31,6 +31,8 @@ export interface HistoricalYear {
   totalHectares: number;
   crops: HistoricalCrop[];
   totalRevenueEUR?: number;
+  totalRevenue?: number; // Adding for compatibility
+  hectares?: number; // Adding for compatibility
 }
 
 export interface FarmData {

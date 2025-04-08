@@ -1,60 +1,56 @@
-
-import { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { HistoricalFarmData } from "./historical/types";
-import { useAuth } from "@/App";
-import { Loader2 } from "lucide-react";
-import HistoricalChart from "./historical/HistoricalChart";
-import HistoricalTable from "./historical/HistoricalTable";
-import EmptyHistoricalState from "./historical/EmptyHistoricalState";
+import { Table, TableBody, TableCell, TableCaption, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchHistoricalData } from "@/services/historicalDataService";
+import { HistoricalYear } from "@/types/farm";
+import { useAuth } from "@/App";
+import { Calendar } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { formatCurrency } from "@/lib/utils";
 
-const DashboardHistorical = () => {
+interface DashboardHistoricalProps {}
+
+const DashboardHistorical = ({}: DashboardHistoricalProps) => {
   const { user } = useAuth();
-  const [historicalData, setHistoricalData] = useState<HistoricalFarmData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [averageRevenue, setAverageRevenue] = useState<number>(0);
-  const [averageRevenueEUR, setAverageRevenueEUR] = useState<number>(0);
-
+  const [historyData, setHistoryData] = useState<HistoricalYear[]>([]);
+  
   useEffect(() => {
     const loadHistoricalData = async () => {
       if (!user) return;
       
       try {
-        setIsLoading(true);
-        
         const data = await fetchHistoricalData(user.id);
-        setHistoricalData(data);
         
-        // Kiszámoljuk az átlagos bevételt
-        if (data.length > 0) {
-          const sum = data.reduce((acc, curr) => acc + curr.totalRevenue, 0);
-          const sumEUR = data.reduce((acc, curr) => acc + curr.totalRevenueEUR, 0);
-          setAverageRevenue(sum / data.length);
-          setAverageRevenueEUR(sumEUR / data.length);
-        }
+        // Transform data if needed to match the required structure
+        const transformedData = data.map(year => ({
+          ...year,
+          hectares: year.totalHectares, // Ensure hectares is set
+          totalRevenue: year.totalRevenueEUR || 0 // Ensure totalRevenue is set
+        }));
+        
+        setHistoryData(transformedData);
       } catch (err) {
-        console.error("Hiba a történeti adatok lekérésekor:", err);
+        console.error("Error loading historical data:", err);
         setError("Nem sikerült betölteni a történeti adatokat");
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
     
     loadHistoricalData();
   }, [user]);
   
-  if (isLoading) {
+  if (loading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Történeti adatok</CardTitle>
-          <CardDescription>Gazdaság történeti adatainak betöltése folyamatban...</CardDescription>
+          <CardDescription>A történeti adatok betöltése folyamatban...</CardDescription>
         </CardHeader>
-        <CardContent className="flex justify-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <CardContent>
+          <p>Adatok betöltése...</p>
         </CardContent>
       </Card>
     );
@@ -65,12 +61,10 @@ const DashboardHistorical = () => {
       <Card>
         <CardHeader>
           <CardTitle>Történeti adatok</CardTitle>
-          <CardDescription>Hiba történt a gazdaság történeti adatainak betöltésekor</CardDescription>
+          <CardDescription>Hiba történt a történeti adatok betöltésekor.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="p-4 text-center">
-            <p className="text-red-500">{error}</p>
-          </div>
+          <p>{error}</p>
         </CardContent>
       </Card>
     );
@@ -79,40 +73,57 @@ const DashboardHistorical = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Történeti adatok</CardTitle>
-        <CardDescription>Gazdaság korábbi éveinek kimutatása a SAPS dokumentumok alapján</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Történeti adatok</CardTitle>
+            <CardDescription>A gazdaság történeti adatai évenkénti bontásban.</CardDescription>
+          </div>
+          <Badge variant="outline" className="flex items-center gap-1 bg-amber-50 text-amber-700">
+            <Calendar className="h-3.5 w-3.5" />
+            2022-2023
+          </Badge>
+        </div>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="chart">
-          <TabsList className="mb-4">
-            <TabsTrigger value="chart">Grafikon</TabsTrigger>
-            <TabsTrigger value="table">Táblázat</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="chart">
-            {historicalData.length > 0 ? (
-              <HistoricalChart 
-                historicalData={historicalData}
-                averageRevenue={averageRevenue}
-                averageRevenueEUR={averageRevenueEUR}
-              />
-            ) : (
-              <EmptyHistoricalState />
-            )}
-          </TabsContent>
-          
-          <TabsContent value="table">
-            {historicalData.length > 0 ? (
-              <HistoricalTable 
-                historicalData={historicalData}
-                averageRevenue={averageRevenue}
-                averageRevenueEUR={averageRevenueEUR}
-              />
-            ) : (
-              <EmptyHistoricalState />
-            )}
-          </TabsContent>
-        </Tabs>
+        {historyData.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Év</TableHead>
+                <TableHead className="text-right">Összes terület (ha)</TableHead>
+                <TableHead className="text-right">Összes bevétel (EUR)</TableHead>
+                <TableHead>Kultúrák</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {historyData.map((yearData, index) => (
+                <TableRow key={index}>
+                  <TableCell>{yearData.year}</TableCell>
+                  <TableCell className="text-right">{yearData.totalHectares.toFixed(2).replace('.', ',')}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(yearData.totalRevenueEUR || 0)}</TableCell>
+                  <TableCell>
+                    {yearData.crops && yearData.crops.length > 0 ? (
+                      <ul>
+                        {yearData.crops.map((crop, cropIndex) => (
+                          <li key={cropIndex}>
+                            {crop.name} ({crop.hectares.toFixed(2).replace('.', ',')} ha)
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      "Nincs adat"
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <div className="py-8 text-center text-muted-foreground">
+            <p>Nincsenek elérhető történeti adatok.</p>
+            <p className="text-sm mt-2">Kérjük, vegye fel a kapcsolatot az ügyfélszolgálattal a további információkért.</p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

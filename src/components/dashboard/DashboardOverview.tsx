@@ -12,7 +12,7 @@ interface DashboardOverviewProps {
 }
 
 const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
-  // Ellenőrizzük, hogy van-e érvényes adat
+  // Check for valid data
   if (!farmData || !farmData.cultures || farmData.cultures.length === 0) {
     return (
       <Card>
@@ -33,14 +33,14 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
   // Current year if not specified
   const displayYear = farmData.year || new Date().getFullYear().toString();
   
-  // Gazdálkodási adatok számítása
+  // Farm data calculation
   const totalHectares = farmData.hectares;
   const totalRevenue = farmData.totalRevenue;
   const avgRevenuePerHectare = totalHectares > 0 ? totalRevenue / totalHectares : 0;
   
   // Get top 3 most valuable cultures
   const topCultures = [...farmData.cultures]
-    .sort((a, b) => (b.estimatedRevenue || 0) - (a.estimatedRevenue || 0))
+    .sort((a, b) => ((b.estimatedRevenue || 0) - (a.estimatedRevenue || 0)))
     .slice(0, 3);
   
   return (
@@ -69,25 +69,25 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
               <div className="text-sm text-muted-foreground">Régió</div>
               <div className="font-medium flex items-center gap-1">
                 <MapPin className="h-4 w-4 text-primary" />
-                {farmData.region || "Ismeretlen régió"}
+                {farmData.region || "N/A"}
               </div>
             </div>
             <div className="flex justify-between">
               <div className="text-sm text-muted-foreground">Beadó neve</div>
               <div className="font-medium">
-                {farmData.applicantName || "Ismeretlen beadó"}
+                {farmData.applicantName || "N/A"}
               </div>
             </div>
             <div className="flex justify-between">
               <div className="text-sm text-muted-foreground">Beadó azonosítója</div>
               <div className="font-medium">
-                {farmData.submitterId || "Ismeretlen azonosító"}
+                {farmData.submitterId || "N/A"}
               </div>
             </div>
             <div className="flex justify-between">
               <div className="text-sm text-muted-foreground">Kérelmező azonosítója</div>
               <div className="font-medium">
-                {farmData.applicantId || "Ismeretlen azonosító"}
+                {farmData.applicantId || "N/A"}
               </div>
             </div>
             <div className="flex justify-between">
@@ -96,6 +96,14 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
                 {farmData.blockIds?.length || 0} db
               </div>
             </div>
+            {farmData.processingId && (
+              <div className="flex justify-between">
+                <div className="text-sm text-muted-foreground">Feldolgozási azonosító</div>
+                <div className="font-medium">
+                  {farmData.processingId}
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -110,17 +118,26 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold mb-4">
-            {totalHectares.toFixed(1).replace(".", ",")} hektár
+            {typeof totalHectares === 'number' 
+              ? totalHectares.toFixed(1).replace(".", ",") + " hektár"
+              : "N/A"}
           </div>
           
           <div className="space-y-4">
             {topCultures.map((culture, index) => (
               <div key={index}>
                 <div className="flex justify-between text-sm mb-1">
-                  <span>{culture.name}</span>
-                  <span className="font-medium">{culture.hectares.toFixed(1).replace(".", ",")} ha</span>
+                  <span>{culture.name || "N/A"}</span>
+                  <span className="font-medium">
+                    {typeof culture.hectares === 'number' 
+                      ? culture.hectares.toFixed(1).replace(".", ",") + " ha"
+                      : "N/A"}
+                  </span>
                 </div>
-                <Progress value={(culture.hectares / totalHectares) * 100} className="h-2" />
+                <Progress 
+                  value={totalHectares > 0 ? (culture.hectares / totalHectares) * 100 : 0} 
+                  className="h-2" 
+                />
               </div>
             ))}
           </div>
@@ -137,17 +154,25 @@ const DashboardOverview = ({ farmData }: DashboardOverviewProps) => {
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold mb-2">
-            {formatCurrency(totalRevenue)}
+            {typeof totalRevenue === 'number' 
+              ? formatCurrency(totalRevenue)
+              : "N/A"}
           </div>
           <div className="text-sm text-muted-foreground mb-6">
-            {formatCurrency(avgRevenuePerHectare)} / hektár
+            {typeof avgRevenuePerHectare === 'number' 
+              ? formatCurrency(avgRevenuePerHectare) + " / hektár"
+              : "N/A"}
           </div>
           
           <div className="space-y-3">
             {topCultures.map((culture, index) => (
               <div key={index} className="flex justify-between items-center">
-                <span className="text-sm">{culture.name}</span>
-                <span className="font-medium">{formatCurrency(culture.estimatedRevenue || 0)}</span>
+                <span className="text-sm">{culture.name || "N/A"}</span>
+                <span className="font-medium">
+                  {typeof culture.estimatedRevenue === 'number' 
+                    ? formatCurrency(culture.estimatedRevenue)
+                    : "N/A"}
+                </span>
               </div>
             ))}
           </div>
