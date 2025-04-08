@@ -46,37 +46,61 @@ export async function processImageBatchWithClaude(
       });
     }
     
-    // Send the request to Claude API
-    const result = await sendClaudeRequest(messageContent, validImageUrls);
+    // Add some retry logic at the batch level as well
+    let retryCount = 0;
+    const maxBatchRetries = 2;
     
-    // Extract the data from Claude's response
-    const { extractedData, rawText } = extractDataFromClaudeResponse(result);
+    while (retryCount <= maxBatchRetries) {
+      try {
+        // Send the request to Claude API
+        const result = await sendClaudeRequest(messageContent, validImageUrls);
+        
+        // Extract the data from Claude's response
+        const { extractedData, rawText } = extractDataFromClaudeResponse(result);
+        
+        // Log batch processing results
+        await logBatchResults(
+          batchId,
+          userId,
+          batchIndex,
+          totalBatches,
+          extractedData,
+          rawText,
+          validImageUrls
+        );
+        
+        // Check if we found any useful data
+        const hasUsefulData = extractedData && 
+                            (extractedData.applicantName || extractedData.documentId || 
+                            (extractedData.cultures && extractedData.cultures.length > 0));
+        
+        return {
+          extractedData,
+          rawText,
+          hasUsefulData,
+          batchIndex,
+          totalBatches,
+          imageCount: validImageUrls.length
+        };
+      } catch (batchError) {
+        if (retryCount >= maxBatchRetries) {
+          // If we've exhausted all retries, rethrow the error
+          console.error(`❌ Claude processing error after ${maxBatchRetries + 1} attempts: ${batchError.message}`);
+          throw batchError;
+        }
+        
+        // Log the error and retry
+        console.warn(`⚠️ Batch processing error (attempt ${retryCount + 1}/${maxBatchRetries + 1}): ${batchError.message}`);
+        console.log(`🔄 Retrying batch ${batchIndex}/${totalBatches} in 5 seconds...`);
+        
+        // Wait for 5 seconds before retrying
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        retryCount++;
+      }
+    }
     
-    // Log batch processing results
-    await logBatchResults(
-      batchId,
-      userId,
-      batchIndex,
-      totalBatches,
-      extractedData,
-      rawText,
-      validImageUrls
-    );
-    
-    // Check if we found any useful data
-    const hasUsefulData = extractedData && 
-                         (extractedData.applicantName || extractedData.documentId || 
-                          (extractedData.cultures && extractedData.cultures.length > 0));
-    
-    return {
-      extractedData,
-      rawText,
-      hasUsefulData,
-      batchIndex,
-      totalBatches,
-      imageCount: validImageUrls.length
-    };
-    
+    // This should never be reached due to the throw in the loop
+    throw new Error("Unexpected error in batch processing retry loop");
   } catch (error) {
     console.error(`❌ Claude processing error: ${error.message}`);
     throw error;

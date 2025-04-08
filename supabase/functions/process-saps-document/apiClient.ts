@@ -1,3 +1,4 @@
+
 // Claude API client
 import { CLAUDE_API_URL, CLAUDE_MODEL } from "./utils.ts";
 
@@ -34,10 +35,11 @@ export async function sendClaudeRequest(
     // Log a sample of the request for debugging
     console.log(`Request summary: model=${payload.model}, images=${validImageUrls.length}, prompt size=${typeof messageContent[0] === 'object' && messageContent[0].text ? messageContent[0].text.length : 'unknown'} chars`);
     
-    // Retry logic for overloaded errors
+    // Enhanced retry logic for overloaded errors
     let retryCount = 0;
-    const maxRetries = 3;
-    const baseDelay = 2000; // 2 seconds initial delay
+    const maxRetries = 5; // Increased from 3 to 5
+    const baseDelay = 3000; // Increased from 2000ms to 3000ms initial delay
+    const maxDelay = 30000; // Maximum delay of 30 seconds
     
     while (retryCount <= maxRetries) {
       try {
@@ -57,9 +59,27 @@ export async function sendClaudeRequest(
           console.warn(`⚠️ Claude API overloaded (attempt ${retryCount + 1}/${maxRetries + 1}): ${errorText}`);
           
           if (retryCount < maxRetries) {
-            // Exponential backoff: 2s, 4s, 8s
-            const delay = baseDelay * Math.pow(2, retryCount);
-            console.log(`🔄 Retrying in ${delay}ms...`);
+            // Exponential backoff with jitter: baseDelay * (2^retryCount) + random jitter
+            const exponentialDelay = baseDelay * Math.pow(2, retryCount);
+            const jitter = Math.random() * 1000; // Add up to 1 second of random jitter
+            const delay = Math.min(exponentialDelay + jitter, maxDelay);
+            
+            console.log(`🔄 Retrying in ${Math.round(delay / 1000)} seconds...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            retryCount++;
+            continue;
+          }
+        }
+        
+        // Handle rate limit errors (429)
+        if (response.status === 429) {
+          const errorText = await response.text();
+          console.warn(`⚠️ Claude API rate limited (attempt ${retryCount + 1}/${maxRetries + 1}): ${errorText}`);
+          
+          if (retryCount < maxRetries) {
+            // For rate limits, use a longer delay
+            const delay = baseDelay * Math.pow(2, retryCount + 1); // More aggressive backoff
+            console.log(`🔄 Rate limited. Retrying in ${Math.round(delay / 1000)} seconds...`);
             await new Promise(resolve => setTimeout(resolve, delay));
             retryCount++;
             continue;
@@ -86,7 +106,8 @@ export async function sendClaudeRequest(
         return result;
       } catch (fetchError) {
         // If it's any other error besides the retry logic, throw immediately
-        if (retryCount >= maxRetries || !fetchError.message.includes("529")) {
+        if (retryCount >= maxRetries || 
+            (!fetchError.message.includes("529") && !fetchError.message.includes("429"))) {
           throw fetchError;
         }
         
@@ -96,7 +117,7 @@ export async function sendClaudeRequest(
     }
     
     // If we've exhausted all retries
-    throw new Error("Claude API is currently overloaded. Maximum retry attempts exceeded.");
+    throw new Error(`Claude API is currently overloaded or rate limited. Maximum retry attempts (${maxRetries}) exceeded.`);
   } catch (error) {
     console.error(`❌ Claude API request error: ${error.message}`);
     throw error;
