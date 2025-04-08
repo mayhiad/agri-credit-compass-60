@@ -57,6 +57,9 @@ export const saveHistoricalData = async (
     console.log(`Saving historical data for user ${userId} and farm ${farmId}`);
     console.log("Historical data:", historicalData);
     
+    // Serialize the historical data to handle Date objects
+    const serializedHistoricalData = JSON.parse(JSON.stringify(historicalData));
+    
     // Check if farm_details exists for this farm
     const { data: farmDetails, error: farmDetailsError } = await supabase
       .from('farm_details')
@@ -79,7 +82,7 @@ export const saveHistoricalData = async (
         : { ...(locationData as Record<string, any>) };
       
       // Add historical years to location_data
-      updatedLocationData.historical_years = historicalData;
+      updatedLocationData.historical_years = serializedHistoricalData;
       
       const { error: updateError } = await supabase
         .from('farm_details')
@@ -94,8 +97,8 @@ export const saveHistoricalData = async (
       }
     } else {
       // Farm details doesn't exist, create it
-      const locationData: Record<string, any> = { 
-        historical_years: historicalData 
+      const locationData = { 
+        historical_years: serializedHistoricalData 
       };
       
       const { error: insertError } = await supabase

@@ -49,22 +49,28 @@ export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string)
     
     // Add historical years data if available
     if (farmData.historicalYears && farmData.historicalYears.length > 0) {
-      locationData.historical_years = farmData.historicalYears;
+      // Convert any Date objects to strings in the historical data
+      const serializedHistoricalYears = JSON.parse(JSON.stringify(farmData.historicalYears));
+      locationData.historical_years = serializedHistoricalYears;
       console.log(`Saved ${farmData.historicalYears.length} historical years to location_data`);
     } else if (farmData.historicalData && farmData.historicalData.length > 0) {
-      locationData.historical_years = farmData.historicalData;
+      // Convert any Date objects to strings in the historical data
+      const serializedHistoricalData = JSON.parse(JSON.stringify(farmData.historicalData));
+      locationData.historical_years = serializedHistoricalData;
       console.log(`Saved ${farmData.historicalData.length} historical data records to location_data`);
     }
     
     // Convert marketPrices to a format compatible with JSON
+    // Use JSON.stringify/parse to handle Date objects
     const marketPricesJson = farmData.marketPrices ? 
-      farmData.marketPrices.map(price => ({
+      JSON.parse(JSON.stringify(farmData.marketPrices.map(price => ({
         culture: price.culture,
         averageYield: price.averageYield,
         price: price.price,
         trend: price.trend,
-        lastUpdated: price.lastUpdated
-      })) : [];
+        lastUpdated: typeof price.lastUpdated === 'object' ? 
+          price.lastUpdated.toISOString() : price.lastUpdated
+      })))) : [];
     
     const { error: detailsError } = await supabase
       .from('farm_details')
