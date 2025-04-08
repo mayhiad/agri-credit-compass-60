@@ -1,183 +1,261 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
-import { corsHeaders, handleCors } from "./cors.ts";
-import { processDocumentWithOpenAI } from "./processDocument.ts";
-import { API_TIMEOUT } from "./fetchUtils.ts";
-import { getClaudeModel } from "./apiClient.ts";
-import { createSupabaseClient } from "./openaiClient.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { corsHeaders } from "./cors.ts";
+import { supabase } from "./openaiClient.ts";
+import { processAllImageBatches } from "./claudeProcessor.ts";
 
-// Required environment variables
-const supabaseUrl = Deno.env.get("SUPABASE_URL");
-const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+serve(async (req) => {
+  // Add initial log message
+  console.log("📥 Supabase function called!");
 
-// Initialize Supabase client with service role key
-const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
-
-serve(async (req: Request) => {
-  // Handle CORS preflight requests
-  const corsResponse = handleCors(req);
-  if (corsResponse) return corsResponse;
-
-  console.log(`⏱️ Function timeout set to ${API_TIMEOUT / 1000} seconds`);
+  // Handle CORS
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    // Parse the request body
-    let requestData;
+    console.log("📥 Request received: URL:", req.url, "Method:", req.method);
+    console.log("📤 Request headers:", JSON.stringify(Object.fromEntries(req.headers.entries()), null, 2));
     
-    try {
-      requestData = await req.json();
-      console.log(`📦 Request data: ${JSON.stringify({
-        ...requestData,
-        // Don't log the full batch for security
-        hasBatchId: !!requestData.batchId,
-        testMode: !!requestData.testMode
-      })}`);
-    } catch (jsonError) {
-      console.error("⚠️ Failed to parse request JSON:", jsonError);
-      return new Response(
-        JSON.stringify({ error: "Invalid JSON in request body" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    
-    // Check for test mode - just verify API connectivity
-    if (requestData.testMode === true) {
-      console.log("🧪 Test mode detected, checking Claude API availability");
-      
-      try {
-        // Simple test to see if Claude API is available
-        const model = await getClaudeModel();
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            message: "Claude API is accessible", 
-            model: model 
-          }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      } catch (apiError) {
-        console.error("❌ Claude API test failed:", apiError);
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: "Claude API is not accessible", 
-            details: apiError.message 
-          }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
-
-    // Extract data from the request
+    const requestData = await req.json();
     const { batchId, userId } = requestData;
-
-    // Validate required fields
-    if (!batchId) {
-      return new Response(
-        JSON.stringify({ error: "Missing required field: batchId" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!userId) {
-      return new Response(
-        JSON.stringify({ error: "Missing required field: userId" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Get the batch information
-    console.log(`🔍 Looking up batch: ${batchId}`);
-    const { data: batchData, error: batchError } = await supabase
-      .from("document_batches")
-      .select("*")
-      .eq("batch_id", batchId)
-      .eq("user_id", userId)
-      .single();
-
-    if (batchError) {
-      console.error("❌ Error fetching batch:", batchError);
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch batch information", details: batchError.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Get the image URLs for the batch
-    console.log(`📷 Fetching image URLs for batch: ${batchId}`);
-    const { data: imageUrls, error: storageError } = await supabase.storage
-      .from("document-images")
-      .list(`${userId}/${batchId}`);
-
-    if (storageError) {
-      console.error("❌ Error fetching images:", storageError);
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch images", details: storageError.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Generate public URLs for all images
-    console.log(`🔗 Generating public URLs for ${imageUrls.length} images`);
     
-    // Only include image files (check extension for safety)
-    const validImageUrls = imageUrls
-      .filter(file => 
-        file.name.endsWith(".jpg") || 
-        file.name.endsWith(".jpeg") || 
-        file.name.endsWith(".png")
-      )
-      .map(file => {
-        const { data } = supabase.storage
-          .from("document-images")
-          .getPublicUrl(`${userId}/${batchId}/${file.name}`);
-        return data.publicUrl;
-      });
+    if (!batchId) throw new Error('Missing batch ID');
+    if (!userId) throw new Error('Missing user ID');
 
-    if (validImageUrls.length === 0) {
-      console.error("❌ No valid images found in the batch");
-      return new Response(
-        JSON.stringify({ error: "No valid images found in the batch" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    console.log(`🔍 Processing SAPS document: Batch ID: ${batchId}, User: ${userId}`);
+    
+    // Check if the batch exists
+    try {
+      const { data: batchData, error: batchError } = await supabase
+        .from('document_batches')
+        .select('*')
+        .eq('batch_id', batchId)
+        .eq('user_id', userId)
+        .single();
+        
+      if (batchError) {
+        console.error(`Error fetching batch data:`, batchError);
+        console.error(`Error details:`, JSON.stringify(batchError, null, 2));
+        throw new Error(`Batch not found: ${batchError.message || 'Unknown error'}`);
+      }
+      
+      if (!batchData) {
+        throw new Error(`Batch not found with ID ${batchId}`);
+      }
+      
+      console.log(`📊 Batch information: ${batchData.page_count} pages, status: ${batchData.status}`);
+      
+      // If the batch has already been processed, return the existing result
+      if (batchData.status === 'completed' && batchData.metadata?.extractedData) {
+        console.log(`🔄 Batch already processed, returning existing result`);
+        
+        return new Response(JSON.stringify({
+          data: {
+            applicantName: batchData.metadata.extractedData.submitterName || null,
+            documentId: batchData.metadata.extractedData.submitterId || null,
+            submitterId: batchData.metadata.extractedData.submitterId || null,
+            applicantId: batchData.metadata.extractedData.applicantId || null,
+            region: null,
+            year: new Date().getFullYear().toString(),
+            hectares: 0,
+            cultures: [],
+            blockIds: [],
+            totalRevenue: 0
+          },
+          status: 'completed',
+          batchInfo: {
+            totalBatches: Math.ceil(batchData.page_count / 20),
+            processedBatches: Math.ceil(batchData.page_count / 20),
+            totalPages: batchData.page_count,
+            processedPages: batchData.page_count
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    } catch (error) {
+      console.error(`Error checking batch:`, error);
+      // Continue processing without throwing an error - we'll create it if missing
     }
-
-    console.log(`✅ Found ${validImageUrls.length} valid images for processing`);
-
-    // Process the document with Claude AI
-    console.log(`🧠 Starting document processing with Claude AI for user: ${userId}`);
-    const result = await processDocumentWithOpenAI(validImageUrls, userId, batchId);
-    console.log(`✅ Claude AI processing complete. Result status: ${result.status}`);
-
-    // Return the processing result
-    return new Response(JSON.stringify(result), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    
+    // Retrieve images for the batch from storage
+    console.log(`🖼️ Retrieving images for batch: ${batchId}`);
+    
+    const { data: files, error: filesError } = await supabase.storage
+      .from('dokumentumok')
+      .list(`saps/${userId}/${batchId}/images`);
+      
+    if (filesError) {
+      console.error(`Error retrieving images:`, filesError);
+      throw new Error(`Failed to retrieve images: ${filesError.message || 'Unknown error'}`);
+    }
+    
+    if (!files || files.length === 0) {
+      throw new Error('No images found for this batch');
+    }
+    
+    console.log(`📁 ${files.length} total files found in storage`);
+    
+    // Filter only JPG files (ensure we only use supported formats)
+    const jpgFiles = files.filter(file => {
+      const isJpg = file.name.toLowerCase().endsWith('.jpg') || file.name.toLowerCase().endsWith('.jpeg');
+      if (!isJpg) {
+        console.log(`⚠️ Skipping non-JPG file: ${file.name}`);
+      }
+      return isJpg;
     });
-  } catch (error) {
-    console.error("🚨 Unhandled exception in process-saps-document function:", error);
     
-    // Try to extract a meaningful error message
-    let errorMessage = "Unknown error in document processing";
-    let errorDetails = null;
+    console.log(`🖼️ ${jpgFiles.length} JPG images found (out of ${files.length} total files)`);
+    
+    if (jpgFiles.length === 0) {
+      throw new Error('No JPG images found for this batch. Please ensure PDF was converted to JPGs correctly.');
+    }
+    
+    // Sort files by page number
+    const sortedFiles = jpgFiles.sort((a, b) => {
+      const aNum = parseInt(a.name.split('_')[0]) || 0;
+      const bNum = parseInt(b.name.split('_')[0]) || 0;
+      return aNum - bNum;
+    });
+    
+    console.log(`📋 Sorted JPG files: First few examples:`);
+    sortedFiles.slice(0, 3).forEach((file, idx) => {
+      console.log(`   ${idx + 1}: ${file.name}`);
+    });
+    
+    // Generate public URLs for the images
+    const imageUrls = sortedFiles.map(file => {
+      const publicUrl = supabase.storage
+        .from('dokumentumok')
+        .getPublicUrl(`saps/${userId}/${batchId}/images/${file.name}`).data.publicUrl;
+      
+      return publicUrl;
+    });
+    
+    // Log the first few URLs for debugging
+    console.log(`🌐 Generated image URLs (first few examples):`);
+    imageUrls.slice(0, 3).forEach((url, idx) => {
+      console.log(`   ${idx + 1}: ${url}`);
+    });
+    
+    console.log(`🌐 ${imageUrls.length} JPG image URLs generated for Claude AI processing`);
+    
+    // Process all images with Claude AI
+    let result;
+    try {
+      result = await processAllImageBatches(imageUrls, userId, batchId);
+    } catch (aiError) {
+      console.error("❌ Claude AI processing error:", aiError);
+      
+      // Return a partial response with error information
+      return new Response(JSON.stringify({
+        error: `AI processing failed: ${aiError.message}`,
+        status: 'failed',
+        data: {
+          applicantName: null,
+          submitterId: null,
+          applicantId: null,
+          region: null,
+          year: new Date().getFullYear().toString(),
+          hectares: 0,
+          cultures: [],
+          blockIds: [],
+          totalRevenue: 0,
+          errorMessage: `Failed to process document: ${aiError.message}`
+        },
+        batchInfo: {
+          totalBatches: Math.ceil(imageUrls.length / 20),
+          processedBatches: 0,
+          totalPages: imageUrls.length,
+          processedPages: 0
+        }
+      }), {
+        status: 200, // Still return 200 with error information in the payload
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Save OCR result to the database
+    try {
+      const { data: ocrLog, error: ocrError } = await supabase
+        .from('document_ocr_logs')
+        .insert({
+          user_id: userId,
+          file_name: files[0].name.split('_')[0] + '.pdf', // Approximation for original filename
+          file_size: 0, // We don't have the original file size here
+          file_type: 'application/pdf',
+          storage_path: `saps/${userId}/${batchId}/images`,
+          ocr_content: result.rawText || "No OCR text available"
+        })
+        .select('id')
+        .single();
+        
+      if (ocrError) {
+        console.warn(`⚠️ OCR log save error: ${ocrError.message}`);
+        console.warn(`Error details:`, JSON.stringify(ocrError, null, 2));
+      } else {
+        console.log(`✅ OCR log successfully created: ${ocrLog.id}`);
+      
+        // Save AI processing result
+        if (ocrLog?.id) {
+          const { error: extractionError } = await supabase
+            .from('document_extraction_results')
+            .insert({
+              ocr_log_id: ocrLog.id,
+              user_id: userId,
+              extracted_data: result.data || { status: 'processing' },
+              processing_status: result.data ? 'completed' : 'in_progress',
+              processing_time: 0
+            });
+            
+          if (extractionError) {
+            console.warn(`⚠️ Extraction result save error: ${extractionError.message}`);
+            console.warn(`Error details:`, JSON.stringify(extractionError, null, 2));
+          } else {
+            console.log(`✅ Extraction result saved successfully`);
+          }
+        }
+      }
+    } catch (dbError) {
+      console.error(`Database operation error:`, dbError);
+      // Continue without throwing error
+    }
+    
+    // Return result
+    return new Response(JSON.stringify({
+      ocrLogId: null, // We don't always have this value
+      data: result.data,
+      status: 'completed',
+      batchInfo: result.batchInfo
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+    
+  } catch (error) {
+    console.error("🔥 Final error handler:", error);
+    
+    // Send more detailed error response to the frontend
+    let errorMessage = "Unknown error occurred";
+    let errorDetails = "";
+    let errorStack = "";
     
     if (error instanceof Error) {
       errorMessage = error.message;
-      errorDetails = error.stack;
-    } else if (typeof error === "string") {
+      errorDetails = error.toString();
+      errorStack = error.stack || "";
+    } else if (typeof error === 'string') {
       errorMessage = error;
-    } else if (error && typeof error === "object") {
+    } else if (error && typeof error === 'object') {
       errorMessage = JSON.stringify(error);
     }
     
-    return new Response(
-      JSON.stringify({ 
-        error: errorMessage, 
-        details: errorDetails,
-        timestamp: new Date().toISOString() 
-      }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ 
+      error: errorMessage, 
+      details: errorDetails,
+      stack: errorStack
+    }), { 
+      status: 500, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    });
   }
 });

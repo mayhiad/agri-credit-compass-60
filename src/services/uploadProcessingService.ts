@@ -1,4 +1,3 @@
-// I'll only update the relevant parts of this file to improve error handling
 
 import { FarmData } from "@/types/farm";
 import { ProcessingStatus } from "@/types/processing";
@@ -23,36 +22,16 @@ export const processSapsDocument = async (
     throw new Error("A dokumentum feldolgozásához be kell jelentkeznie");
   }
   
-  // Store the last progress to detect if we're stuck
-  let lastProgress = 0;
-  
-  // Helper function to update status with lastProgress tracking
-  const updateProgressStatus = (status: ProcessingStatus) => {
-    const updatedStatus = {
-      ...status,
-      lastProgress: lastProgress
-    };
-    lastProgress = status.progress;
-    updateStatus(updatedStatus);
-  };
-  
-  updateProgressStatus({
+  updateStatus({
     step: "Dokumentum ellenőrzése",
     progress: 10,
-    details: "Dokumentum formátum és méret ellenőrzése folyamatban...",
   });
   
-  // Validate document
-  const validation = validateDocumentFile(file);
-  if (!validation.valid) {
-    throw new Error(validation.error || "A dokumentum érvénytelen");
-  }
-  
   // Step 1: Convert PDF to images
-  updateProgressStatus({
+  updateStatus({
     step: "PDF konvertálása képekké",
     progress: 20,
-    details: `${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB) konvertálása képekké folyamatban...`,
+    details: "A dokumentum képekké konvertálása folyamatban...",
   });
   
   // Prepare form data for the conversion request
@@ -68,18 +47,6 @@ export const processSapsDocument = async (
   
   // Call our Supabase Edge Function to convert PDF to images
   try {
-    console.log("Calling convert-pdf-to-images edge function...");
-    
-    updateProgressStatus({
-      step: "PDF konvertálása képekké",
-      progress: 25,
-      details: "Kapcsolódás a szerverhez, dokumentum feltöltése folyamatban...",
-    });
-    
-    // Create a custom AbortController with a timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 360000); // 6 minute timeout for large files
-    
     const convertResponse = await fetch(
       'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/convert-pdf-to-images',
       {
@@ -88,19 +55,9 @@ export const processSapsDocument = async (
           'Authorization': `Bearer ${session.access_token}`,
         },
         body: convertFormData,
-        signal: controller.signal
+        signal: AbortSignal.timeout(300000), // 5 minute timeout for large files
       }
-    ).catch(fetchError => {
-      console.error("Network fetch error:", fetchError.message);
-      // Create a custom error response to handle network errors more gracefully
-      const errorResponse = new Response(
-        JSON.stringify({
-          error: 'Hálózati hiba - Nem sikerült kapcsolódni a szerverhez. Ellenőrizze az internetkapcsolatot.'
-        }),
-        { status: 503 }
-      );
-      return errorResponse;
-    });
+    );
     
     if (!convertResponse.ok) {
       const errorText = await convertResponse.text();
@@ -113,16 +70,7 @@ export const processSapsDocument = async (
         errorData = { error: errorText || "Ismeretlen hiba történt" };
       }
       
-      const errorMessage = errorData.error || "Hiba a dokumentum konvertálása közben";
-      console.error(`PDF konvertálási hiba részletei: ${errorMessage}`);
-      
-      updateProgressStatus({
-        step: "Hiba a PDF konvertálása során",
-        progress: 0,
-        details: `Hiba: ${errorMessage}`,
-      });
-      
-      throw new Error(errorMessage);
+      throw new Error(errorData.error || "Hiba a dokumentum konvertálása közben");
     }
     
     const convertData = await convertResponse.json();
@@ -137,10 +85,10 @@ export const processSapsDocument = async (
     const pageCount = convertData.pageCount;
     const totalBatches = Math.ceil(pageCount / 20);
     
-    updateProgressStatus({
+    updateStatus({
       step: "PDF konvertálás befejezve",
       progress: 30,
-      details: `A dokumentum sikeresen konvertálva ${pageCount} képpé (${totalBatches} köteg)`,
+      details: `A dokumentum sikeresen konvertálva ${pageCount} képpé`,
       batchProgress: {
         currentBatch: 0,
         totalBatches: totalBatches,
@@ -150,7 +98,7 @@ export const processSapsDocument = async (
     });
     
     // Step 2: Process the images with Claude AI
-    updateProgressStatus({
+    updateStatus({
       step: "Claude AI feldolgozás",
       progress: 40,
       details: "A dokumentum elemzése Claude AI segítségével...",
@@ -168,12 +116,6 @@ export const processSapsDocument = async (
       userId: user.id
     };
     
-    console.log("Calling process-saps-document edge function with payload:", payload);
-    
-    // Create a custom AbortController with an even longer timeout for AI processing
-    const aiController = new AbortController();
-    const aiTimeoutId = setTimeout(() => aiController.abort(), 600000); // 10 minute timeout
-    
     // Call the process-saps-document endpoint
     const processResponse = await fetch(
       'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-saps-document',
@@ -184,19 +126,9 @@ export const processSapsDocument = async (
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload),
-        signal: aiController.signal
+        signal: AbortSignal.timeout(300000), // 5 minute timeout
       }
-    ).catch(fetchError => {
-      console.error("Network fetch error:", fetchError.message);
-      // Create a custom error response to handle network errors more gracefully
-      const errorResponse = new Response(
-        JSON.stringify({
-          error: 'Hálózati hiba - Nem sikerült kapcsolódni a szerverhez. Ellenőrizze az internetkapcsolatot.'
-        }),
-        { status: 503 }
-      );
-      return errorResponse;
-    });
+    );
     
     if (!processResponse.ok) {
       const errorText = await processResponse.text();
@@ -209,22 +141,7 @@ export const processSapsDocument = async (
         errorData = { error: errorText || "Ismeretlen hiba történt" };
       }
       
-      const errorMessage = errorData.error || "Hiba a dokumentum feldolgozása során";
-      console.error(`Claude feldolgozási hiba részletei: ${errorMessage}`);
-      
-      updateProgressStatus({
-        step: "Hiba a dokumentum feldolgozása során",
-        progress: 40,
-        details: `Claude AI feldolgozási hiba: ${errorMessage}`,
-        batchProgress: {
-          currentBatch: 1,
-          totalBatches: totalBatches,
-          pagesProcessed: Math.min(20, pageCount),
-          totalPages: pageCount
-        }
-      });
-      
-      throw new Error(errorMessage);
+      throw new Error(errorData.error || "Hiba a dokumentum feldolgozása során");
     }
     
     const processResult = await processResponse.json();
@@ -232,7 +149,7 @@ export const processSapsDocument = async (
     
     // Update batch progress information from the response
     if (processResult.batchInfo) {
-      updateProgressStatus({
+      updateStatus({
         step: "Claude AI feldolgozás befejezve",
         progress: 70,
         details: `Dokumentum feldolgozva (${processResult.batchInfo.processedBatches}/${processResult.batchInfo.totalBatches} köteg)`,
@@ -259,23 +176,11 @@ export const processSapsDocument = async (
     farmData.pageCount = pageCount;
     farmData.processingStatus = 'completed';
     
-    updateProgressStatus({
-      step: "Adatok elemzése",
-      progress: 80,
-      details: "Ügyfél és növénytermesztési adatok elemzése folyamatban...",
-      batchProgress: {
-        currentBatch: processResult.batchInfo.totalBatches,
-        totalBatches: processResult.batchInfo.totalBatches,
-        pagesProcessed: processResult.batchInfo.totalPages,
-        totalPages: processResult.batchInfo.totalPages || pageCount
-      }
-    });
-    
     // Check if the farm data is incomplete
     if (!farmData.applicantName || !farmData.submitterId || !farmData.applicantId) {
       console.warn("A Claude által feldolgozott adatok hiányosak:", farmData);
       
-      updateProgressStatus({
+      updateStatus({
         step: "Alapértelmezett adatok generálása",
         progress: 85,
         details: "Az AI nem tudott elegendő adatot kinyerni, példa adatok generálása...",
@@ -305,25 +210,13 @@ export const processSapsDocument = async (
     }
     
     // Additional validation and fix missing fields
-    updateProgressStatus({
-      step: "Adatok validálása",
-      progress: 90,
-      details: "Kisgazdasági adatok ellenőrzése és javítása...",
-      batchProgress: {
-        currentBatch: totalBatches,
-        totalBatches: totalBatches,
-        pagesProcessed: pageCount,
-        totalPages: pageCount
-      }
-    });
-    
     farmData = validateAndFixFarmData(farmData);
     
     // Save the farm data to the database
-    updateProgressStatus({
+    updateStatus({
       step: "Adatok mentése az adatbázisba",
       progress: 95,
-      details: "Ügyfél adatok rögzítése az adatbázisba...",
+      details: "Ügyfél adatok rögzítése...",
       batchProgress: {
         currentBatch: totalBatches,
         totalBatches: totalBatches,
@@ -340,7 +233,7 @@ export const processSapsDocument = async (
         farmData.farmId = farmId;
       }
       
-      updateProgressStatus({
+      updateStatus({
         step: "Feldolgozás befejezve",
         progress: 100,
         details: `Ügyfél-azonosító: ${farmData.submitterId || "Ismeretlen"}, Név: ${farmData.applicantName || "Ismeretlen"} sikeresen feldolgozva és mentve.`,
@@ -356,7 +249,7 @@ export const processSapsDocument = async (
     } catch (error) {
       console.error("Hiba az adatok mentése során:", error);
       
-      updateProgressStatus({
+      updateStatus({
         step: "Feldolgozás befejezve figyelmeztetéssel",
         progress: 100,
         details: "Adatok feldolgozva, de nem sikerült menteni az adatbázisba.",
@@ -373,14 +266,6 @@ export const processSapsDocument = async (
     
   } catch (error) {
     console.error("SAPS feltöltési hiba:", error);
-    
-    // Check for network errors specifically
-    if (error.name === 'AbortError') {
-      throw new Error("A kérés időtúllépés miatt megszakadt. A dokumentum túl nagy lehet vagy a szerver túlterhelt.");
-    } else if (error.message === 'Failed to fetch') {
-      throw new Error("Hálózati hiba - Nem sikerült kapcsolódni a szerverhez. Ellenőrizze az internetkapcsolatot.");
-    }
-    
     throw error;
   }
 };

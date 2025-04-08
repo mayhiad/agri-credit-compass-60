@@ -1,62 +1,65 @@
 
-import React from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, MapPin, Fingerprint } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { User, Calendar, FileText, UserCheck } from "lucide-react";
 
 interface SubmitterInfoProps {
-  applicantName?: string;
-  submitterId?: string;
-  applicantId?: string;
-  region?: string;
+  submitterName?: string | null;
+  submitterId?: string | null;
+  applicantId?: string | null;
+  submissionDate?: string | null;
 }
 
-const SubmitterInfo: React.FC<SubmitterInfoProps> = ({ 
-  applicantName = "N/A", 
-  submitterId = "N/A",
-  applicantId = "N/A", 
-  region = "N/A" 
-}) => {
+const SubmitterInfo = ({ 
+  submitterName, 
+  submitterId, 
+  applicantId,
+  submissionDate
+}: SubmitterInfoProps) => {
   return (
-    <Card className="mt-4">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <User className="h-5 w-5 text-primary" />
-          Beadó adatai
-        </CardTitle>
-        <CardDescription>
-          Az egységes kérelem benyújtójának adatai
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Beadó neve</p>
-            <p className="font-semibold">{applicantName}</p>
+    <Card>
+      <CardContent className="pt-6">
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <User className="h-5 w-5 text-primary mt-0.5" />
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">Beadó neve:</div>
+              <div className="font-semibold">
+                {submitterName || "Nem elérhető"}
+              </div>
+            </div>
           </div>
-          
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Beadó ügyfél-azonosító száma</p>
-            <p className="font-semibold flex items-center gap-1">
-              <Fingerprint className="h-4 w-4 text-muted-foreground" />
-              {submitterId}
-            </p>
+
+          <div className="flex items-start gap-3">
+            <FileText className="h-5 w-5 text-primary mt-0.5" />
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">Beadó azonosítószáma:</div>
+              <div className="font-semibold">
+                {submitterId || "Nem elérhető"}
+              </div>
+            </div>
           </div>
-          
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Kérelmező ügyfél-azonosító száma</p>
-            <p className="font-semibold flex items-center gap-1">
-              <Fingerprint className="h-4 w-4 text-muted-foreground" />
-              {applicantId}
-            </p>
+
+          <div className="flex items-start gap-3">
+            <UserCheck className="h-5 w-5 text-primary mt-0.5" />
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">Kérelmező azonosítószáma:</div>
+              <div className="font-semibold">
+                {applicantId || "Nem elérhető"}
+              </div>
+            </div>
           </div>
-          
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Régió / megye</p>
-            <p className="font-semibold flex items-center gap-1">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              {region}
-            </p>
-          </div>
+
+          {submissionDate && (
+            <div className="flex items-start gap-3">
+              <Calendar className="h-5 w-5 text-primary mt-0.5" />
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Beadás időpontja:</div>
+                <div className="font-semibold">
+                  {submissionDate}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

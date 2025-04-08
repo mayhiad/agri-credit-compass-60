@@ -105,7 +105,7 @@ export const processWithClaude = async (
         submitterId: farmData.submitterId || fallbackData.submitterId,
         applicantId: farmData.applicantId || fallbackData.applicantId,
         errorMessage: "Nem sikerült az összes adatot kinyerni a dokumentumból. Demonstrációs adatok kerültek megjelenítésre.",
-        rawText: farmData.rawText || ""
+        ocrText: farmData.rawText || ""
       };
     }
     

@@ -1,91 +1,43 @@
 
-import React from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tractor, TrendingUp } from "lucide-react";
-import { Culture } from "@/types/farm";
+import { FarmData } from "@/types/farm";
+import { formatCurrency } from "@/lib/utils";
 
-export interface CultureTableProps {
-  cultures: Culture[];
+interface CultureTableProps {
+  farmData: FarmData;
 }
 
-const CultureTable: React.FC<CultureTableProps> = ({ cultures }) => {
-  // Format numbers with local separator
-  const formatNumber = (num: number) => {
-    return num.toLocaleString('hu-HU');
-  };
-  
-  // Format currency values
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('hu-HU', { 
-      style: 'currency', 
-      currency: 'HUF',
-      maximumFractionDigits: 0
-    }).format(value);
-  };
-  
-  if (!cultures || cultures.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Tractor className="h-5 w-5 text-primary" />
-            Növénykultúrák
-          </CardTitle>
-          <CardDescription>
-            Nem található növénykultúra a dokumentumban
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            A dokumentumban nem sikerült növénykultúrákat felismerni, vagy nem tartalmazott ilyeneket.
-          </p>
-        </CardContent>
-      </Card>
-    );
+export const CultureTable = ({ farmData }: CultureTableProps) => {
+  if (!farmData || !farmData.cultures || farmData.cultures.length === 0) {
+    return null;
   }
   
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Tractor className="h-5 w-5 text-primary" />
-          Növénykultúrák
-        </CardTitle>
-        <CardDescription>
-          A gazdaságban termesztett növénykultúrák listája
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Növénykultúra</TableHead>
-              <TableHead className="text-right">Terület (ha)</TableHead>
-              <TableHead className="text-right">Várható bevétel</TableHead>
+    <div className="border rounded-md">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Kultúra</TableHead>
+            <TableHead className="text-right">Terület (ha)</TableHead>
+            <TableHead className="text-right">Becsült bevétel</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {farmData.cultures.map((culture, idx) => (
+            <TableRow key={idx}>
+              <TableCell>{culture.name}</TableCell>
+              <TableCell className="text-right">{culture.hectares ? culture.hectares.toFixed(2) : "0.00"}</TableCell>
+              <TableCell className="text-right">{formatCurrency(culture.estimatedRevenue || 0)}</TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {cultures.map((culture, index) => (
-              <TableRow key={index}>
-                <TableCell className="font-medium">{culture.name}</TableCell>
-                <TableCell className="text-right">{formatNumber(culture.hectares)}</TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    {culture.estimatedRevenue ? (
-                      <>
-                        <TrendingUp className={`h-4 w-4 ${culture.estimatedRevenue > 0 ? 'text-green-500' : 'text-red-500'}`} />
-                        {formatCurrency(culture.estimatedRevenue)}
-                      </>
-                    ) : 'N/A'}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+          ))}
+          <TableRow>
+            <TableCell className="font-medium">Összesen</TableCell>
+            <TableCell className="text-right font-medium">{farmData.hectares ? farmData.hectares.toFixed(2) : "0.00"} ha</TableCell>
+            <TableCell className="text-right font-medium">{formatCurrency(farmData.totalRevenue || 0)}</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </div>
   );
 };
 

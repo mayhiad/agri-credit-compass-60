@@ -5,8 +5,7 @@ import {
   saveDocumentToStorage, 
   extractTextFromDocument, 
   logOcrResult,
-  logExtractionResult,
-  saveRawClaudeResponse
+  logExtractionResult
 } from "./fileUtils.ts";
 import { processDocumentWithClaude } from "./claudeProcessor.ts";
 
@@ -44,9 +43,6 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
       console.warn(`⚠️ Az OCR eredmények nem kerültek mentésre az adatbázisba, de folytatjuk a feldolgozást`);
     } else {
       console.log(`✅ OCR napló sikeresen létrehozva: ${ocrLogId}`);
-      
-      // Nyers Claude válasz mentése szöveges dokumentumként
-      await saveRawClaudeResponse(result.rawText || "", fileName, userId, ocrLogId);
     }
     
     // AI feldolgozás indításának naplózása az adatbázisba
@@ -61,11 +57,6 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
         undefined, // nincs thread_id a Claude esetén
         undefined  // nincs run_id a Claude esetén
       );
-    }
-
-    // Add the ocrLogId to the result data so it can be displayed in the UI
-    if (result.data && ocrLogId) {
-      result.data.ocrLogId = ocrLogId;
     }
 
     return {

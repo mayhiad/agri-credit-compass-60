@@ -4,11 +4,14 @@ ynfciltkzptrsmrjylkd = "https://ynfciltkzptrsmrjylkd.supabase.co"
 [functions.convert-pdf-to-images]
 verify_jwt = true
 
-[functions.delete-user]
+[functions.get-thread-results]
+verify_jwt = true
+
+[functions.openai-scan]
+verify_jwt = true
+
+[functions.process-document-with-vision]
 verify_jwt = true
 
 [functions.process-saps-document]
 verify_jwt = true
-
-[auth.email]
-enable_mfa = true

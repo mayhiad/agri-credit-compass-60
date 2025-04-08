@@ -1,17 +1,27 @@
 
+// Common types used across the farm and loan application components
+
 export interface Culture {
   name: string;
   hectares: number;
-  estimatedRevenue?: number;
   yieldPerHectare?: number;
   pricePerTon?: number;
+  estimatedRevenue?: number;
+}
+
+export interface MarketPrice {
+  culture: string;
+  averageYield: number;
+  price: number;
+  trend: number;
+  lastUpdated: string | Date;
 }
 
 export interface HistoricalCrop {
   name: string;
   hectares: number;
   yield: number;
-  totalYield?: number;
+  totalYield: number;
   priceEUR?: number;
   revenueEUR?: number;
 }
@@ -23,65 +33,47 @@ export interface HistoricalYear {
   totalRevenueEUR?: number;
 }
 
-export interface HistoricalData {
-  year: string;
-  crop: string;
-  yield: number;
-  revenue: number;
-}
-
-export interface MarketPrice {
-  id?: string;
-  culture: string;
-  averageYield: number;
-  price: number;
-  trend: number;
-  region: string;
-  year: string;
-  is_forecast: boolean;
-  last_updated: string | Date;
-}
-
-export interface BatchInfo {
-  totalBatches: number;
-  processedBatches: number;
-  failedBatches: number;
-  totalPages: number;
-  processedPages: number;
-}
-
 export interface FarmData {
   farmId?: string;
-  documentId?: string;
+  fileName?: string;
+  fileSize?: number;
   applicantName?: string;
-  submitterId?: string;
-  applicantId?: string;
-  totalRevenue?: number;
+  documentId?: string;
+  region?: string;
+  year?: string;
   hectares: number;
   cultures: Culture[];
   blockIds?: string[];
-  region?: string;
-  submissionDate?: string;
-  year?: string;
-  historicalData?: HistoricalYear[];
-  marketPrices?: MarketPrice[];
-  batchInfo?: BatchInfo;
-  ocrLogId?: string;
-  fileName?: string;
-  fileSize?: number;
-  batchId?: string;
-  pageCount?: number;
-  processingStatus?: string;
+  totalRevenue: number;
   errorMessage?: string;
+  ocrText?: string;
+  wordDocumentUrl?: string;
+  submitterId?: string;
+  applicantId?: string;
   rawText?: string;
+  marketPrices?: MarketPrice[];
+  documentDate?: string;
+  parcels?: any[];
+  batchId?: string;  // Added for batch processing
+  pageCount?: number; // Added to track document pages
+  processingStatus?: string; // Added to track processing status
+  submissionDate?: string; // Added for document submission date
+  historicalData?: HistoricalYear[]; // Added for historical crop data
 }
 
 export interface UserData {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  address: string;
-  taxId: string;
-  bankAccount: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  taxId?: string;
+}
+
+export interface BatchProcessingInfo {
+  batchId: string;
+  pageCount: number;
+  currentBatch: number;
+  totalBatches: number;
+  processedPages: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
 }

@@ -1,6 +1,5 @@
 
-import { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useState } from "react";
 import FileUpload from "@/components/FileUpload";
 import Steps from "@/components/Steps";
 import CreditScore from "@/components/CreditScore";
@@ -11,58 +10,16 @@ import FarmLocation from "@/components/FarmLocation";
 import ContractSigning from "@/components/ContractSigning";
 import LoanComplete from "@/components/LoanComplete";
 import { FarmData, UserData } from "@/types/farm";
-import FarmInfoDisplay from "@/components/farm/FarmInfoDisplay";
 
 const LoanApplication = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [farmData, setFarmData] = useState<FarmData | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loanAmount, setLoanAmount] = useState(0);
-  const [paymentFrequency, setPaymentFrequency] = useState("quarterly");
-  const [preApprovedAmount, setPreApprovedAmount] = useState<number | undefined>(undefined);
-  const [totalRevenue, setTotalRevenue] = useState<number | undefined>(undefined);
-  
-  // Get preApprovedAmount and totalRevenue from location state if available
-  useEffect(() => {
-    if (location.state) {
-      const { preApprovedAmount, totalRevenue } = location.state as { 
-        preApprovedAmount?: number;
-        totalRevenue?: number;
-      };
-      
-      if (preApprovedAmount) {
-        setPreApprovedAmount(preApprovedAmount);
-      }
-      
-      if (totalRevenue) {
-        setTotalRevenue(totalRevenue);
-        
-        // If we have revenue data, we can create a minimal farmData object
-        if (!farmData) {
-          setFarmData({
-            totalRevenue: totalRevenue,
-            cultures: [],
-            hectares: 0 // Added the required hectares property with a default value
-          });
-        }
-      }
-    }
-  }, [location.state]);
+  const [paymentFrequency, setPaymentFrequency] = useState("monthly");
   
   const handleFileUploadComplete = (data: FarmData) => {
-    // Add verification for data quality before proceeding
-    const hasValidData = data && (
-      data.applicantName || 
-      data.submitterId || 
-      data.applicantId || 
-      data.documentId
-    );
-    
     setFarmData(data);
-    
-    // Always move to step 2 (farm info display) after upload, even if data is incomplete
     setStep(2);
   };
   
@@ -73,28 +30,16 @@ const LoanApplication = () => {
   const handleLoanTermsSubmit = (loanSettings: any) => {
     setLoanAmount(loanSettings.amount);
     setPaymentFrequency(loanSettings.paymentFrequency);
-    handleNextStep(); // Automatically advance to the next step after submission
-  };
-  
-  const handleBackToDashboard = () => {
-    navigate('/dashboard');
   };
   
   const renderStep = () => {
     switch (step) {
       case 1:
-        // If we already have farm data from state, skip to step 2
-        if (farmData && totalRevenue) {
-          // Automatically move to next step if we have the data
-          setTimeout(() => setStep(2), 0);
-          return <div className="text-center p-8">Adatok betöltése...</div>;
-        }
         return <FileUpload onComplete={handleFileUploadComplete} />;
       case 2:
-        return <FarmInfoDisplay 
+        return <FarmInfo 
           farmData={farmData!} 
-          onComplete={handleNextStep}
-          onBackToDashboard={handleBackToDashboard}
+          onComplete={handleNextStep} 
         />;
       case 3:
         return <FarmLocation onComplete={handleNextStep} />;
@@ -106,12 +51,12 @@ const LoanApplication = () => {
       case 5:
         return <CreditScore 
           farmData={farmData!}
-          creditLimit={preApprovedAmount || (farmData?.totalRevenue ? Math.round(farmData.totalRevenue * 0.7) : 0)}
+          creditLimit={farmData?.totalRevenue ? Math.round(farmData.totalRevenue * 0.7) : 0}
           onComplete={handleNextStep} 
         />;
       case 6:
         return <LoanTerms 
-          approvedAmount={preApprovedAmount || (farmData?.totalRevenue ? Math.round(farmData.totalRevenue * 0.7) : 1000000)}
+          approvedAmount={farmData?.totalRevenue ? Math.round(farmData.totalRevenue * 0.7) : 1000000}
           onComplete={handleNextStep}
           onSubmit={handleLoanTermsSubmit}
         />;

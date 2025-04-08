@@ -1,3 +1,4 @@
+
 import { FarmData } from "@/types/farm";
 
 export const getBlocks = (data: any): string[] => {
@@ -86,75 +87,3 @@ export const extractFarmDataFromOcrText = (ocrText: string): Partial<FarmData> =
   console.log("Extracted data from OCR:", extractedData);
   return extractedData;
 }
-
-// New diagnostic function 
-export const diagnoseFarmData = (farmData: FarmData): { 
-  isValid: boolean; 
-  missingFields: string[]; 
-  message: string;
-} => {
-  const required = ['applicantName', 'submitterId', 'documentId'];
-  const missing = required.filter(field => !farmData[field as keyof FarmData]);
-  
-  const hasNoCultures = !farmData.cultures || farmData.cultures.length === 0;
-  const hasNoBlocks = !farmData.blockIds || farmData.blockIds.length === 0;
-  
-  if (missing.length === 0 && !hasNoCultures && !hasNoBlocks) {
-    return { 
-      isValid: true, 
-      missingFields: [], 
-      message: "Az adatok sikeresen kiolvasásra kerültek" 
-    };
-  }
-  
-  // Build diagnostic message
-  let message = "Hiányos adatok: ";
-  if (missing.includes('applicantName')) message += "kérelmező neve, ";
-  if (missing.includes('submitterId')) message += "ügyfél-azonosító, ";
-  if (missing.includes('documentId')) message += "iratazonosító, ";
-  if (hasNoCultures) message += "termelési adatok, ";
-  if (hasNoBlocks) message += "blokkazonosítók, ";
-  
-  // Remove trailing comma and space
-  message = message.replace(/, $/, "");
-  
-  return {
-    isValid: false,
-    missingFields: [
-      ...missing,
-      ...(hasNoCultures ? ['cultures'] : []),
-      ...(hasNoBlocks ? ['blockIds'] : [])
-    ],
-    message
-  };
-};
-
-// Add new function to check for Claude response URL
-export const getClaudeResponseUrl = async (ocrLogId: string): Promise<string | null> => {
-  try {
-    // Get the Supabase instance
-    const { supabase } = await import("@/integrations/supabase/client");
-    
-    if (!ocrLogId) {
-      console.error("OCR log ID is missing");
-      return null;
-    }
-    
-    // Query the document_ocr_logs table to get the Claude response URL
-    const { data, error } = await supabase
-      .from('document_ocr_logs')
-      .select('claude_response_url')
-      .eq('id', ocrLogId)
-      .maybeSingle();
-    
-    if (error) {
-      console.error("Error fetching Claude response URL:", error);
-      return null;
-    }
-    
-    return data?.claude_response_url || null;
-  } catch (err) {
-    console.error("Error in getClaudeResponseUrl:", err);
-    return null;
-  }
-};

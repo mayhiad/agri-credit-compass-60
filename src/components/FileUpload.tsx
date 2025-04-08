@@ -66,61 +66,11 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         details: "A feltöltött dokumentum Claude AI elemzése folyamatban..."
       });
       
-      // Add diagnostic information in console
-      console.log("Starting document processing with user:", user.id);
-      console.log("File details:", {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        lastModified: new Date(file.lastModified).toISOString()
-      });
-
-      try {
-        // First, check if the API is accessible
-        try {
-          const isConnected = await fetch(
-            'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-saps-document',
-            { method: 'OPTIONS' }
-          );
-          
-          console.log("API connectivity check:", isConnected.status === 204 || isConnected.ok ? "Success" : "Failed");
-          
-          if (!isConnected.ok && isConnected.status !== 204) {
-            throw new Error("API endpoint is not accessible. Please check your network connection.");
-          }
-        } catch (connectivityError) {
-          console.error("API connectivity check failed:", connectivityError);
-          throw new Error("Hálózati hiba - Nem sikerült kapcsolódni a szerverhez. Ellenőrizze az internetkapcsolatot.");
-        }
-        
-        // Use a longer timeout for large files
-        const farmData = await processSapsDocument(file, user, setProcessingStatus);
-        
-        onComplete(farmData);
-        toast.success("SAPS dokumentum sikeresen feldolgozva");
-      } catch (processingError) {
-        console.error("Részletes SAPS feldolgozási hiba:", processingError);
-        
-        // Handle network errors more specifically
-        if (processingError.message === "Failed to fetch" || 
-            processingError.message.includes("kapcsolódni") ||
-            processingError.message.includes("network") ||
-            processingError.message.includes("internet")) {
-          setError("Hálózati hiba történt a szerverrel való kommunikáció során. Kérjük ellenőrizze az internetkapcsolatot és próbálja újra.");
-          toast.error("Hálózati kapcsolati hiba");
-        } 
-        // Handle overloaded Claude API specifically
-        else if (processingError.message.includes("overloaded") || processingError.message.includes("529")) {
-          setError("A Claude AI rendszer jelenleg túlterhelt. Kérjük, próbálja meg néhány perc múlva ismét feltölteni a dokumentumot.");
-          toast.error("Claude AI szolgáltatás túlterhelt");
-        }
-        else {
-          setError(processingError instanceof Error ? processingError.message : "Ismeretlen hiba történt a feldolgozás során");
-          toast.error("Hiba történt a dokumentum feldolgozása során");
-        }
-        
-        setProcessingStatus(null);
-      }
+      const farmData = await processSapsDocument(file, user, setProcessingStatus);
+      
+      onComplete(farmData);
+      toast.success("SAPS dokumentum sikeresen feldolgozva");
+      
     } catch (error) {
       console.error("SAPS feldolgozási hiba:", error);
       setError(error instanceof Error ? error.message : "Ismeretlen hiba történt a feldolgozás során");

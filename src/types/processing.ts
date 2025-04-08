@@ -8,7 +8,6 @@ export type ProcessingStatus = {
   progress: number;
   details?: string;
   wordDocumentUrl?: string;
-  lastProgress?: number; // To detect if progress is stuck
   batchProgress?: {
     currentBatch: number;
     totalBatches: number;

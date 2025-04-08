@@ -1,84 +1,53 @@
 
-import React from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tractor, Map, Euro, LayoutGrid } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MapPin } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
+import { FarmData } from "@/types/farm";
 
-export interface FarmSummaryProps {
-  hectares: number;
-  cultures: number;
-  blocksCount: number;
-  totalRevenue: number;
+interface FarmSummaryProps {
+  farmData: FarmData;
 }
 
-const FarmSummary: React.FC<FarmSummaryProps> = ({ 
-  hectares, 
-  cultures, 
-  blocksCount, 
-  totalRevenue 
-}) => {
-  // Format numbers with local separator
-  const formatNumber = (num: number) => {
-    return num.toLocaleString('hu-HU');
-  };
-  
-  // Format currency values
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('hu-HU', { 
-      style: 'currency', 
-      currency: 'HUF',
-      maximumFractionDigits: 0
-    }).format(value);
-  };
+export const FarmSummary = ({ farmData }: FarmSummaryProps) => {
+  // Make sure farmData is properly defined before using its properties
+  if (!farmData) return null;
   
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Tractor className="h-5 w-5 text-primary" />
-          Gazdaság összesítő
-        </CardTitle>
-        <CardDescription>
-          A gazdaság főbb adatainak összesítése
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center space-x-2">
-            <Map className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Összes terület</p>
-              <p className="text-lg font-bold">{formatNumber(hectares)} ha</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Tractor className="h-5 w-5 text-green-600" />
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Növénykultúrák</p>
-              <p className="text-lg font-bold">{cultures} db</p>
-            </div>
-          </div>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center space-x-2">
+        <MapPin className="h-5 w-5 text-muted-foreground" />
+        <span className="text-muted-foreground">{farmData.region || "Ismeretlen régió"}</span>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Összes terület</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{farmData.hectares ? farmData.hectares.toFixed(2) : "0.00"} ha</p>
+          </CardContent>
+        </Card>
         
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center space-x-2">
-            <LayoutGrid className="h-5 w-5 text-amber-600" />
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Blokkazonosítók</p>
-              <p className="text-lg font-bold">{blocksCount} db</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Euro className="h-5 w-5 text-blue-600" />
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Várható bevétel</p>
-              <p className="text-lg font-bold">{formatCurrency(totalRevenue)}</p>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Kultúrák</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{farmData.cultures ? farmData.cultures.length : 0} db</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Éves árbevétel</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{formatCurrency(farmData.totalRevenue || 0)}</p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 };
 
