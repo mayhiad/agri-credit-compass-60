@@ -198,6 +198,7 @@ export type Database = {
       }
       document_ocr_logs: {
         Row: {
+          claude_response_url: string | null
           created_at: string
           file_name: string
           file_size: number | null
@@ -208,6 +209,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          claude_response_url?: string | null
           created_at?: string
           file_name: string
           file_size?: number | null
@@ -218,6 +220,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          claude_response_url?: string | null
           created_at?: string
           file_name?: string
           file_size?: number | null

@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FarmData } from "@/types/farm";
@@ -113,8 +113,8 @@ const FarmInfoDisplay: React.FC<FarmInfoDisplayProps> = ({
             <div>
               <DocumentInfo 
                 documentId={farmData.documentId} 
-                submissionDate={farmData.submissionDate}
                 year={farmData.year}
+                submissionDate={farmData.submissionDate}
               />
               <SubmitterInfo 
                 applicantName={farmData.applicantName}
@@ -181,6 +181,7 @@ const FarmInfoDisplay: React.FC<FarmInfoDisplayProps> = ({
               <CurrentYearRevenue 
                 totalRevenue={farmData.totalRevenue || 0}
                 hectares={farmData.hectares || 0}
+                cultures={farmData.cultures || []}
               />
             </div>
           </div>

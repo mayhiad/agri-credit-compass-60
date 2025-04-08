@@ -2,74 +2,69 @@
 import React from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatCurrency } from "@/lib/utils";
-import { CircleDollarSign, TrendingUp, Calendar } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { FarmData } from "@/types/farm";
+import { BadgeCheck, TrendingUp, Calendar, ArrowRight } from "lucide-react";
 
-interface CreditOfferCardProps {
-  totalRevenue: number;
-  approvedAmount?: number; // Megítélhető hitelösszeg
-  currentYear?: string;
+export interface CreditOfferCardProps {
+  farmData: FarmData;
+  onApply: () => void;
 }
 
-const CreditOfferCard = ({ totalRevenue, approvedAmount, currentYear = new Date().getFullYear().toString() }: CreditOfferCardProps) => {
-  const navigate = useNavigate();
+const CreditOfferCard: React.FC<CreditOfferCardProps> = ({ farmData, onApply }) => {
+  // Calculate credit limit based on total revenue
+  const creditLimit = farmData.totalRevenue ? Math.round(farmData.totalRevenue * 0.7) : 0;
   
-  // Kiszámoljuk a megítélhető hitelösszeget (ha nincs explicit megadva)
-  const calculatedAmount = approvedAmount || Math.round(totalRevenue * 0.2);
-  
-  const handleApplyClick = (e: React.MouseEvent) => {
-    // Prevent default to avoid page reload
-    e.preventDefault();
-    
-    // Navigate to loan application page with the pre-approved amount in state
-    navigate("/loan-application", { 
-      state: { 
-        preApprovedAmount: calculatedAmount,
-        totalRevenue: totalRevenue
-      }
-    });
+  // Format currency values
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('hu-HU', { 
+      style: 'currency', 
+      currency: 'HUF',
+      maximumFractionDigits: 0
+    }).format(value);
   };
-
+  
   return (
     <Card className="border-primary/20 bg-primary/5">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-xl">
-          <CircleDollarSign className="h-5 w-5 text-primary" />
-          Hitelajánlat
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-primary">
+          <BadgeCheck className="h-5 w-5" />
+          Előminősített hitelajánlat
         </CardTitle>
         <CardDescription>
-          Előminősített ajánlat a gazdasági adatok alapján
+          A gazdasága alapján előminősített hitelajánlat
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">Számított éves árbevétel</div>
-            <div className="font-medium">{formatCurrency(totalRevenue)}</div>
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">Maximális hitelkeret</p>
+            <p className="text-2xl font-bold text-primary">{formatCurrency(creditLimit)}</p>
           </div>
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground flex items-center gap-1">
-              <Calendar className="h-4 w-4" />
-              {currentYear}. évi adatok
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center space-x-2">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">Kamat</p>
+                <p className="font-medium">9.9%</p>
+              </div>
             </div>
-            <div className="font-medium text-primary flex items-center gap-1">
-              <TrendingUp className="h-4 w-4" />
-              Előminősítve
-            </div>
-          </div>
-          <div className="my-6">
-            <div className="text-sm text-muted-foreground mb-1">Igényelhető hitelkeret</div>
-            <div className="text-3xl font-bold text-primary">{formatCurrency(calculatedAmount)}</div>
-            <div className="text-xs text-muted-foreground mt-1">
-              Az éves bevétel 20%-áig terjedő összeg
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">Futamidő</p>
+                <p className="font-medium">12-36 hónap</p>
+              </div>
             </div>
           </div>
         </div>
       </CardContent>
       <CardFooter>
-        <Button onClick={handleApplyClick} className="w-full">
-          Hitelkérelem indítása
+        <Button onClick={onApply} className="w-full">
+          <span className="flex items-center gap-2">
+            Hiteligénylés indítása
+            <ArrowRight className="h-4 w-4" />
+          </span>
         </Button>
       </CardFooter>
     </Card>

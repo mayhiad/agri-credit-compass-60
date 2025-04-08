@@ -1,105 +1,115 @@
-import { supabase, getErrorDetails } from "./openaiClient.ts";
+import { getErrorDetails } from "./openaiClient.ts";
+import { supabaseAdmin } from "./utils.ts";
+import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.43/deno-dom-wasm.ts';
 
-// Egyszerű PDF és Excel dokumentum szöveg kinyerése
-export async function extractTextFromDocument(fileBuffer: ArrayBuffer, fileName: string): Promise<string> {
-  console.log(`📄 Szöveg kinyerése kezdése: ${fileName}`);
-  const extractStart = Date.now();
-  
+// API endpoint for Google Cloud Vision OCR
+const GOOGLE_VISION_API_URL = 'https://vision.googleapis.com/v1/images:annotate';
+
+// Google Cloud Vision API Key
+const GOOGLE_CLOUD_VISION_API_KEY = Deno.env.get('GOOGLE_CLOUD_VISION_API_KEY');
+
+/**
+ * Save a document to Supabase storage
+ */
+export async function saveDocumentToStorage(fileBuffer: ArrayBuffer, fileName: string, userId: string): Promise<string | null> {
   try {
-    // Alap szöveget próbálunk kinyerni a dokumentumból
-    // PDF esetén csak egyszerűen byte formátumból konvertálunk karakterkódolással
-    let extractedText = "";
-    
-    // Ellenőrizzük a fájl típusát a neve alapján
-    const fileExtension = fileName.split('.').pop()?.toLowerCase();
-    
-    if (fileExtension === 'pdf') {
-      console.log(`📑 PDF dokumentum feldolgozása...`);
-      
-      // Egyszerű PDF feldolgozás - ez csak nagyon alapszintű szöveget ad vissza
-      // Valós megoldásban itt használnánk egy komplexebb PDF parser-t
-      const decoder = new TextDecoder('utf-8');
-      try {
-        extractedText = decoder.decode(fileBuffer);
-      } catch (decodeError) {
-        console.error(`❌ Hiba a PDF dekódolása során: ${decodeError}`);
-        // Próbáljuk meg latin1 kódolással is, ami gyakran működik az európai nyelvekhez
-        try {
-          extractedText = new TextDecoder('latin1').decode(fileBuffer);
-        } catch (secondDecodeError) {
-          console.error(`❌ A másodlagos dekódolás is sikertelen: ${secondDecodeError}`);
-        }
-      }
-      
-      // Tisztítsuk meg a szöveget a bináris karakterektől
-      extractedText = extractedText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '');
-      extractedText = extractedText.replace(/[^\x20-\x7E\xA0-\xFF\u0100-\u017F\u0180-\u024F\u1E00-\u1EFF]/g, ' ');
-      
-    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-      console.log(`📊 Excel dokumentum feldolgozása...`);
-      
-      // Excel esetén csak egy egyszerű üzenetet küldünk vissza, hogy kezelje a modellje
-      extractedText = `Ez egy Excel formátumú SAPS dokumentum. Kérlek olvasd ki a gazdálkodó nevét belőle.
-      Az Excel dokumentumokból nem tudunk automatikusan szöveget kinyerni, kérlek jelezd, ha ez problémát okoz.`;
-      
-    } else {
-      console.log(`❓ Ismeretlen dokumentum típus: ${fileExtension}`);
-      extractedText = `Ismeretlen dokumentum formátum: ${fileExtension}. 
-      Kérlek próbáld meg PDF vagy Excel formátumban feltölteni a dokumentumot.`;
+    console.log(`💾 Fájl mentése a Supabase tárolóba: ${fileName}`);
+
+    // Fájlnév tisztítása
+    const cleanFileName = fileName.replace(/[^a-zA-Z0-9.]/g, '_');
+
+    // Mappa létrehozása a felhasználóhoz
+    const filePath = `saps_documents/${userId}/${cleanFileName}`;
+
+    // Fájl feltöltése a Supabase tárolóba
+    const { data, error } = await supabaseAdmin
+      .storage
+      .from('saps_documents')
+      .upload(filePath, fileBuffer, {
+        contentType: fileName.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream',
+        upsert: true
+      });
+
+    if (error) {
+      console.error(`❌ Hiba a fájl mentésekor a Supabase tárolóba: ${error.message}`);
+      return null;
     }
-    
-    // RÉSZLETES NAPLÓZÁS
-    console.log(`🔍 TELJES KINYERT SZÖVEG (${extractedText.length} karakter):`);
-    console.log('---START OF DOCUMENT TEXT---');
-    console.log(extractedText);
-    console.log('---END OF DOCUMENT TEXT---');
-    
-    // Kinyert szöveg első és utolsó 500 karakterének részletezése
-    console.log(`📝 Szöveg első 500 karaktere:\n${extractedText.substring(0, 500)}`);
-    console.log(`📝 Szöveg utolsó 500 karaktere:\n${extractedText.substring(extractedText.length - 500)}`);
-    
-    // Sorok és bekezdések statisztikái
-    const lines = extractedText.split('\n');
-    console.log(`📊 Dokumentum statisztikák:`);
-    console.log(`   - Sorok száma: ${lines.length}`);
-    console.log(`   - Első 5 sor:`);
-    lines.slice(0, 5).forEach((line, index) => {
-      console.log(`     ${index + 1}. sor: ${line}`);
-    });
-    
-    // Ellenőrizzük a kinyert szöveg méretét
-    console.log(`📏 Kinyert szöveg hossza: ${extractedText.length} karakter`);
-    
-    if (extractedText.length < 100) {
-      console.warn(`⚠️ A kinyert szöveg nagyon rövid (${extractedText.length} karakter), ez jelentheti, hogy nem sikerült megfelelően kinyerni a szöveget.`);
-    }
-    
-    const extractTime = Date.now() - extractStart;
-    console.log(`✅ Szöveg kinyerése befejezve (${extractTime}ms).`);
-    
-    return extractedText;
+
+    console.log(`✅ Fájl sikeresen mentve a Supabase tárolóba: ${filePath}`);
+    return filePath;
   } catch (error) {
-    console.error(`❌ Hiba a szöveg kinyerése során: ${getErrorDetails(error)}`);
-    
-    // Hiba esetén egy alapértelmezett szöveget adunk vissza
-    return `Nem sikerült kinyerni a szöveget a dokumentumból. Kérlek olvasd ki a gazdálkodó nevét.`;
+    console.error(`❌ Hiba a fájl mentésekor a Supabase tárolóba: ${getErrorDetails(error)}`);
+    return null;
   }
 }
 
-// Dokumentum OCR eredmény mentése az adatbázisba
-export async function logOcrResult(userId: string, fileName: string, fileSize: number, fileType: string, 
-                                   storagePath: string | null, ocrContent: string): Promise<string | null> {
+/**
+ * Extract text from a PDF document using Google Cloud Vision API
+ */
+export async function extractTextFromDocument(fileBuffer: ArrayBuffer): Promise<string | null> {
   try {
-    console.log(`📝 OCR eredmények mentése az adatbázisba: ${fileName}`);
-    
-    // Validáljuk a Supabase kliens állapotát
-    if (!supabase) {
-      console.error("❌ Supabase kliens nem elérhető vagy nincs inicializálva");
+    if (!GOOGLE_CLOUD_VISION_API_KEY) {
+      throw new Error('A Google Cloud Vision API kulcs nincs beállítva.');
+    }
+
+    const base64File = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)));
+
+    const requestBody = {
+      requests: [
+        {
+          image: {
+            content: base64File
+          },
+          features: [
+            {
+              type: 'DOCUMENT_TEXT_DETECTION',
+              maxResults: 1
+            }
+          ]
+        }
+      ]
+    };
+
+    const response = await fetch(`${GOOGLE_VISION_API_URL}?key=${GOOGLE_CLOUD_VISION_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    const data = await response.json();
+
+    if (!data.responses || data.responses.length === 0 || !data.responses[0].fullTextAnnotation) {
+      console.warn('⚠️ Nem sikerült szöveget kinyerni a dokumentumból a Google Cloud Vision API segítségével.');
       return null;
     }
-    
-    // Mentsük az OCR eredményt az adatbázisba
-    const { data, error } = await supabase.from('document_ocr_logs')
+
+    const extractedText = data.responses[0].fullTextAnnotation.text;
+    console.log(`✅ Szöveg sikeresen kinyerve a dokumentumból (${extractedText.length} karakter).`);
+    return extractedText;
+  } catch (error) {
+    console.error(`❌ Hiba a szöveg kinyerésekor a Google Cloud Vision API segítségével: ${getErrorDetails(error)}`);
+    return null;
+  }
+}
+
+/**
+ * Log OCR result to the database
+ */
+export async function logOcrResult(
+  userId: string,
+  fileName: string,
+  fileSize: number,
+  fileType: string,
+  storagePath: string | null,
+  ocrContent: string | null
+): Promise<string | null> {
+  try {
+    console.log(`📝 OCR eredmény naplózása az adatbázisba: ${fileName}`);
+
+    const { data, error } = await supabaseAdmin
+      .from('document_ocr_logs')
       .insert({
         user_id: userId,
         file_name: fileName,
@@ -110,84 +120,38 @@ export async function logOcrResult(userId: string, fileName: string, fileSize: n
       })
       .select('id')
       .single();
-    
+
     if (error) {
-      console.error(`❌ Hiba az OCR eredmények mentésekor: ${error.message}`, error);
+      console.error(`❌ Hiba az OCR eredmény naplózásakor az adatbázisba: ${error.message}`);
       return null;
     }
-    
-    console.log(`✅ OCR eredmények sikeresen mentve. Log ID: ${data.id}`);
-    return data.id;
+
+    const logId = data.id;
+    console.log(`✅ OCR eredmény sikeresen naplózva az adatbázisba. Napló ID: ${logId}`);
+    return logId;
   } catch (error) {
-    console.error(`❌ Váratlan hiba az OCR eredmények mentése során: ${getErrorDetails(error)}`);
+    console.error(`❌ Hiba az OCR eredmény naplózásakor az adatbázisba: ${getErrorDetails(error)}`);
     return null;
   }
 }
 
-// Dokumentum mentése a Supabase tárolóba
-export async function saveDocumentToStorage(fileBuffer: ArrayBuffer, fileName: string, userId: string) {
+/**
+ * Log extraction result to the database
+ */
+export async function logExtractionResult(
+  ocrLogId: string,
+  userId: string,
+  extractedData: any,
+  processingStatus: string,
+  processingTime: number,
+  threadId?: string,
+  runId?: string
+): Promise<boolean> {
   try {
-    console.log(`💾 Dokumentum mentése a Supabase tárolóba: ${fileName} felhasználó: ${userId}`);
-    const saveStart = Date.now();
-    
-    // Validáljuk a Supabase kliens állapotát
-    if (!supabase || !supabase.storage) {
-      console.error("❌ Supabase kliens nem elérhető vagy nincs inicializálva");
-      return; // Folytatjuk a feldolgozást annak ellenére, hogy nem sikerült tárolni
-    }
-    
-    // Generálunk egy egyedi fájl nevet
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileExtension = fileName.split('.').pop();
-    
-    // Tisztítjuk a fájlnevet a speciális karakterektől
-    const cleanFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const storagePath = `saps/${userId}/${timestamp}-${cleanFileName}`;
-    
-    console.log(`📁 Tárolási útvonal: ${storagePath}`);
-    
-    const { data, error } = await supabase.storage
-      .from('dokumentumok')
-      .upload(storagePath, fileBuffer, {
-        contentType: fileExtension === 'pdf' ? 'application/pdf' : 
-                    (fileExtension === 'xlsx' || fileExtension === 'xls') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 
-                    'application/octet-stream',
-        upsert: false
-      });
-    
-    if (error) {
-      console.error("❌ Hiba a dokumentum tárolása során:", error.message, error.details);
-      console.error("❌ Teljes hiba: ", JSON.stringify(error, null, 2));
-      // Folytatjuk a feldolgozást annak ellenére, hogy nem sikerült tárolni
-    } else {
-      const saveTime = Date.now() - saveStart;
-      console.log(`✅ Dokumentum sikeresen tárolva (${saveTime}ms). Path: ${storagePath}`);
-    }
-    
-    return storagePath;
-  } catch (storageError) {
-    console.error("❌ Váratlan hiba a dokumentum tárolása során:", getErrorDetails(storageError));
-    console.error("❌ Teljes hiba: ", JSON.stringify(storageError, null, 2));
-    // Folytatjuk a feldolgozást annak ellenére, hogy nem sikerült tárolni
-    return null;
-  }
-}
+    console.log(`📝 Feldolgozási eredmény naplózása az adatbázisba. OCR napló ID: ${ocrLogId}`);
 
-// AI feldolgozási eredmény mentése az adatbázisba
-export async function logExtractionResult(ocrLogId: string, userId: string, extractedData: any, 
-                                          processingStatus: string, processingTime: number,
-                                          threadId?: string, runId?: string): Promise<string | null> {
-  try {
-    console.log(`📊 AI feldolgozási eredmények mentése az adatbázisba. OCR Log ID: ${ocrLogId}`);
-    
-    // Validáljuk a Supabase kliens állapotát
-    if (!supabase) {
-      console.error("❌ Supabase kliens nem elérhető vagy nincs inicializálva");
-      return null;
-    }
-    
-    // Mentsük az AI feldolgozási eredményt az adatbázisba
-    const { data, error } = await supabase.from('document_extraction_results')
+    const { error } = await supabaseAdmin
+      .from('document_extraction_results')
       .insert({
         ocr_log_id: ocrLogId,
         user_id: userId,
@@ -196,87 +160,75 @@ export async function logExtractionResult(ocrLogId: string, userId: string, extr
         processing_time: processingTime,
         thread_id: threadId,
         run_id: runId
-      })
-      .select('id')
-      .single();
-    
+      });
+
     if (error) {
-      console.error(`❌ Hiba az AI feldolgozási eredmények mentésekor: ${error.message}`, error);
-      return null;
+      console.error(`❌ Hiba a feldolgozási eredmény naplózásakor az adatbázisba: ${error.message}`);
+      return false;
     }
-    
-    console.log(`✅ AI feldolgozási eredmények sikeresen mentve. Result ID: ${data.id}`);
-    return data.id;
+
+    console.log(`✅ Feldolgozási eredmény sikeresen naplózva az adatbázisba.`);
+    return true;
   } catch (error) {
-    console.error(`❌ Váratlan hiba az AI feldolgozási eredmények mentése során: ${getErrorDetails(error)}`);
-    return null;
+    console.error(`❌ Hiba a feldolgozási eredmény naplózásakor az adatbázisba: ${getErrorDetails(error)}`);
+    return false;
   }
 }
 
-// Nyers Claude válasz mentése szöveges dokumentumként
+/**
+ * Save raw Claude AI response to storage for debugging
+ */
 export async function saveRawClaudeResponse(
-  rawResponse: string, 
-  originalFileName: string, 
+  rawText: string, 
+  fileName: string,
   userId: string,
   ocrLogId: string
 ): Promise<string | null> {
   try {
-    console.log(`📄 Claude nyers válasz mentése egyszerű szöveges formátumban...`);
+    console.log(`📝 Saving raw Claude response to storage for document: ${fileName}, ocrLogId: ${ocrLogId}`);
     
-    // Validáljuk a Supabase kliens állapotát
-    if (!supabase || !supabase.storage) {
-      console.error("❌ Supabase kliens nem elérhető vagy nincs inicializálva");
-      return null;
-    }
+    // Create a formatted filename for the Claude response
+    const cleanFileName = fileName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+    const timestamp = new Date().toISOString().replace(/[^0-9]/g, '');
+    const responsePath = `claude_responses/${userId}/${cleanFileName}_${timestamp}.txt`;
     
-    // Generálunk egy egyedi fájl nevet
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const cleanFileName = originalFileName.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/\.pdf$/i, '');
-    const responseFileName = `claude-response-${cleanFileName}-${timestamp}.txt`;
-    const storagePath = `claude-responses/${userId}/${responseFileName}`;
-    
-    console.log(`📁 Claude válasz tárolási útvonal: ${storagePath}`);
-    
-    // Mentjük a szöveges fájlt a storage-ba
-    const textEncoder = new TextEncoder();
-    const fileBuffer = textEncoder.encode(rawResponse);
-    
-    const { data, error } = await supabase.storage
-      .from('dokumentumok')
-      .upload(storagePath, fileBuffer, {
+    // Upload the raw text as a file
+    const { data, error } = await supabaseAdmin
+      .storage
+      .from('saps_documents')
+      .upload(responsePath, new Blob([rawText]), {
         contentType: 'text/plain',
-        upsert: false
+        upsert: true
       });
     
     if (error) {
-      console.error("❌ Hiba a Claude válasz mentése során:", error.message);
+      console.error(`❌ Error saving Claude response: ${error.message}`);
       return null;
     }
     
-    // Generáljuk a publikus URL-t
-    const { data: { publicUrl } } = supabase.storage
-      .from('dokumentumok')
-      .getPublicUrl(storagePath);
+    // Generate a public URL for the file
+    const { data: urlData } = await supabaseAdmin
+      .storage
+      .from('saps_documents')
+      .getPublicUrl(responsePath);
     
-    console.log(`�� Claude válasz sikeresen mentve: ${publicUrl}`);
+    const publicUrl = urlData.publicUrl;
     
-    // Frissítsük az OCR logunkat a Claude válasz URL-jével
-    if (ocrLogId) {
-      const { error: updateError } = await supabase
-        .from('document_ocr_logs')
-        .update({
-          claude_response_url: publicUrl
-        })
-        .eq('id', ocrLogId);
-      
-      if (updateError) {
-        console.error("❌ OCR log frissítése sikertelen:", updateError.message);
-      }
+    // Update the document_ocr_logs table with the Claude response URL
+    const { error: updateError } = await supabaseAdmin
+      .from('document_ocr_logs')
+      .update({ claude_response_url: publicUrl })
+      .eq('id', ocrLogId);
+    
+    if (updateError) {
+      console.error(`❌ Error updating OCR log with Claude response URL: ${updateError.message}`);
+    } else {
+      console.log(`✅ Successfully saved Claude response at: ${publicUrl}`);
     }
     
     return publicUrl;
   } catch (error) {
-    console.error(`❌ Váratlan hiba a Claude válasz mentése során: ${getErrorDetails(error)}`);
+    console.error(`❌ Error in saveRawClaudeResponse: ${getErrorDetails(error)}`);
     return null;
   }
 }

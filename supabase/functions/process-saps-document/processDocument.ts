@@ -63,6 +63,11 @@ export async function processDocumentWithOpenAI(fileBuffer: ArrayBuffer, fileNam
       );
     }
 
+    // Add the ocrLogId to the result data so it can be displayed in the UI
+    if (result.data && ocrLogId) {
+      result.data.ocrLogId = ocrLogId;
+    }
+
     return {
       ocrLogId: ocrLogId,
       data: result.data,

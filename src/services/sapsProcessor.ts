@@ -1,4 +1,3 @@
-
 import { FarmData } from "@/types/farm";
 
 export const getBlocks = (data: any): string[] => {

@@ -1,83 +1,87 @@
 
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatNumber } from "@/lib/utils";
-import { FarmData } from "@/types/farm";
+import React from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tractor, TrendingUp } from "lucide-react";
+import { Culture } from "@/types/farm";
 
-interface CultureTableProps {
-  farmData: FarmData;
-  showPrices?: boolean;
-  showRevenue?: boolean;
+export interface CultureTableProps {
+  cultures: Culture[];
 }
 
-export const CultureTable = ({ farmData, showPrices = true, showRevenue = true }: CultureTableProps) => {
-  if (!farmData.cultures || farmData.cultures.length === 0) {
+const CultureTable: React.FC<CultureTableProps> = ({ cultures }) => {
+  // Format numbers with local separator
+  const formatNumber = (num: number) => {
+    return num.toLocaleString('hu-HU');
+  };
+  
+  // Format currency values
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('hu-HU', { 
+      style: 'currency', 
+      currency: 'HUF',
+      maximumFractionDigits: 0
+    }).format(value);
+  };
+  
+  if (!cultures || cultures.length === 0) {
     return (
-      <div className="text-center p-4 bg-muted/20 rounded-md">
-        <p className="text-muted-foreground">Nincs növénykultúra információ.</p>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Tractor className="h-5 w-5 text-primary" />
+            Növénykultúrák
+          </CardTitle>
+          <CardDescription>
+            Nem található növénykultúra a dokumentumban
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">
+            A dokumentumban nem sikerült növénykultúrákat felismerni, vagy nem tartalmazott ilyeneket.
+          </p>
+        </CardContent>
+      </Card>
     );
   }
-
-  const totalHectares = farmData.cultures.reduce((sum, culture) => sum + culture.hectares, 0);
   
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Növénykultúrák</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Tractor className="h-5 w-5 text-primary" />
+          Növénykultúrák
+        </CardTitle>
+        <CardDescription>
+          A gazdaságban termesztett növénykultúrák listája
+        </CardDescription>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Növénykultúra</TableHead>
-              <TableHead className="text-center">Terület (ha)</TableHead>
-              <TableHead className="text-center">Megoszlás (%)</TableHead>
-              {showPrices && (
-                <>
-                  <TableHead className="text-center">Termésátlag (t/ha)</TableHead>
-                  <TableHead className="text-center">Piaci ár (Ft/t)</TableHead>
-                </>
-              )}
-              {showRevenue && (
-                <TableHead className="text-right">Bevétel (Ft)</TableHead>
-              )}
+              <TableHead className="text-right">Terület (ha)</TableHead>
+              <TableHead className="text-right">Várható bevétel</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {farmData.cultures.map((culture, index) => (
+            {cultures.map((culture, index) => (
               <TableRow key={index}>
                 <TableCell className="font-medium">{culture.name}</TableCell>
-                <TableCell className="text-center">{formatNumber(culture.hectares, 1)}</TableCell>
-                <TableCell className="text-center">
-                  {formatNumber((culture.hectares / totalHectares) * 100, 1)}%
+                <TableCell className="text-right">{formatNumber(culture.hectares)}</TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    {culture.estimatedRevenue ? (
+                      <>
+                        <TrendingUp className={`h-4 w-4 ${culture.estimatedRevenue > 0 ? 'text-green-500' : 'text-red-500'}`} />
+                        {formatCurrency(culture.estimatedRevenue)}
+                      </>
+                    ) : 'N/A'}
+                  </div>
                 </TableCell>
-                {showPrices && (
-                  <>
-                    <TableCell className="text-center">{formatNumber(culture.yieldPerHectare, 1)}</TableCell>
-                    <TableCell className="text-center">{formatNumber(culture.pricePerTon, 0)}</TableCell>
-                  </>
-                )}
-                {showRevenue && (
-                  <TableCell className="text-right">{formatNumber(culture.estimatedRevenue, 0)}</TableCell>
-                )}
               </TableRow>
             ))}
-            
-            <TableRow className="bg-muted/20 font-semibold">
-              <TableCell>Összesen</TableCell>
-              <TableCell className="text-center">{formatNumber(totalHectares, 1)}</TableCell>
-              <TableCell className="text-center">100%</TableCell>
-              {showPrices && (
-                <>
-                  <TableCell className="text-center">-</TableCell>
-                  <TableCell className="text-center">-</TableCell>
-                </>
-              )}
-              {showRevenue && (
-                <TableCell className="text-right">{formatNumber(farmData.totalRevenue, 0)}</TableCell>
-              )}
-            </TableRow>
           </TableBody>
         </Table>
       </CardContent>
