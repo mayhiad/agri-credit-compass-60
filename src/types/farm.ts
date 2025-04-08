@@ -12,7 +12,7 @@ export interface Culture {
 export interface MarketPrice {
   id: string;
   culture: string;
-  averageYield: number;
+  averageYield: number;  // This matches with average_yield in the database
   price: number;
   trend: number;
   last_updated: string | Date;

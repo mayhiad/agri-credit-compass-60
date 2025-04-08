@@ -1,420 +1,393 @@
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
-import { ArrowUp, ArrowDown, Save, Plus, Trash } from "lucide-react";
-import { toast } from "sonner";
-import { formatCurrency, formatNumber } from "@/lib/utils";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MarketPrice } from "@/types/farm";
+import { formatNumber } from "@/lib/utils";
+import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-const CURRENT_YEAR = new Date().getFullYear().toString();
-const PREVIOUS_YEARS = Array.from({ length: 5 }, (_, i) => (Number(CURRENT_YEAR) - (i + 1)).toString());
-const ALL_YEARS = [CURRENT_YEAR, ...PREVIOUS_YEARS];
+import { ArrowUp, ArrowDown, Minus, Trash, PlusCircle, Save } from "lucide-react";
 
 const AdminMarketPrices = () => {
   const [marketPrices, setMarketPrices] = useState<MarketPrice[]>([]);
-  const [filteredPrices, setFilteredPrices] = useState<MarketPrice[]>([]);
-  const [editingPrice, setEditingPrice] = useState<MarketPrice | null>(null);
-  const [newCropName, setNewCropName] = useState("");
-  const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
   const [loading, setLoading] = useState(true);
-  
+  const [selectedRegion, setSelectedRegion] = useState("Magyarország");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [regions, setRegions] = useState<string[]>([]);
+  const [years, setYears] = useState<string[]>([]);
+  const [editingPrice, setEditingPrice] = useState<Partial<MarketPrice> | null>(null);
+
   useEffect(() => {
     fetchMarketPrices();
-  }, []);
-  
-  useEffect(() => {
-    if (marketPrices.length > 0) {
-      filterPricesByYear(selectedYear);
-    }
-  }, [marketPrices, selectedYear]);
-  
+  }, [selectedRegion, selectedYear]);
+
   const fetchMarketPrices = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Fetch regions first if not already loaded
+      if (regions.length === 0) {
+        const { data: regionsData } = await supabase
+          .from('market_prices')
+          .select('region')
+          .distinct();
+        
+        if (regionsData) {
+          const uniqueRegions = [...new Set(regionsData.map(item => item.region))];
+          setRegions(uniqueRegions);
+          
+          // If Magyarország isn't in the list, add it
+          if (!uniqueRegions.includes("Magyarország")) {
+            setRegions(prev => [...prev, "Magyarország"]);
+          }
+        }
+      }
+
+      // Fetch years if not already loaded
+      if (years.length === 0) {
+        const { data: yearsData } = await supabase
+          .from('market_prices')
+          .select('year')
+          .distinct();
+        
+        if (yearsData) {
+          const uniqueYears = [...new Set(yearsData.map(item => item.year))];
+          setYears(uniqueYears);
+          
+          // If current year isn't in the list, add it
+          const currentYear = new Date().getFullYear().toString();
+          if (!uniqueYears.includes(currentYear)) {
+            setYears(prev => [...prev, currentYear]);
+          }
+        }
+      }
+
+      // Then fetch prices for the selected region and year
+      const { data: pricesData, error } = await supabase
         .from('market_prices')
         .select('*')
-        .order('culture', { ascending: true });
+        .eq('region', selectedRegion)
+        .eq('year', selectedYear);
       
-      if (error) {
-        throw error;
+      if (error) throw error;
+      
+      if (pricesData) {
+        // Map database fields to our MarketPrice interface
+        const transformedPrices = pricesData.map(price => ({
+          id: price.id,
+          culture: price.culture,
+          averageYield: price.average_yield,
+          price: price.price,
+          trend: price.trend,
+          last_updated: price.last_updated,
+          region: price.region,
+          year: price.year,
+          is_forecast: price.is_forecast
+        }));
+        
+        setMarketPrices(transformedPrices);
       }
-      
-      setMarketPrices(data || []);
-      filterPricesByYear(selectedYear);
     } catch (error) {
-      console.error("Hiba a piaci árak lekérése során:", error);
-      toast.error("Nem sikerült lekérni a piaci árakat");
+      console.error("Error fetching market prices:", error);
+      toast.error("Hiba történt az árak betöltése során");
     } finally {
       setLoading(false);
     }
   };
-  
-  const filterPricesByYear = (year: string) => {
-    const filtered = marketPrices.filter(price => price.year === year);
-    setFilteredPrices(filtered);
+
+  const handleEdit = (price: MarketPrice) => {
+    setEditingPrice(price);
   };
-  
-  const handleYearChange = (year: string) => {
-    setSelectedYear(year);
-  };
-  
-  const startEditing = (price: MarketPrice) => {
-    setEditingPrice({...price});
-  };
-  
-  const cancelEditing = () => {
-    setEditingPrice(null);
-  };
-  
-  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!editingPrice) return;
-    
-    setEditingPrice({
-      ...editingPrice,
-      price: Number(e.target.value)
-    });
-  };
-  
-  const handleYieldChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!editingPrice) return;
-    
-    setEditingPrice({
-      ...editingPrice,
-      averageYield: Number(e.target.value)
-    });
-  };
-  
-  const handleTrendChange = (trend: number) => {
-    if (!editingPrice) return;
-    
-    setEditingPrice({
-      ...editingPrice,
-      trend
-    });
-  };
-  
-  const savePrice = async () => {
-    if (!editingPrice) return;
-    
-    try {
-      const { error } = await supabase
-        .from('market_prices')
-        .update({
-          price: editingPrice.price,
-          averageYield: editingPrice.averageYield,
-          trend: editingPrice.trend,
-          last_updated: new Date().toISOString()
-        })
-        .eq('id', editingPrice.id);
-      
-      if (error) {
-        throw error;
-      }
-      
-      // Update the local state
-      setMarketPrices(marketPrices.map(p => 
-        p.id === editingPrice.id ? editingPrice : p
-      ));
-      
-      toast.success(`${editingPrice.culture} árak sikeresen frissítve`);
-      setEditingPrice(null);
-    } catch (error) {
-      console.error("Hiba a piaci ár mentése során:", error);
-      toast.error("Nem sikerült menteni a piaci árakat");
-    }
-  };
-  
-  const addNewCrop = async () => {
-    if (!newCropName.trim()) {
-      toast.error("Adjon meg egy terménynevet");
-      return;
-    }
-    
-    try {
-      // Check if the crop already exists for this year
-      const existingCrop = marketPrices.find(p => 
-        p.culture.toLowerCase() === newCropName.toLowerCase() && p.year === selectedYear
-      );
-      
-      if (existingCrop) {
-        toast.error(`${newCropName} már létezik ebben az évben`);
-        return;
-      }
-      
-      const newCrop: Partial<MarketPrice> = {
-        culture: newCropName.trim(),
-        price: 75000, // Default price
-        averageYield: 5.0, // Default yield
-        trend: 0,
-        region: 'Magyarország',
-        year: selectedYear,
-        is_forecast: selectedYear === CURRENT_YEAR
-      };
-      
-      const { data, error } = await supabase
-        .from('market_prices')
-        .insert(newCrop)
-        .select()
-        .single();
-      
-      if (error) {
-        throw error;
-      }
-      
-      setMarketPrices([...marketPrices, data]);
-      toast.success(`${newCropName} sikeresen hozzáadva`);
-      setNewCropName("");
-    } catch (error) {
-      console.error("Hiba az új termény hozzáadása során:", error);
-      toast.error("Nem sikerült hozzáadni az új terményt");
-    }
-  };
-  
-  const deleteCrop = async (id: string) => {
+
+  const handleDelete = async (id: string) => {
     try {
       const { error } = await supabase
         .from('market_prices')
         .delete()
         .eq('id', id);
       
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
       
-      setMarketPrices(marketPrices.filter(p => p.id !== id));
-      toast.success("Termény sikeresen törölve");
+      setMarketPrices(prices => prices.filter(price => price.id !== id));
+      toast.success("Ár sikeresen törölve");
     } catch (error) {
-      console.error("Hiba a termény törlése során:", error);
-      toast.error("Nem sikerült törölni a terményt");
+      console.error("Error deleting price:", error);
+      toast.error("Hiba történt az ár törlése során");
     }
   };
-  
-  const copyFromPreviousYear = async () => {
-    const previousYear = (Number(selectedYear) - 1).toString();
+
+  const handleSaveEdit = async () => {
+    if (!editingPrice) return;
     
     try {
-      // Get prices from previous year
-      const { data: previousYearPrices, error: fetchError } = await supabase
+      // Map our interface back to database field names
+      const { error } = await supabase
         .from('market_prices')
-        .select('*')
-        .eq('year', previousYear);
+        .upsert({
+          id: editingPrice.id,
+          culture: editingPrice.culture,
+          average_yield: editingPrice.averageYield,
+          price: editingPrice.price,
+          trend: editingPrice.trend || 0,
+          region: editingPrice.region || selectedRegion,
+          year: editingPrice.year || selectedYear,
+          is_forecast: editingPrice.is_forecast || false,
+          last_updated: new Date().toISOString()
+        });
       
-      if (fetchError) {
-        throw fetchError;
-      }
+      if (error) throw error;
       
-      if (!previousYearPrices || previousYearPrices.length === 0) {
-        toast.error(`Nincs adat a(z) ${previousYear}. évből`);
-        return;
-      }
-      
-      // Prepare new records for current year
-      const newRecords = previousYearPrices.map(price => ({
-        culture: price.culture,
-        price: Math.round(price.price * 1.05), // 5% increase as default
-        averageYield: price.averageYield,
-        trend: 0,
-        region: price.region,
-        year: selectedYear,
-        is_forecast: true
-      }));
-      
-      // Insert the new records
-      const { error: insertError } = await supabase
-        .from('market_prices')
-        .insert(newRecords);
-      
-      if (insertError) {
-        throw insertError;
-      }
-      
-      toast.success(`Árak sikeresen átmásolva a(z) ${previousYear}. évből`);
+      // Update local state
       fetchMarketPrices();
+      setEditingPrice(null);
+      toast.success("Ár sikeresen mentve");
     } catch (error) {
-      console.error("Hiba az árak másolása során:", error);
-      toast.error("Nem sikerült másolni az árakat az előző évből");
+      console.error("Error saving price:", error);
+      toast.error("Hiba történt az ár mentése során");
     }
   };
-  
+
+  const handleCreateBulk = async () => {
+    try {
+      // Example default values
+      const defaultCrops = [
+        { culture: "Búza", price: 85000, averageYield: 5.5, trend: 0 },
+        { culture: "Kukorica", price: 75000, averageYield: 8.2, trend: 0 },
+        { culture: "Napraforgó", price: 160000, averageYield: 3.2, trend: 0 },
+        { culture: "Árpa", price: 78000, averageYield: 5.0, trend: 0 },
+        { culture: "Repce", price: 170000, averageYield: 3.2, trend: 0 },
+        { culture: "Szója", price: 150000, averageYield: 2.8, trend: 0 }
+      ];
+      
+      // Convert to database field names
+      const bulkData = defaultCrops.map(crop => ({
+        culture: crop.culture,
+        average_yield: crop.averageYield,
+        price: crop.price,
+        trend: crop.trend,
+        region: selectedRegion,
+        year: selectedYear,
+        is_forecast: false,
+        last_updated: new Date().toISOString()
+      }));
+      
+      const { error } = await supabase
+        .from('market_prices')
+        .insert(bulkData);
+      
+      if (error) throw error;
+      
+      fetchMarketPrices();
+      toast.success("Alapértelmezett árak sikeresen hozzáadva");
+    } catch (error) {
+      console.error("Error creating bulk prices:", error);
+      toast.error("Hiba történt az árak létrehozása során");
+    }
+  };
+
   return (
-    <div className="container mx-auto py-10 space-y-8">
+    <div className="container mx-auto py-8">
       <Card>
         <CardHeader>
           <CardTitle>Piaci árak kezelése</CardTitle>
           <CardDescription>
-            Itt állíthatja be a különböző terményekhez tartozó piaci árakat és termésátlagokat, amelyeket a rendszer a hitelkalkulációhoz használ.
+            Itt kezelheti a különböző régió és év szerinti piaci árakat, amelyek alapján a rendszer kiszámítja a hitelkereteket.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="mb-6 flex items-center gap-4">
-            <div className="flex-1">
-              <Label htmlFor="year-select">Év kiválasztása</Label>
-              <Select value={selectedYear} onValueChange={handleYearChange}>
-                <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Válasszon évet" />
+          <div className="flex gap-4 mb-6">
+            <div className="w-1/2">
+              <Select
+                value={selectedRegion}
+                onValueChange={setSelectedRegion}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Válassz régiót" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ALL_YEARS.map(year => (
-                    <SelectItem key={year} value={year}>{year}</SelectItem>
+                  {regions.map(region => (
+                    <SelectItem key={region} value={region}>
+                      {region}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            
-            <div className="flex-1">
-              {filteredPrices.length === 0 && selectedYear !== CURRENT_YEAR && (
-                <Button className="mt-8" onClick={copyFromPreviousYear}>
-                  Másolás előző évből
-                </Button>
-              )}
-            </div>
-          </div>
-          
-          <div className="mb-6 flex gap-4">
-            <div className="flex-1">
-              <Label htmlFor="new-crop">Új termény hozzáadása</Label>
-              <div className="flex gap-2 mt-2">
-                <Input 
-                  id="new-crop" 
-                  value={newCropName} 
-                  onChange={e => setNewCropName(e.target.value)} 
-                  placeholder="Termény neve" 
-                />
-                <Button onClick={addNewCrop}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Hozzáadás
-                </Button>
-              </div>
+            <div className="w-1/2">
+              <Select
+                value={selectedYear}
+                onValueChange={setSelectedYear}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Válassz évet" />
+                </SelectTrigger>
+                <SelectContent>
+                  {years.map(year => (
+                    <SelectItem key={year} value={year}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           
           {loading ? (
-            <div className="text-center py-8">
-              <p>Adatok betöltése...</p>
-            </div>
-          ) : filteredPrices.length === 0 ? (
-            <div className="text-center py-8 bg-muted/20 rounded-md">
-              <p className="text-muted-foreground">Nincs megadva piaci adat erre az évre.</p>
-            </div>
+            <div className="text-center py-12">Adatok betöltése...</div>
           ) : (
-            <div className="rounded-md border">
+            <>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Termény</TableHead>
-                    <TableHead className="text-right">Átlag terméshozam (t/ha)</TableHead>
-                    <TableHead className="text-right">Egységár (Ft/t)</TableHead>
-                    <TableHead className="text-right">Trend</TableHead>
+                    <TableHead>Növény</TableHead>
+                    <TableHead className="text-right">Átlaghozam (t/ha)</TableHead>
+                    <TableHead className="text-right">Ár (Ft/t)</TableHead>
+                    <TableHead className="text-center">Trend</TableHead>
                     <TableHead className="text-right">Utolsó frissítés</TableHead>
-                    <TableHead className="text-right">Műveletek</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredPrices.map(price => (
-                    <TableRow key={price.id}>
-                      <TableCell className="font-medium">{price.culture}</TableCell>
-                      
-                      <TableCell className="text-right">
-                        {editingPrice?.id === price.id ? (
-                          <Input 
-                            type="number" 
-                            value={editingPrice.averageYield} 
-                            onChange={handleYieldChange}
-                            className="w-24 text-right ml-auto"
-                            step="0.1"
-                            min="0"
-                          />
-                        ) : (
-                          formatNumber(price.averageYield)
-                        )}
+                  {marketPrices.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-4">
+                        Nincs adat a kiválasztott régióra és évre
                       </TableCell>
-                      
-                      <TableCell className="text-right">
-                        {editingPrice?.id === price.id ? (
-                          <Input 
-                            type="number" 
-                            value={editingPrice.price} 
-                            onChange={handlePriceChange}
-                            className="w-28 text-right ml-auto"
-                            step="1000"
-                            min="0"
-                          />
-                        ) : (
-                          formatCurrency(price.price)
-                        )}
-                      </TableCell>
-                      
-                      <TableCell className="text-right">
-                        {editingPrice?.id === price.id ? (
-                          <div className="flex gap-1 justify-end">
-                            <Button 
-                              variant={editingPrice.trend === -1 ? "default" : "outline"} 
-                              size="icon" 
-                              onClick={() => handleTrendChange(-1)}
+                    </TableRow>
+                  ) : (
+                    marketPrices.map(price => (
+                      <TableRow key={price.id}>
+                        <TableCell>{price.culture}</TableCell>
+                        <TableCell className="text-right">{formatNumber(price.averageYield, 1)}</TableCell>
+                        <TableCell className="text-right">{formatNumber(price.price, 0)}</TableCell>
+                        <TableCell className="text-center">
+                          {price.trend > 0 ? (
+                            <ArrowUp className="inline text-green-600" />
+                          ) : price.trend < 0 ? (
+                            <ArrowDown className="inline text-red-600" />
+                          ) : (
+                            <Minus className="inline text-gray-600" />
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {new Date(price.last_updated).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEdit(price)}
                             >
-                              <ArrowDown className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant={editingPrice.trend === 0 ? "default" : "outline"} 
-                              size="icon" 
-                              onClick={() => handleTrendChange(0)}
-                            >
-                              −
-                            </Button>
-                            <Button 
-                              variant={editingPrice.trend === 1 ? "default" : "outline"} 
-                              size="icon" 
-                              onClick={() => handleTrendChange(1)}
-                            >
-                              <ArrowUp className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex justify-end">
-                            {price.trend === -1 && <ArrowDown className="h-4 w-4 text-red-500" />}
-                            {price.trend === 0 && <span>−</span>}
-                            {price.trend === 1 && <ArrowUp className="h-4 w-4 text-green-500" />}
-                          </div>
-                        )}
-                      </TableCell>
-                      
-                      <TableCell className="text-right">
-                        {new Date(price.last_updated).toLocaleDateString('hu-HU')}
-                      </TableCell>
-                      
-                      <TableCell className="text-right">
-                        {editingPrice?.id === price.id ? (
-                          <div className="flex gap-2 justify-end">
-                            <Button size="sm" onClick={savePrice} variant="default">
-                              <Save className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" onClick={cancelEditing} variant="outline">
-                              Mégse
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex gap-2 justify-end">
-                            <Button size="sm" onClick={() => startEditing(price)} variant="outline">
                               Szerkesztés
                             </Button>
-                            <Button size="sm" onClick={() => deleteCrop(price.id)} variant="destructive">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDelete(price.id)}
+                            >
                               <Trash className="h-4 w-4" />
                             </Button>
                           </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
-            </div>
+              
+              <div className="mt-6 flex justify-between">
+                <Button
+                  variant="outline"
+                  onClick={() => setEditingPrice({})}
+                >
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  Új ár hozzáadása
+                </Button>
+                {marketPrices.length === 0 && (
+                  <Button
+                    variant="default"
+                    onClick={handleCreateBulk}
+                  >
+                    Alapértelmezett árak létrehozása
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
+          
+          {editingPrice && (
+            <Card className="mt-6 border-2 border-primary/10">
+              <CardHeader>
+                <CardTitle>
+                  {editingPrice.id ? 'Ár szerkesztése' : 'Új ár hozzáadása'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Növény</label>
+                    <Input
+                      value={editingPrice.culture || ''}
+                      onChange={e => setEditingPrice({...editingPrice, culture: e.target.value})}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Átlaghozam (t/ha)</label>
+                    <Input
+                      type="number"
+                      value={editingPrice.averageYield || ''}
+                      onChange={e => setEditingPrice({...editingPrice, averageYield: parseFloat(e.target.value)})}
+                      className="mt-1"
+                      step="0.1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Ár (Ft/t)</label>
+                    <Input
+                      type="number"
+                      value={editingPrice.price || ''}
+                      onChange={e => setEditingPrice({...editingPrice, price: parseFloat(e.target.value)})}
+                      className="mt-1"
+                      step="1000"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Trend</label>
+                    <Select
+                      value={(editingPrice.trend || 0).toString()}
+                      onValueChange={value => setEditingPrice({...editingPrice, trend: parseInt(value)})}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">Növekvő ár</SelectItem>
+                        <SelectItem value="0">Stagnáló ár</SelectItem>
+                        <SelectItem value="-1">Csökkenő ár</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditingPrice(null)}
+                  >
+                    Mégsem
+                  </Button>
+                  <Button
+                    onClick={handleSaveEdit}
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    Mentés
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </CardContent>
       </Card>

@@ -1,6 +1,7 @@
 
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { formatCurrency, formatNumber } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatNumber } from "@/lib/utils";
 import { FarmData } from "@/types/farm";
 
 interface CultureTableProps {
@@ -13,62 +14,74 @@ export const CultureTable = ({ farmData, showPrices = true, showRevenue = true }
   if (!farmData.cultures || farmData.cultures.length === 0) {
     return (
       <div className="text-center p-4 bg-muted/20 rounded-md">
-        <p className="text-muted-foreground">Nem található növénykultúra adat.</p>
+        <p className="text-muted-foreground">Nincs növénykultúra információ.</p>
       </div>
     );
   }
 
+  const totalHectares = farmData.cultures.reduce((sum, culture) => sum + culture.hectares, 0);
+  
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Növénykultúra</TableHead>
-            <TableHead className="text-right">Terület (ha)</TableHead>
-            {showPrices && (
-              <>
-                <TableHead className="text-right">Termésátlag (t/ha)</TableHead>
-                <TableHead className="text-right">Egységár (Ft/t)</TableHead>
-              </>
-            )}
-            {showRevenue && (
-              <TableHead className="text-right">Becsült bevétel</TableHead>
-            )}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {farmData.cultures.map((culture, index) => (
-            <TableRow key={index}>
-              <TableCell className="font-medium">{culture.name}</TableCell>
-              <TableCell className="text-right">{formatNumber(culture.hectares)}</TableCell>
+    <Card>
+      <CardHeader>
+        <CardTitle>Növénykultúrák</CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Növénykultúra</TableHead>
+              <TableHead className="text-center">Terület (ha)</TableHead>
+              <TableHead className="text-center">Megoszlás (%)</TableHead>
               {showPrices && (
                 <>
-                  <TableCell className="text-right">{culture.yieldPerHectare ? formatNumber(culture.yieldPerHectare) : "N/A"}</TableCell>
-                  <TableCell className="text-right">{culture.pricePerTon ? formatCurrency(culture.pricePerTon) : "N/A"}</TableCell>
+                  <TableHead className="text-center">Termésátlag (t/ha)</TableHead>
+                  <TableHead className="text-center">Piaci ár (Ft/t)</TableHead>
                 </>
               )}
               {showRevenue && (
-                <TableCell className="text-right">{culture.estimatedRevenue ? formatCurrency(culture.estimatedRevenue) : "N/A"}</TableCell>
+                <TableHead className="text-right">Bevétel (Ft)</TableHead>
               )}
             </TableRow>
-          ))}
-          
-          {showRevenue && farmData.cultures.length > 1 && (
-            <TableRow className="font-medium">
-              <TableCell>Összes</TableCell>
-              <TableCell className="text-right">{formatNumber(farmData.hectares)}</TableCell>
+          </TableHeader>
+          <TableBody>
+            {farmData.cultures.map((culture, index) => (
+              <TableRow key={index}>
+                <TableCell className="font-medium">{culture.name}</TableCell>
+                <TableCell className="text-center">{formatNumber(culture.hectares, 1)}</TableCell>
+                <TableCell className="text-center">
+                  {formatNumber((culture.hectares / totalHectares) * 100, 1)}%
+                </TableCell>
+                {showPrices && (
+                  <>
+                    <TableCell className="text-center">{formatNumber(culture.yieldPerHectare, 1)}</TableCell>
+                    <TableCell className="text-center">{formatNumber(culture.pricePerTon, 0)}</TableCell>
+                  </>
+                )}
+                {showRevenue && (
+                  <TableCell className="text-right">{formatNumber(culture.estimatedRevenue, 0)}</TableCell>
+                )}
+              </TableRow>
+            ))}
+            
+            <TableRow className="bg-muted/20 font-semibold">
+              <TableCell>Összesen</TableCell>
+              <TableCell className="text-center">{formatNumber(totalHectares, 1)}</TableCell>
+              <TableCell className="text-center">100%</TableCell>
               {showPrices && (
                 <>
-                  <TableCell className="text-right"></TableCell>
-                  <TableCell className="text-right"></TableCell>
+                  <TableCell className="text-center">-</TableCell>
+                  <TableCell className="text-center">-</TableCell>
                 </>
               )}
-              <TableCell className="text-right">{formatCurrency(farmData.totalRevenue)}</TableCell>
+              {showRevenue && (
+                <TableCell className="text-right">{formatNumber(farmData.totalRevenue, 0)}</TableCell>
+              )}
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </div>
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 };
 

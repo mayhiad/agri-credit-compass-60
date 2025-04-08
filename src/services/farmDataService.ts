@@ -1,115 +1,107 @@
 
-import { FarmData } from "@/types/farm";
 import { supabase } from "@/integrations/supabase/client";
+import { FarmData, MarketPrice } from "@/types/farm";
 
+/**
+ * Save farm data to the database
+ */
 export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string): Promise<string | null> => {
   try {
-    if (!farmData || !userId) {
-      console.error("Missing farm data or user ID");
-      return null;
-    }
-    
-    console.log("Saving farm data to database:", farmData);
-    
-    // 1. Save the main farm record
-    const { data: farm, error: farmError } = await supabase
+    // First, create or update the farm record
+    const { data: farmRecord, error: farmError } = await supabase
       .from('farms')
-      .insert({
+      .upsert({
         user_id: userId,
         hectares: farmData.hectares,
-        total_revenue: farmData.totalRevenue,
         document_id: farmData.documentId,
-        region: farmData.region
+        region: farmData.region,
+        total_revenue: farmData.totalRevenue
       })
       .select('id')
       .single();
-    
+
     if (farmError) {
       console.error("Error saving farm data:", farmError);
-      return null;
+      throw farmError;
+    }
+
+    const farmId = farmRecord.id;
+    
+    // Next, save the cultures
+    if (farmData.cultures && farmData.cultures.length > 0) {
+      // Delete existing cultures for this farm to avoid duplicates
+      await supabase
+        .from('cultures')
+        .delete()
+        .eq('farm_id', farmId);
+      
+      // Insert new cultures
+      const { error: culturesError } = await supabase
+        .from('cultures')
+        .insert(farmData.cultures.map(culture => ({
+          farm_id: farmId,
+          name: culture.name,
+          hectares: culture.hectares,
+          estimated_revenue: culture.estimatedRevenue
+        })));
+      
+      if (culturesError) {
+        console.error("Error saving cultures:", culturesError);
+        throw culturesError;
+      }
     }
     
-    const farmId = farm.id;
-    console.log(`Farm record created with ID: ${farmId}`);
+    // Save market prices if available and we have a region
+    if (farmData.marketPrices && farmData.marketPrices.length > 0 && farmData.region) {
+      // Check if market prices for this region and year already exist
+      const year = farmData.year || new Date().getFullYear().toString();
+      
+      const { data: existingPrices } = await supabase
+        .from('market_prices')
+        .select('id')
+        .eq('region', farmData.region)
+        .eq('year', year);
+      
+      // Only insert if no prices exist for this region and year
+      if (!existingPrices || existingPrices.length === 0) {
+        const { error: pricesError } = await supabase
+          .from('market_prices')
+          .insert(farmData.marketPrices.map(price => ({
+            culture: price.culture,
+            average_yield: price.averageYield,
+            price: price.price,
+            trend: price.trend,
+            region: farmData.region,
+            year: year,
+            is_forecast: price.is_forecast,
+            last_updated: price.last_updated
+          })));
+        
+        if (pricesError) {
+          console.error("Error saving market prices:", pricesError);
+          // Continue even if market prices save fails
+        }
+      }
+    }
     
-    // 2. Save the farm details (including market prices)
-    if (farmData.marketPrices && farmData.marketPrices.length > 0) {
-      // Convert MarketPrice objects to format compatible with JSON storage
-      const marketPricesForJson = farmData.marketPrices.map(price => ({
-        culture: price.culture,
-        averageYield: price.averageYield,
-        price: price.price,
-        trend: price.trend,
-        lastUpdated: price.lastUpdated instanceof Date ? price.lastUpdated.toISOString() : price.lastUpdated
-      }));
-
+    // Save additional farm details if needed
+    if (farmData.blockIds && farmData.blockIds.length > 0) {
       const { error: detailsError } = await supabase
         .from('farm_details')
-        .insert({
+        .upsert({
           farm_id: farmId,
-          market_prices: marketPricesForJson,
-          crop_type: farmData.year ? `${farmData.year} évi termés` : 'Jelenlegi termés'
+          location_data: { blockIds: farmData.blockIds }
         });
       
       if (detailsError) {
         console.error("Error saving farm details:", detailsError);
-      }
-    }
-    
-    // 3. Save OCR information (if available)
-    if (farmData.ocrText || farmData.fileName) {
-      const rawData = {
-        farm_id: farmId,
-        ocr_text: farmData.ocrText,
-        file_name: farmData.fileName,
-        file_size: farmData.fileSize,
-        document_date: farmData.documentDate || farmData.year,
-        extracted_blocks: farmData.blockIds,
-        word_document_url: farmData.wordDocumentUrl
-      };
-      
-      console.log("Saving OCR information:", rawData);
-      
-      // Don't let this block the operation if it fails
-      try {
-        const { error: ocrError } = await supabase
-          .from('document_extraction_results')
-          .insert({
-            user_id: userId,
-            extracted_data: rawData,
-            processing_status: 'completed',
-            ocr_log_id: '00000000-0000-0000-0000-000000000000' // Placeholder since we don't have the actual log ID
-          });
-          
-        if (ocrError) {
-          console.warn("Warning: Could not save OCR information:", ocrError);
-        }
-      } catch (ocrSaveError) {
-        console.warn("Error saving OCR information:", ocrSaveError);
-      }
-    }
-    
-    // 4. Save each culture
-    if (farmData.cultures && farmData.cultures.length > 0) {
-      const cultures = farmData.cultures.map(culture => ({
-        farm_id: farmId,
-        name: culture.name,
-        hectares: culture.hectares,
-        estimated_revenue: culture.estimatedRevenue
-      }));
-      
-      const { error: culturesError } = await supabase
-        .from('cultures')
-        .insert(cultures);
-      
-      if (culturesError) {
-        console.error("Error saving cultures:", culturesError);
+        // Continue even if details save fails
       }
     }
     
     return farmId;
   } catch (error) {
-    console.error("Unexpected error saving farm data:", error);
+    console.error("Error in saveFarmDataToDatabase:", error);
     return null;
   }
 };

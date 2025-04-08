@@ -1,20 +1,19 @@
 
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
- 
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number, currency: string = "HUF"): string {
-  if (isNaN(amount)) return "0";
+// Add the formatNumber utility function
+export function formatNumber(value: number | undefined | null, fractionDigits: number = 2): string {
+  if (value === undefined || value === null) {
+    return "-";
+  }
   
-  const formatter = new Intl.NumberFormat('hu-HU', {
-    style: 'currency',
-    currency: currency,
+  return new Intl.NumberFormat('hu-HU', { 
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
-  
-  return formatter.format(amount);
+    maximumFractionDigits: fractionDigits,
+  }).format(value);
 }
