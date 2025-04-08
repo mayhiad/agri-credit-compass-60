@@ -51,6 +51,27 @@ export const fetchFarmData = async (userId: string): Promise<{
       console.error("Hiba a kultúrák lekérésekor:", culturesError);
     }
 
+    // Fetch user profile to get the name if available
+    const { data: userProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('first_name, last_name')
+      .eq('id', userId)
+      .single();
+    
+    if (profileError && profileError.code !== 'PGRST116') {
+      console.error("Hiba a felhasználói profil lekérésekor:", profileError);
+    }
+
+    // Determine applicant name - use from farm data first, then profile, then fallback
+    let applicantName = farm.applicant_name;
+    if (!applicantName && userProfile && (userProfile.first_name || userProfile.last_name)) {
+      applicantName = `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim();
+    }
+    if (!applicantName) {
+      // Fallback to a more user-friendly default than userId
+      applicantName = "Ismeretlen felhasználó";
+    }
+
     // Build market price data
     const marketPriceData = farmDetails?.market_prices && 
       Array.isArray(farmDetails.market_prices) ? 
@@ -73,8 +94,12 @@ export const fetchFarmData = async (userId: string): Promise<{
       totalRevenue: farm.total_revenue,
       region: farm.region || "Ismeretlen régió",
       documentId: farm.document_id || `SAPS-2023-${userId.substring(0, 6)}`,
-      applicantName: userId.split('@')[0] || "Ismeretlen felhasználó",
-      blockIds: [`K-${userId.substring(0, 4)}`, `L-${userId.substring(4, 8)}`],
+      applicantName: applicantName,
+      submitterId: farm.submitter_id || "Ismeretlen azonosító",
+      applicantId: farm.applicant_id || "Ismeretlen azonosító",
+      submissionDate: farm.submission_date || "Ismeretlen dátum",
+      year: farm.year || new Date().getFullYear().toString(),
+      blockIds: farm.block_ids || [`K-${userId.substring(0, 4)}`, `L-${userId.substring(4, 8)}`],
       marketPrices: marketPriceData as MarketPrice[]
     };
     

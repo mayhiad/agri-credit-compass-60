@@ -15,6 +15,7 @@ const Header = () => {
     try {
       await supabase.auth.signOut();
       toast.success("Sikeres kijelentkezés");
+      // Ensure we navigate to the home page with the proper branding
       navigate("/");
     } catch (error) {
       console.error("Sign out error:", error);
