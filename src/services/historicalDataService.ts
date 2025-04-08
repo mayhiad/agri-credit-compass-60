@@ -6,23 +6,41 @@ export const fetchHistoricalData = async (userId: string, farmId?: string): Prom
   try {
     console.log(`Fetching historical data for user ${userId} and farm ${farmId || 'any'}`);
     
-    // Fetching from database - actual implementation
-    const { data, error } = await supabase
-      .from('farms')
-      .select('historical_data')
-      .eq('user_id', userId)
+    // First, try to get historical data from farm_details table where it's more likely to be stored
+    const { data: farmDetailsData, error: farmDetailsError } = await supabase
+      .from('farm_details')
+      .select('location_data')
+      .eq('farm_id', farmId || '')
       .order('created_at', { ascending: false })
       .limit(1);
       
-    if (error) {
-      console.error("Error fetching historical data:", error);
-      return [];
+    if (!farmDetailsError && farmDetailsData && farmDetailsData.length > 0 && farmDetailsData[0].location_data) {
+      const locationData = farmDetailsData[0].location_data as any;
+      if (locationData.historical_years && Array.isArray(locationData.historical_years)) {
+        return locationData.historical_years;
+      }
     }
     
-    if (data && data.length > 0 && data[0].historical_data) {
-      return data[0].historical_data;
+    // If no data found and no specific farmId was provided, check all farm_details for this user
+    if (!farmId) {
+      const { data: farmsData, error: farmsError } = await supabase
+        .from('farms')
+        .select('id')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+        
+      if (!farmsError && farmsData && farmsData.length > 0) {
+        // Check each farm for historical data
+        for (const farm of farmsData) {
+          const historicalData = await getHistoricalDataFromFarmDetails(farm.id);
+          if (historicalData && historicalData.length > 0) {
+            return historicalData;
+          }
+        }
+      }
     }
     
+    // If still no data, return empty array
     return [];
   } catch (error) {
     console.error("Error fetching historical data:", error);
@@ -39,15 +57,45 @@ export const saveHistoricalData = async (
     console.log(`Saving historical data for user ${userId} and farm ${farmId}`);
     console.log("Historical data:", historicalData);
     
-    const { error } = await supabase
-      .from('farms')
-      .update({ historical_data: historicalData })
-      .eq('id', farmId)
-      .eq('user_id', userId);
-      
-    if (error) {
-      console.error("Error saving historical data:", error);
+    // Check if farm_details exists for this farm
+    const { data: farmDetails, error: farmDetailsError } = await supabase
+      .from('farm_details')
+      .select('id, location_data')
+      .eq('farm_id', farmId)
+      .maybeSingle();
+    
+    if (farmDetailsError && farmDetailsError.code !== 'PGRST116') {
+      console.error("Error checking farm_details:", farmDetailsError);
       return false;
+    }
+    
+    if (farmDetails) {
+      // Farm details exists, update it
+      const locationData = farmDetails.location_data || {};
+      locationData.historical_years = historicalData;
+      
+      const { error: updateError } = await supabase
+        .from('farm_details')
+        .update({ location_data: locationData })
+        .eq('id', farmDetails.id);
+        
+      if (updateError) {
+        console.error("Error updating historical data:", updateError);
+        return false;
+      }
+    } else {
+      // Farm details doesn't exist, create it
+      const { error: insertError } = await supabase
+        .from('farm_details')
+        .insert({
+          farm_id: farmId,
+          location_data: { historical_years: historicalData }
+        });
+        
+      if (insertError) {
+        console.error("Error creating historical data:", insertError);
+        return false;
+      }
     }
     
     return true;
@@ -64,7 +112,7 @@ export const getHistoricalDataFromFarmDetails = async (
     // Fetch farm details
     const { data: farmDetails, error } = await supabase
       .from('farm_details')
-      .select('*')
+      .select('location_data')
       .eq('farm_id', farmId)
       .maybeSingle();
     
@@ -75,27 +123,11 @@ export const getHistoricalDataFromFarmDetails = async (
     
     // Try to find historical data in the farm details
     if (farmDetails && farmDetails.location_data) {
-      // Check if historical_data is in location_data (sometimes it's stored there)
+      // Check if historical_years is in location_data
       const locationData = farmDetails.location_data as any;
-      if (locationData.historical_data) {
-        return locationData.historical_data;
+      if (locationData.historical_years && Array.isArray(locationData.historical_years)) {
+        return locationData.historical_years;
       }
-    }
-    
-    // If not found in farm_details, try the farms table directly
-    const { data: farm, error: farmError } = await supabase
-      .from('farms')
-      .select('historical_data')
-      .eq('id', farmId)
-      .maybeSingle();
-      
-    if (farmError) {
-      console.error("Error fetching farm:", farmError);
-      return null;
-    }
-    
-    if (farm && farm.historical_data) {
-      return farm.historical_data;
     }
     
     return null;
