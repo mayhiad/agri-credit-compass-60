@@ -1,6 +1,7 @@
 
 import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
+// We're only going to use one toaster - shadcn's Toaster (not Sonner)
+// import { Toaster as Sonner } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { createContext, useContext, useEffect, useState } from "react";
@@ -82,7 +83,7 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <AuthContext.Provider value={{ session, user, loading, signOut }}>
         <Toaster />
-        <Sonner />
+        {/* Remove the second toaster to avoid conflicts */}
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />

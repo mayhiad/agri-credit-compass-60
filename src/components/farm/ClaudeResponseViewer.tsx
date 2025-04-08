@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, ExternalLink } from "lucide-react";
+import { toast } from "@/hooks/use-toast"; // Fix import path
 
 interface ClaudeResponseViewerProps {
   ocrLogId: string | null;
@@ -28,6 +29,11 @@ const ClaudeResponseViewer: React.FC<ClaudeResponseViewerProps> = ({ ocrLogId })
         setClaudeResponseUrl(url);
       } catch (err) {
         console.error("Hiba a Claude válasz URL lekérdezésekor:", err);
+        toast({
+          title: "Hiba",
+          description: "Nem sikerült lekérdezni a Claude AI válasz URL-jét",
+          variant: "destructive"
+        });
       }
     };
     
