@@ -1,247 +1,183 @@
 
-// Main edge function entry point for SAPS document processing
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { processDocumentWithClaude } from "./claudeProcessor.ts";
+import { createClient } from "@supabase/supabase-js";
 import { corsHeaders, handleCors } from "./cors.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import { processDocumentWithOpenAI } from "./processDocument.ts";
+import { API_TIMEOUT } from "./fetchUtils.ts";
+import { getClaudeModel } from "./apiClient.ts";
+import { createSupabaseClient } from "./openaiClient.ts";
 
-// Initialize Supabase client
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Required environment variables
+const supabaseUrl = Deno.env.get("SUPABASE_URL");
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-// Function to check internet connectivity
-async function checkConnectivity() {
+// Initialize Supabase client with service role key
+const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
+
+serve(async (req: Request) => {
+  // Handle CORS preflight requests
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
+
+  console.log(`⏱️ Function timeout set to ${API_TIMEOUT / 1000} seconds`);
+
   try {
-    const response = await fetch('https://www.google.com', { 
-      method: 'HEAD',
-      signal: AbortSignal.timeout(5000) // 5 second timeout
-    });
-    return response.ok;
-  } catch (error) {
-    console.error(`❌ Connectivity check failed: ${error.message}`);
-    return false;
-  }
-}
-
-serve(async (req) => {
-  try {
-    // Add start timestamp for logging
-    const startTime = new Date();
-    
-    // Diagnostic logging for EVERY request
-    console.log(`🔍 New request received: ${req.method} ${new URL(req.url).pathname} at ${startTime.toISOString()}`);
-    console.log(`🔓 Edge function environment: SUPABASE_URL set: ${Boolean(Deno.env.get('SUPABASE_URL'))}, ANTHROPIC_API_KEY set: ${Boolean(Deno.env.get('ANTHROPIC_API_KEY'))}`);
-    
-    // Handle CORS preflight requests
-    const corsResponse = handleCors(req);
-    if (corsResponse) {
-      console.log(`🔄 Responding to OPTIONS preflight request`);
-      return corsResponse;
-    }
-    
-    // Add CORS headers to all responses
-    const headers = {
-      'Content-Type': 'application/json',
-      ...corsHeaders
-    };
-    
-    if (req.method !== 'POST') {
-      console.log(`⚠️ Method not allowed: ${req.method}`);
-      return new Response(
-        JSON.stringify({ error: 'Method not allowed' }),
-        { status: 405, headers }
-      );
-    }
-    
-    // Quick connectivity check to verify internet access
-    const isConnected = await checkConnectivity();
-    if (!isConnected) {
-      console.error('❌ Internet connectivity check failed');
-      return new Response(
-        JSON.stringify({ 
-          error: 'A szervernek nincs internet kapcsolata. Kérjük ellenőrizze a hálózati beállításokat.',
-          details: 'Edge function cannot access the internet'
-        }),
-        { status: 503, headers }
-      );
-    }
-    
     // Parse the request body
     let requestData;
+    
     try {
       requestData = await req.json();
-      console.log("✅ Request data parsed successfully:", JSON.stringify(requestData));
-    } catch (parseError) {
-      console.error("❌ Error parsing request JSON:", parseError.message);
+      console.log(`📦 Request data: ${JSON.stringify({
+        ...requestData,
+        // Don't log the full batch for security
+        hasBatchId: !!requestData.batchId,
+        testMode: !!requestData.testMode
+      })}`);
+    } catch (jsonError) {
+      console.error("⚠️ Failed to parse request JSON:", jsonError);
       return new Response(
-        JSON.stringify({ error: 'Invalid JSON in request body', details: parseError.message }),
-        { status: 400, headers }
+        JSON.stringify({ error: "Invalid JSON in request body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
+    // Check for test mode - just verify API connectivity
+    if (requestData.testMode === true) {
+      console.log("🧪 Test mode detected, checking Claude API availability");
+      
+      try {
+        // Simple test to see if Claude API is available
+        const model = await getClaudeModel();
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: "Claude API is accessible", 
+            model: model 
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (apiError) {
+        console.error("❌ Claude API test failed:", apiError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: "Claude API is not accessible", 
+            details: apiError.message 
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Extract data from the request
+    const { batchId, userId } = requestData;
+
     // Validate required fields
-    if (!requestData.batchId || !requestData.userId) {
-      console.log("⚠️ Missing required fields in request");
+    if (!batchId) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: batchId and userId are required' }),
-        { status: 400, headers }
+        JSON.stringify({ error: "Missing required field: batchId" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    
-    console.log(`📝 Processing batch ${requestData.batchId} for user ${requestData.userId}`);
-    
-    // Get batch information from database
-    let batchData;
-    try {
-      const { data, error } = await supabase
-        .from('document_batches')
-        .select('*')
-        .eq('batch_id', requestData.batchId)
-        .eq('user_id', requestData.userId)
-        .single();
-      
-      if (error) throw error;
-      batchData = data;
-      console.log(`📊 Found batch information: ${batchData ? 'Yes' : 'No'}`);
-    } catch (batchError) {
-      console.error("❌ Batch retrieval error:", batchError.message);
+
+    if (!userId) {
       return new Response(
-        JSON.stringify({ error: 'Could not find batch information', details: batchError.message }),
-        { status: 404, headers }
+        JSON.stringify({ error: "Missing required field: userId" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    
-    if (!batchData) {
+
+    // Get the batch information
+    console.log(`🔍 Looking up batch: ${batchId}`);
+    const { data: batchData, error: batchError } = await supabase
+      .from("document_batches")
+      .select("*")
+      .eq("batch_id", batchId)
+      .eq("user_id", userId)
+      .single();
+
+    if (batchError) {
+      console.error("❌ Error fetching batch:", batchError);
       return new Response(
-        JSON.stringify({ error: 'Batch not found' }),
-        { status: 404, headers }
+        JSON.stringify({ error: "Failed to fetch batch information", details: batchError.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    
-    // Get all images for this batch
-    let images;
-    try {
-      const { data, error } = await supabase
-        .storage
-        .from('dokumentumok')
-        .list(`saps/${requestData.userId}/${requestData.batchId}/images`);
-      
-      if (error) throw error;
-      images = data;
-      console.log(`🖼️ Found ${images?.length || 0} files in storage`);
-    } catch (storageError) {
-      console.error("❌ Storage error:", storageError.message);
+
+    // Get the image URLs for the batch
+    console.log(`📷 Fetching image URLs for batch: ${batchId}`);
+    const { data: imageUrls, error: storageError } = await supabase.storage
+      .from("document-images")
+      .list(`${userId}/${batchId}`);
+
+    if (storageError) {
+      console.error("❌ Error fetching images:", storageError);
       return new Response(
-        JSON.stringify({ error: 'Could not retrieve images from storage', details: storageError.message }),
-        { status: 500, headers }
+        JSON.stringify({ error: "Failed to fetch images", details: storageError.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Generate public URLs for all images
+    console.log(`🔗 Generating public URLs for ${imageUrls.length} images`);
     
-    if (!images || images.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'No images found for processing' }),
-        { status: 400, headers }
-      );
-    }
-    
-    // Get public URLs for all images
-    const imageUrls = images
-      .filter(file => file.name && file.name.endsWith('.jpg'))  // Only include JPG images
+    // Only include image files (check extension for safety)
+    const validImageUrls = imageUrls
+      .filter(file => 
+        file.name.endsWith(".jpg") || 
+        file.name.endsWith(".jpeg") || 
+        file.name.endsWith(".png")
+      )
       .map(file => {
-        const publicUrl = supabase.storage
-          .from('dokumentumok')
-          .getPublicUrl(`saps/${requestData.userId}/${requestData.batchId}/images/${file.name}`);
-        return publicUrl.data.publicUrl;
+        const { data } = supabase.storage
+          .from("document-images")
+          .getPublicUrl(`${userId}/${batchId}/${file.name}`);
+        return data.publicUrl;
       });
-    
-    console.log(`📊 Processing ${imageUrls.length} images for batch ${requestData.batchId}`);
-    
-    if (imageUrls.length === 0) {
+
+    if (validImageUrls.length === 0) {
+      console.error("❌ No valid images found in the batch");
       return new Response(
-        JSON.stringify({ error: 'No JPG images found for processing' }),
-        { status: 400, headers }
+        JSON.stringify({ error: "No valid images found in the batch" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    
-    // Process images with Claude AI
-    try {
-      console.log(`🤖 Starting Claude AI processing at ${new Date().toISOString()}`);
-      
-      const result = await processDocumentWithClaude(imageUrls, requestData.userId, requestData.batchId);
-      
-      console.log(`✅ Claude processing completed successfully at ${new Date().toISOString()}`);
-      console.log(`⏱️ Total processing time: ${(new Date().getTime() - startTime.getTime()) / 1000} seconds`);
-      
-      // Return the result
-      return new Response(
-        JSON.stringify(result),
-        { status: 200, headers }
-      );
-    } catch (processingError) {
-      console.error(`❌ Claude processing error: ${processingError.message}`);
-      console.error(`Stack trace: ${processingError.stack || 'No stack trace available'}`);
-      
-      // Check for connectivity issues
-      if (processingError.message.includes("HTML instead of JSON") || 
-          processingError.message.includes("Failed to fetch") ||
-          processingError.message.includes("network") ||
-          processingError.message.includes("connection")) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'Hálózati kapcsolódási probléma a Claude AI szolgáltatáshoz. Kérjük ellenőrizze az internetkapcsolatot.', 
-            details: processingError.message
-          }),
-          { status: 503, headers }
-        );
-      }
-      
-      // Check for specific error types
-      if (processingError.message.includes("overloaded") || processingError.message.includes("529")) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'Claude AI szolgáltatás túlterhelt, kérjük próbálja később', 
-            details: processingError.message
-          }),
-          { status: 503, headers }
-        );
-      }
-      
-      if (processingError.message.includes("rate limit") || processingError.message.includes("429")) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'Claude API kérések korlátozva, kérjük próbálja később', 
-            details: processingError.message
-          }),
-          { status: 429, headers }
-        );
-      }
-      
-      // Generic error response
-      return new Response(
-        JSON.stringify({ 
-          error: 'Hiba történt a dokumentum feldolgozása során', 
-          details: processingError.message
-        }),
-        { status: 500, headers }
-      );
-    }
+
+    console.log(`✅ Found ${validImageUrls.length} valid images for processing`);
+
+    // Process the document with Claude AI
+    console.log(`🧠 Starting document processing with Claude AI for user: ${userId}`);
+    const result = await processDocumentWithOpenAI(validImageUrls, userId, batchId);
+    console.log(`✅ Claude AI processing complete. Result status: ${result.status}`);
+
+    // Return the processing result
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
   } catch (error) {
-    console.error(`❌ Unhandled error in edge function: ${error.message}`);
-    console.error(`Stack trace: ${error.stack || 'No stack trace available'}`);
+    console.error("🚨 Unhandled exception in process-saps-document function:", error);
+    
+    // Try to extract a meaningful error message
+    let errorMessage = "Unknown error in document processing";
+    let errorDetails = null;
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      errorDetails = error.stack;
+    } else if (typeof error === "string") {
+      errorMessage = error;
+    } else if (error && typeof error === "object") {
+      errorMessage = JSON.stringify(error);
+    }
     
     return new Response(
       JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-        stack: error instanceof Error ? error.stack : undefined
+        error: errorMessage, 
+        details: errorDetails,
+        timestamp: new Date().toISOString() 
       }),
-      { 
-        status: 500, 
-        headers: { 
-          'Content-Type': 'application/json',
-          ...corsHeaders 
-        } 
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

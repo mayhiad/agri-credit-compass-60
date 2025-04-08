@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import FileUpload from "@/components/FileUpload";
 import Steps from "@/components/Steps";
 import CreditScore from "@/components/CreditScore";
@@ -15,6 +15,7 @@ import FarmInfoDisplay from "@/components/farm/FarmInfoDisplay";
 
 const LoanApplication = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [farmData, setFarmData] = useState<FarmData | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -51,7 +52,17 @@ const LoanApplication = () => {
   }, [location.state]);
   
   const handleFileUploadComplete = (data: FarmData) => {
+    // Add verification for data quality before proceeding
+    const hasValidData = data && (
+      data.applicantName || 
+      data.submitterId || 
+      data.applicantId || 
+      data.documentId
+    );
+    
     setFarmData(data);
+    
+    // Always move to step 2 (farm info display) after upload, even if data is incomplete
     setStep(2);
   };
   
@@ -63,6 +74,10 @@ const LoanApplication = () => {
     setLoanAmount(loanSettings.amount);
     setPaymentFrequency(loanSettings.paymentFrequency);
     handleNextStep(); // Automatically advance to the next step after submission
+  };
+  
+  const handleBackToDashboard = () => {
+    navigate('/dashboard');
   };
   
   const renderStep = () => {
@@ -78,7 +93,8 @@ const LoanApplication = () => {
       case 2:
         return <FarmInfoDisplay 
           farmData={farmData!} 
-          onComplete={handleNextStep} 
+          onComplete={handleNextStep}
+          onBackToDashboard={handleBackToDashboard}
         />;
       case 3:
         return <FarmLocation onComplete={handleNextStep} />;

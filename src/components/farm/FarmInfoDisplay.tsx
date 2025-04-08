@@ -3,20 +3,28 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { FarmData } from "@/types/farm";
-import { ArrowRight, Check, FileText, User, Calendar, MapPin, Layers } from "lucide-react";
+import { ArrowRight, Check, FileText, User, Calendar, MapPin, Layers, RotateCcw } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SubmitterInfo from "./SubmitterInfo";
 import BlocksAccordion from "./BlocksAccordion";
 import CultureTable from "./CultureTable";
 import HistoricalCrops from "./HistoricalCrops";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface FarmInfoDisplayProps {
   farmData: FarmData;
   onComplete: () => void;
+  onBackToDashboard?: () => void;
 }
 
-export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoDisplayProps) => {
+export const FarmInfoDisplay = ({ farmData, onComplete, onBackToDashboard }: FarmInfoDisplayProps) => {
   const [activeTab, setActiveTab] = useState("admin");
+  
+  // Check if we have meaningful data or mostly N/A values
+  const hasIncompleteData = !farmData?.applicantName && 
+                          !farmData?.submitterId && 
+                          !farmData?.applicantId && 
+                          !farmData?.documentId;
   
   // Make sure farmData is properly defined before rendering
   if (!farmData) {
@@ -34,9 +42,15 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoDisplayProps) 
             <p className="text-sm mt-2">Kérjük, töltse fel újra a SAPS dokumentumot.</p>
           </div>
         </CardContent>
-        <CardFooter>
-          <Button onClick={onComplete} className="w-full">
-            Vissza
+        <CardFooter className="flex justify-between">
+          {onBackToDashboard && (
+            <Button variant="outline" onClick={onBackToDashboard}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Vissza az irányítópultra
+            </Button>
+          )}
+          <Button onClick={onComplete} className="ml-auto">
+            Folytatás
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </CardFooter>
@@ -53,6 +67,15 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoDisplayProps) 
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {hasIncompleteData && (
+          <Alert variant="warning" className="bg-amber-50 border-amber-200 mb-4">
+            <AlertTitle className="text-amber-800">Hiányos adatok</AlertTitle>
+            <AlertDescription className="text-amber-700">
+              A dokumentumból nem sikerült minden fontos adatot kiolvasni. Ellenőrizze az adatokat, vagy próbálkozzon egy másik dokumentum feltöltésével.
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid grid-cols-4 mb-6">
             <TabsTrigger value="admin">
@@ -88,8 +111,14 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoDisplayProps) 
                   documentYear={farmData.year}
                 />
               </CardContent>
-              <CardFooter>
-                <Button onClick={() => setActiveTab("blocks")} className="w-full">
+              <CardFooter className="flex justify-between">
+                {onBackToDashboard && hasIncompleteData && (
+                  <Button variant="outline" onClick={onBackToDashboard}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Vissza az irányítópultra
+                  </Button>
+                )}
+                <Button onClick={() => setActiveTab("blocks")} className={hasIncompleteData ? "ml-auto" : "w-full"}>
                   Jóváhagyás
                   <Check className="ml-2 h-4 w-4" />
                 </Button>
@@ -104,9 +133,22 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoDisplayProps) 
               </CardHeader>
               <CardContent className="space-y-4">
                 <BlocksAccordion farmData={farmData} />
+                {(!farmData.blockIds || farmData.blockIds.length === 0) && (
+                  <Alert className="bg-amber-50 border-amber-200">
+                    <AlertDescription className="text-amber-800">
+                      A dokumentumból nem sikerült blokkazonosítókat kiolvasni. 
+                    </AlertDescription>
+                  </Alert>
+                )}
               </CardContent>
-              <CardFooter>
-                <Button onClick={() => setActiveTab("historical")} className="w-full">
+              <CardFooter className="flex justify-between">
+                {onBackToDashboard && hasIncompleteData && (
+                  <Button variant="outline" onClick={onBackToDashboard}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Vissza az irányítópultra
+                  </Button>
+                )}
+                <Button onClick={() => setActiveTab("historical")} className={hasIncompleteData ? "ml-auto" : "w-full"}>
                   Jóváhagyás
                   <Check className="ml-2 h-4 w-4" />
                 </Button>
@@ -121,9 +163,22 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoDisplayProps) 
               </CardHeader>
               <CardContent className="space-y-4">
                 <HistoricalCrops historicalData={farmData.historicalData || []} />
+                {(!farmData.historicalData || farmData.historicalData.length === 0) && (
+                  <Alert className="bg-amber-50 border-amber-200">
+                    <AlertDescription className="text-amber-800">
+                      A dokumentumból nem sikerült historikus adatokat kiolvasni.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </CardContent>
-              <CardFooter>
-                <Button onClick={() => setActiveTab("current")} className="w-full">
+              <CardFooter className="flex justify-between">
+                {onBackToDashboard && hasIncompleteData && (
+                  <Button variant="outline" onClick={onBackToDashboard}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Vissza az irányítópultra
+                  </Button>
+                )}
+                <Button onClick={() => setActiveTab("current")} className={hasIncompleteData ? "ml-auto" : "w-full"}>
                   Jóváhagyás
                   <Check className="ml-2 h-4 w-4" />
                 </Button>
@@ -138,9 +193,22 @@ export const FarmInfoDisplay = ({ farmData, onComplete }: FarmInfoDisplayProps) 
               </CardHeader>
               <CardContent className="space-y-4">
                 <CultureTable farmData={farmData} showPrices={false} showRevenue={false} />
+                {(!farmData.cultures || farmData.cultures.length === 0) && (
+                  <Alert className="bg-amber-50 border-amber-200">
+                    <AlertDescription className="text-amber-800">
+                      A dokumentumból nem sikerült tárgyévi termelési adatokat kiolvasni.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </CardContent>
-              <CardFooter>
-                <Button onClick={onComplete} className="w-full">
+              <CardFooter className="flex justify-between">
+                {onBackToDashboard && hasIncompleteData && (
+                  <Button variant="outline" onClick={onBackToDashboard}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Vissza az irányítópultra
+                  </Button>
+                )}
+                <Button onClick={onComplete} className={hasIncompleteData ? "ml-auto" : "w-full"}>
                   Tovább a hitelajánlatra
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>

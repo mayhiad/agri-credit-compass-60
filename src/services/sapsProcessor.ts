@@ -87,3 +87,45 @@ export const extractFarmDataFromOcrText = (ocrText: string): Partial<FarmData> =
   console.log("Extracted data from OCR:", extractedData);
   return extractedData;
 }
+
+// New diagnostic function 
+export const diagnoseFarmData = (farmData: FarmData): { 
+  isValid: boolean; 
+  missingFields: string[]; 
+  message: string;
+} => {
+  const required = ['applicantName', 'submitterId', 'documentId'];
+  const missing = required.filter(field => !farmData[field as keyof FarmData]);
+  
+  const hasNoCultures = !farmData.cultures || farmData.cultures.length === 0;
+  const hasNoBlocks = !farmData.blockIds || farmData.blockIds.length === 0;
+  
+  if (missing.length === 0 && !hasNoCultures && !hasNoBlocks) {
+    return { 
+      isValid: true, 
+      missingFields: [], 
+      message: "Az adatok sikeresen kiolvasásra kerültek" 
+    };
+  }
+  
+  // Build diagnostic message
+  let message = "Hiányos adatok: ";
+  if (missing.includes('applicantName')) message += "kérelmező neve, ";
+  if (missing.includes('submitterId')) message += "ügyfél-azonosító, ";
+  if (missing.includes('documentId')) message += "iratazonosító, ";
+  if (hasNoCultures) message += "termelési adatok, ";
+  if (hasNoBlocks) message += "blokkazonosítók, ";
+  
+  // Remove trailing comma and space
+  message = message.replace(/, $/, "");
+  
+  return {
+    isValid: false,
+    missingFields: [
+      ...missing,
+      ...(hasNoCultures ? ['cultures'] : []),
+      ...(hasNoBlocks ? ['blockIds'] : [])
+    ],
+    message
+  };
+};
