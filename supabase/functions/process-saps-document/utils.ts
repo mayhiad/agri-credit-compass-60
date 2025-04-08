@@ -16,3 +16,17 @@ export const batchArray = <T>(array: T[], batchSize: number): T[][] => {
   }
   return batches;
 };
+
+/**
+ * Sort files by page number
+ * @param files Array of files with names that include page numbers
+ * @returns Sorted array of files
+ */
+export const sortFilesByPageNumber = (files: any[]): any[] => {
+  return [...files].sort((a, b) => {
+    // Extract page numbers from filenames (assumes format like "1_page.jpg", "2_page.jpg", etc.)
+    const aNum = parseInt(a.name.split('_')[0]) || 0;
+    const bNum = parseInt(b.name.split('_')[0]) || 0;
+    return aNum - bNum;
+  });
+};

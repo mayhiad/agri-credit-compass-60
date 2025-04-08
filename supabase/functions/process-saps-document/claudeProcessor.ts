@@ -1,5 +1,5 @@
 
-import { batchArray } from "./utils.ts";
+import { batchArray, sortFilesByPageNumber } from "./utils.ts";
 
 export const processAllImageBatches = async (
   imageUrls: string[],

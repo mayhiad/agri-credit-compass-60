@@ -1,9 +1,10 @@
+
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutDashboard, Map, Tractor, Upload, History, Euro, FileText, Database } from "lucide-react";
+import { LayoutDashboard, Map, Tractor, Upload, History, Euro, FileText, Database, Blocks } from "lucide-react";
 import { FarmData } from "@/types/farm";
 import DashboardOverview from "./DashboardOverview";
-import DashboardCrops from "./DashboardCrops";
+import DashboardBlocks from "./DashboardBlocks";
 import DashboardMap from "./DashboardMap";
 import DashboardHistorical from "./DashboardHistorical";
 import CurrentYearRevenue from "@/components/farm/CurrentYearRevenue";
@@ -89,15 +90,15 @@ const DashboardContent = ({ farmData, onFarmDataUpdate }: DashboardContentProps)
         </div>
       )}
       
-      <Tabs defaultValue="overview">
+      <Tabs defaultValue="basicData">
         <TabsList className="mb-6">
-          <TabsTrigger value="overview">
-            <LayoutDashboard className="h-4 w-4 mr-2" />
-            Áttekintés
+          <TabsTrigger value="basicData">
+            <Database className="h-4 w-4 mr-2" />
+            Alapadatok
           </TabsTrigger>
-          <TabsTrigger value="crops">
-            <Tractor className="h-4 w-4 mr-2" />
-            Növénykultúrák
+          <TabsTrigger value="blocks">
+            <Blocks className="h-4 w-4 mr-2" />
+            Blokkazonosítók
           </TabsTrigger>
           <TabsTrigger value="currentYear">
             <Euro className="h-4 w-4 mr-2" />
@@ -117,12 +118,12 @@ const DashboardContent = ({ farmData, onFarmDataUpdate }: DashboardContentProps)
           </TabsTrigger>
         </TabsList>
         
-        <TabsContent value="overview">
+        <TabsContent value="basicData">
           <DashboardOverview farmData={farmData} />
         </TabsContent>
         
-        <TabsContent value="crops">
-          <DashboardCrops farmData={farmData} />
+        <TabsContent value="blocks">
+          <DashboardBlocks farmData={farmData} />
         </TabsContent>
         
         <TabsContent value="currentYear">
