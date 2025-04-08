@@ -11,6 +11,8 @@ export function processImages(imageUrls: string[]) {
   const invalidImageUrls: string[] = [];
   const unsupportedFormatUrls: string[] = [];
   
+  console.log(`🔍 Processing ${imageUrls.length} image URLs for validation`);
+  
   // Check each image URL
   for (const imageUrl of imageUrls) {
     try {
@@ -23,16 +25,16 @@ export function processImages(imageUrls: string[]) {
         validImageUrls.push(imageUrl);
       } else {
         unsupportedFormatUrls.push(imageUrl);
-        console.log(`Unsupported image format: ${path}`);
+        console.log(`⚠️ Unsupported image format: ${path}`);
       }
     } catch (error) {
       // URL is invalid
       invalidImageUrls.push(imageUrl);
-      console.log(`Invalid image URL: ${imageUrl}`);
+      console.log(`⚠️ Invalid image URL: ${imageUrl}`);
     }
   }
   
-  console.log(`Images processed: Valid: ${validImageUrls.length}, Invalid: ${invalidImageUrls.length}, Unsupported: ${unsupportedFormatUrls.length}`);
+  console.log(`📊 Images processed: Valid: ${validImageUrls.length}, Invalid: ${invalidImageUrls.length}, Unsupported: ${unsupportedFormatUrls.length}`);
   
   return { validImageUrls, invalidImageUrls, unsupportedFormatUrls };
 }

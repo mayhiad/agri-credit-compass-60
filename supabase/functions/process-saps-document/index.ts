@@ -12,12 +12,16 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 serve(async (req) => {
   try {
-    // Diagnostic logging
-    console.log(`Request received: ${req.method} ${new URL(req.url).pathname}`);
+    // Add start timestamp for logging
+    const startTime = new Date();
+    
+    // Diagnostic logging for EVERY request
+    console.log(`🔍 New request received: ${req.method} ${new URL(req.url).pathname} at ${startTime.toISOString()}`);
     
     // Handle CORS preflight requests
     const corsResponse = handleCors(req);
     if (corsResponse) {
+      console.log(`🔄 Responding to OPTIONS preflight request`);
       return corsResponse;
     }
     
@@ -28,7 +32,7 @@ serve(async (req) => {
     };
     
     if (req.method !== 'POST') {
-      console.log(`Method not allowed: ${req.method}`);
+      console.log(`⚠️ Method not allowed: ${req.method}`);
       return new Response(
         JSON.stringify({ error: 'Method not allowed' }),
         { status: 405, headers }
@@ -39,9 +43,9 @@ serve(async (req) => {
     let requestData;
     try {
       requestData = await req.json();
-      console.log("Request data parsed successfully");
+      console.log("✅ Request data parsed successfully:", JSON.stringify(requestData));
     } catch (parseError) {
-      console.error("Error parsing request JSON:", parseError.message);
+      console.error("❌ Error parsing request JSON:", parseError.message);
       return new Response(
         JSON.stringify({ error: 'Invalid JSON in request body', details: parseError.message }),
         { status: 400, headers }
@@ -50,14 +54,14 @@ serve(async (req) => {
     
     // Validate required fields
     if (!requestData.batchId || !requestData.userId) {
-      console.log("Missing required fields in request");
+      console.log("⚠️ Missing required fields in request");
       return new Response(
         JSON.stringify({ error: 'Missing required fields: batchId and userId are required' }),
         { status: 400, headers }
       );
     }
     
-    console.log(`Processing batch ${requestData.batchId} for user ${requestData.userId}`);
+    console.log(`📝 Processing batch ${requestData.batchId} for user ${requestData.userId}`);
     
     // Get batch information from database
     let batchData;
@@ -71,9 +75,9 @@ serve(async (req) => {
       
       if (error) throw error;
       batchData = data;
-      console.log(`Found batch information: ${batchData ? 'Yes' : 'No'}`);
+      console.log(`📊 Found batch information: ${batchData ? 'Yes' : 'No'}`);
     } catch (batchError) {
-      console.error("Batch retrieval error:", batchError.message);
+      console.error("❌ Batch retrieval error:", batchError.message);
       return new Response(
         JSON.stringify({ error: 'Could not find batch information', details: batchError.message }),
         { status: 404, headers }
@@ -97,9 +101,9 @@ serve(async (req) => {
       
       if (error) throw error;
       images = data;
-      console.log(`Found ${images?.length || 0} files in storage`);
+      console.log(`🖼️ Found ${images?.length || 0} files in storage`);
     } catch (storageError) {
-      console.error("Storage error:", storageError.message);
+      console.error("❌ Storage error:", storageError.message);
       return new Response(
         JSON.stringify({ error: 'Could not retrieve images from storage', details: storageError.message }),
         { status: 500, headers }
@@ -127,15 +131,19 @@ serve(async (req) => {
     
     if (imageUrls.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'No images found for processing' }),
+        JSON.stringify({ error: 'No JPG images found for processing' }),
         { status: 400, headers }
       );
     }
     
     // Process images with Claude AI
     try {
+      console.log(`🤖 Starting Claude AI processing at ${new Date().toISOString()}`);
+      
       const result = await processDocumentWithClaude(imageUrls, requestData.userId, requestData.batchId);
-      console.log("Claude processing completed successfully");
+      
+      console.log(`✅ Claude processing completed successfully at ${new Date().toISOString()}`);
+      console.log(`⏱️ Total processing time: ${(new Date().getTime() - startTime.getTime()) / 1000} seconds`);
       
       // Return the result
       return new Response(
@@ -143,7 +151,8 @@ serve(async (req) => {
         { status: 200, headers }
       );
     } catch (processingError) {
-      console.error("Claude processing error:", processingError.message);
+      console.error(`❌ Claude processing error: ${processingError.message}`);
+      console.error(`Stack trace: ${processingError.stack || 'No stack trace available'}`);
       
       // Check for specific error types
       if (processingError.message.includes("overloaded") || processingError.message.includes("529")) {
@@ -176,7 +185,9 @@ serve(async (req) => {
       );
     }
   } catch (error) {
-    console.error("Unhandled error:", error.message, error.stack);
+    console.error(`❌ Unhandled error in edge function: ${error.message}`);
+    console.error(`Stack trace: ${error.stack || 'No stack trace available'}`);
+    
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Unknown error occurred',

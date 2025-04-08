@@ -11,7 +11,7 @@ export const corsHeaders = {
 export function handleCors(req: Request): Response | null {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log("Processing CORS preflight request");
+    console.log("⚙️ Processing CORS preflight request");
     return new Response(null, {
       status: 204, // No content
       headers: corsHeaders,

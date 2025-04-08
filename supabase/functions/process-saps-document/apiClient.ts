@@ -13,6 +13,7 @@ export async function sendClaudeRequest(
     const claudeApiKey = Deno.env.get('ANTHROPIC_API_KEY');
     
     if (!claudeApiKey) {
+      console.error("❌ ANTHROPIC_API_KEY environment variable not set");
       throw new Error("ANTHROPIC_API_KEY environment variable not set");
     }
     
@@ -30,10 +31,8 @@ export async function sendClaudeRequest(
       ]
     };
     
-    console.log(`🚀 Sending Claude API request: ${CLAUDE_API_URL}, model: ${CLAUDE_MODEL}, with ${validImageUrls.length} images`);
-    
-    // Log a sample of the request for debugging
-    console.log(`Request summary: model=${payload.model}, images=${validImageUrls.length}, prompt size=${typeof messageContent[0] === 'object' && messageContent[0].text ? messageContent[0].text.length : 'unknown'} chars`);
+    console.log(`🚀 Sending Claude API request to ${CLAUDE_API_URL}, model: ${CLAUDE_MODEL}, with ${validImageUrls.length} images`);
+    console.log(`🧾 Request payload summary: model=${payload.model}, images=${validImageUrls.length}`);
     
     // Enhanced retry logic for overloaded errors
     let retryCount = 0;
@@ -43,7 +42,7 @@ export async function sendClaudeRequest(
     
     while (retryCount <= maxRetries) {
       try {
-        console.log(`API request attempt ${retryCount + 1}/${maxRetries + 1}`);
+        console.log(`🔄 API request attempt ${retryCount + 1}/${maxRetries + 1}`);
         
         const response = await fetch(CLAUDE_API_URL, {
           method: "POST",
@@ -57,7 +56,7 @@ export async function sendClaudeRequest(
         });
         
         // Log response status
-        console.log(`Claude API response status: ${response.status}`);
+        console.log(`🔍 Claude API response status: ${response.status}`);
         
         // Check for overloaded error specifically
         if (response.status === 529) {
@@ -70,7 +69,7 @@ export async function sendClaudeRequest(
             const jitter = Math.random() * 1000; // Add up to 1 second of random jitter
             const delay = Math.min(exponentialDelay + jitter, maxDelay);
             
-            console.log(`🔄 Retrying in ${Math.round(delay / 1000)} seconds...`);
+            console.log(`⏱️ Retrying in ${Math.round(delay / 1000)} seconds...`);
             await new Promise(resolve => setTimeout(resolve, delay));
             retryCount++;
             continue;
@@ -85,7 +84,7 @@ export async function sendClaudeRequest(
           if (retryCount < maxRetries) {
             // For rate limits, use a longer delay
             const delay = baseDelay * Math.pow(2, retryCount + 1); // More aggressive backoff
-            console.log(`🔄 Rate limited. Retrying in ${Math.round(delay / 1000)} seconds...`);
+            console.log(`⏱️ Rate limited. Retrying in ${Math.round(delay / 1000)} seconds...`);
             await new Promise(resolve => setTimeout(resolve, delay));
             retryCount++;
             continue;
@@ -94,17 +93,19 @@ export async function sendClaudeRequest(
         
         // Handle other error responses
         if (!response.ok) {
+          let errorMessage = "";
           try {
             // Try to parse error response as JSON first
             const errorJson = await response.json();
-            console.error(`❌ Claude API error: ${response.status} - ${JSON.stringify(errorJson)}`);
-            throw new Error(`Claude API error: ${response.status} - ${errorJson.error?.message || JSON.stringify(errorJson)}`);
+            errorMessage = `Claude API error: ${response.status} - ${errorJson.error?.message || JSON.stringify(errorJson)}`;
+            console.error(`❌ ${errorMessage}`);
           } catch (jsonError) {
             // Fallback to text if not JSON
             const errorText = await response.text();
-            console.error(`❌ Claude API error: ${response.status} - ${errorText}`);
-            throw new Error(`Claude API error: ${response.status} - ${errorText}`);
+            errorMessage = `Claude API error: ${response.status} - ${errorText}`;
+            console.error(`❌ ${errorMessage}`);
           }
+          throw new Error(errorMessage);
         }
         
         // Try to parse the successful response
@@ -114,8 +115,9 @@ export async function sendClaudeRequest(
           
           return result;
         } catch (parseError) {
-          console.error(`❌ Failed to parse Claude API response: ${parseError.message}`);
-          throw new Error(`Failed to parse Claude API response: ${parseError.message}`);
+          const parseErrorMsg = `Failed to parse Claude API response: ${parseError.message}`;
+          console.error(`❌ ${parseErrorMsg}`);
+          throw new Error(parseErrorMsg);
         }
       } catch (fetchError) {
         console.error(`❌ Network error during API request: ${fetchError.message}`);
