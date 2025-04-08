@@ -10,6 +10,20 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+// Function to check internet connectivity
+async function checkConnectivity() {
+  try {
+    const response = await fetch('https://www.google.com', { 
+      method: 'HEAD',
+      signal: AbortSignal.timeout(5000) // 5 second timeout
+    });
+    return response.ok;
+  } catch (error) {
+    console.error(`❌ Connectivity check failed: ${error.message}`);
+    return false;
+  }
+}
+
 serve(async (req) => {
   try {
     // Add start timestamp for logging
@@ -17,6 +31,7 @@ serve(async (req) => {
     
     // Diagnostic logging for EVERY request
     console.log(`🔍 New request received: ${req.method} ${new URL(req.url).pathname} at ${startTime.toISOString()}`);
+    console.log(`🔓 Edge function environment: SUPABASE_URL set: ${Boolean(Deno.env.get('SUPABASE_URL'))}, ANTHROPIC_API_KEY set: ${Boolean(Deno.env.get('ANTHROPIC_API_KEY'))}`);
     
     // Handle CORS preflight requests
     const corsResponse = handleCors(req);
@@ -36,6 +51,19 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Method not allowed' }),
         { status: 405, headers }
+      );
+    }
+    
+    // Quick connectivity check to verify internet access
+    const isConnected = await checkConnectivity();
+    if (!isConnected) {
+      console.error('❌ Internet connectivity check failed');
+      return new Response(
+        JSON.stringify({ 
+          error: 'A szervernek nincs internet kapcsolata. Kérjük ellenőrizze a hálózati beállításokat.',
+          details: 'Edge function cannot access the internet'
+        }),
+        { status: 503, headers }
       );
     }
     
@@ -153,6 +181,20 @@ serve(async (req) => {
     } catch (processingError) {
       console.error(`❌ Claude processing error: ${processingError.message}`);
       console.error(`Stack trace: ${processingError.stack || 'No stack trace available'}`);
+      
+      // Check for connectivity issues
+      if (processingError.message.includes("HTML instead of JSON") || 
+          processingError.message.includes("Failed to fetch") ||
+          processingError.message.includes("network") ||
+          processingError.message.includes("connection")) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Hálózati kapcsolódási probléma a Claude AI szolgáltatáshoz. Kérjük ellenőrizze az internetkapcsolatot.', 
+            details: processingError.message
+          }),
+          { status: 503, headers }
+        );
+      }
       
       // Check for specific error types
       if (processingError.message.includes("overloaded") || processingError.message.includes("529")) {

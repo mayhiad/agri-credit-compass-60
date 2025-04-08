@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,6 +76,23 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       });
 
       try {
+        // First, check if the API is accessible
+        try {
+          const isConnected = await fetch(
+            'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-saps-document',
+            { method: 'OPTIONS' }
+          );
+          
+          console.log("API connectivity check:", isConnected.status === 204 || isConnected.ok ? "Success" : "Failed");
+          
+          if (!isConnected.ok && isConnected.status !== 204) {
+            throw new Error("API endpoint is not accessible. Please check your network connection.");
+          }
+        } catch (connectivityError) {
+          console.error("API connectivity check failed:", connectivityError);
+          throw new Error("Hálózati hiba - Nem sikerült kapcsolódni a szerverhez. Ellenőrizze az internetkapcsolatot.");
+        }
+        
         // Use a longer timeout for large files
         const farmData = await processSapsDocument(file, user, setProcessingStatus);
         
@@ -86,7 +102,10 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         console.error("Részletes SAPS feldolgozási hiba:", processingError);
         
         // Handle network errors more specifically
-        if (processingError.message === "Failed to fetch") {
+        if (processingError.message === "Failed to fetch" || 
+            processingError.message.includes("kapcsolódni") ||
+            processingError.message.includes("network") ||
+            processingError.message.includes("internet")) {
           setError("Hálózati hiba történt a szerverrel való kommunikáció során. Kérjük ellenőrizze az internetkapcsolatot és próbálja újra.");
           toast.error("Hálózati kapcsolati hiba");
         } 

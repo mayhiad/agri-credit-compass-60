@@ -1,5 +1,4 @@
-
-// I'll only update the relevant parts of this file to improve progress reporting
+// I'll only update the relevant parts of this file to improve error handling
 
 import { FarmData } from "@/types/farm";
 import { ProcessingStatus } from "@/types/processing";
@@ -91,7 +90,17 @@ export const processSapsDocument = async (
         body: convertFormData,
         signal: controller.signal
       }
-    ).finally(() => clearTimeout(timeoutId));
+    ).catch(fetchError => {
+      console.error("Network fetch error:", fetchError.message);
+      // Create a custom error response to handle network errors more gracefully
+      const errorResponse = new Response(
+        JSON.stringify({
+          error: 'Hálózati hiba - Nem sikerült kapcsolódni a szerverhez. Ellenőrizze az internetkapcsolatot.'
+        }),
+        { status: 503 }
+      );
+      return errorResponse;
+    });
     
     if (!convertResponse.ok) {
       const errorText = await convertResponse.text();
@@ -177,7 +186,17 @@ export const processSapsDocument = async (
         body: JSON.stringify(payload),
         signal: aiController.signal
       }
-    ).finally(() => clearTimeout(aiTimeoutId));
+    ).catch(fetchError => {
+      console.error("Network fetch error:", fetchError.message);
+      // Create a custom error response to handle network errors more gracefully
+      const errorResponse = new Response(
+        JSON.stringify({
+          error: 'Hálózati hiba - Nem sikerült kapcsolódni a szerverhez. Ellenőrizze az internetkapcsolatot.'
+        }),
+        { status: 503 }
+      );
+      return errorResponse;
+    });
     
     if (!processResponse.ok) {
       const errorText = await processResponse.text();

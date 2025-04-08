@@ -58,6 +58,15 @@ export async function sendClaudeRequest(
         // Log response status
         console.log(`🔍 Claude API response status: ${response.status}`);
         
+        // Check for HTML response which indicates an error
+        const contentType = response.headers.get('Content-Type') || '';
+        if (contentType.includes('text/html')) {
+          const htmlContent = await response.text();
+          console.error('❌ Received HTML instead of JSON. This typically indicates a network error or proxy issue:');
+          console.error(htmlContent.substring(0, 200) + '...'); // Log first 200 chars of HTML
+          throw new Error('Received HTML instead of JSON response. Check network connectivity and proxy settings.');
+        }
+        
         // Check for overloaded error specifically
         if (response.status === 529) {
           const errorText = await response.text();
@@ -95,14 +104,26 @@ export async function sendClaudeRequest(
         if (!response.ok) {
           let errorMessage = "";
           try {
-            // Try to parse error response as JSON first
-            const errorJson = await response.json();
-            errorMessage = `Claude API error: ${response.status} - ${errorJson.error?.message || JSON.stringify(errorJson)}`;
-            console.error(`❌ ${errorMessage}`);
-          } catch (jsonError) {
-            // Fallback to text if not JSON
-            const errorText = await response.text();
-            errorMessage = `Claude API error: ${response.status} - ${errorText}`;
+            // First check if the response contains HTML (which would throw an error when parsing as JSON)
+            const responseText = await response.text();
+            if (responseText.trim().startsWith('<')) {
+              errorMessage = `Claude API error: ${response.status} - Received HTML instead of JSON. Network issue detected.`;
+              console.error(`❌ ${errorMessage}`);
+              console.error(`HTML response preview: ${responseText.substring(0, 200)}...`);
+            } else {
+              // Try to parse as JSON if it's not HTML
+              try {
+                const errorJson = JSON.parse(responseText);
+                errorMessage = `Claude API error: ${response.status} - ${errorJson.error?.message || JSON.stringify(errorJson)}`;
+              } catch (parseError) {
+                // If it's neither valid HTML nor JSON, just use the text
+                errorMessage = `Claude API error: ${response.status} - ${responseText}`;
+              }
+              console.error(`❌ ${errorMessage}`);
+            }
+          } catch (textError) {
+            // Fallback if we can't read the response at all
+            errorMessage = `Claude API error: ${response.status} - Could not read response body`;
             console.error(`❌ ${errorMessage}`);
           }
           throw new Error(errorMessage);
@@ -110,7 +131,17 @@ export async function sendClaudeRequest(
         
         // Try to parse the successful response
         try {
-          const result = await response.json();
+          let result;
+          const responseText = await response.text();
+          try {
+            result = JSON.parse(responseText);
+          } catch (jsonError) {
+            // If response isn't valid JSON, log it and throw an error
+            console.error(`❌ Failed to parse Claude API response as JSON: ${jsonError.message}`);
+            console.error(`Response text (first 200 chars): ${responseText.substring(0, 200)}...`);
+            throw new Error(`Response is not valid JSON: ${jsonError.message}`);
+          }
+          
           console.log(`✅ Claude API response received. Content type: ${result.content?.[0]?.type}, length: ${result.content?.[0]?.text?.length || 0} chars`);
           
           return result;
@@ -122,9 +153,22 @@ export async function sendClaudeRequest(
       } catch (fetchError) {
         console.error(`❌ Network error during API request: ${fetchError.message}`);
         
+        // Check if it's the HTML issue
+        if (fetchError.message.includes('HTML instead of JSON')) {
+          console.error('This may indicate network connectivity issues or a proxy server issue');
+          if (retryCount < maxRetries) {
+            const delay = baseDelay * Math.pow(2, retryCount);
+            console.log(`⏱️ Network issue detected. Retrying in ${Math.round(delay / 1000)} seconds...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            retryCount++;
+            continue;
+          }
+        }
+        
         // If it's any other error besides the retry logic, throw immediately
         if (retryCount >= maxRetries || 
-            (!fetchError.message.includes("529") && !fetchError.message.includes("429"))) {
+            (!fetchError.message.includes("529") && !fetchError.message.includes("429") && 
+             !fetchError.message.includes("HTML instead of JSON"))) {
           throw fetchError;
         }
         

@@ -9,6 +9,9 @@ export const corsHeaders = {
 
 // Handle OPTIONS preflight requests
 export function handleCors(req: Request): Response | null {
+  // Log the request headers for debugging
+  console.log("📝 Request headers:", JSON.stringify(Object.fromEntries([...new Headers(req.headers)])));
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     console.log("⚙️ Processing CORS preflight request");
