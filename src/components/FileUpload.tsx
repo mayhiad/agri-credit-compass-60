@@ -89,7 +89,13 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
         if (processingError.message === "Failed to fetch") {
           setError("Hálózati hiba történt a szerverrel való kommunikáció során. Kérjük ellenőrizze az internetkapcsolatot és próbálja újra.");
           toast.error("Hálózati kapcsolati hiba");
-        } else {
+        } 
+        // Handle overloaded Claude API specifically
+        else if (processingError.message.includes("overloaded") || processingError.message.includes("529")) {
+          setError("A Claude AI rendszer jelenleg túlterhelt. Kérjük, próbálja meg néhány perc múlva ismét feltölteni a dokumentumot.");
+          toast.error("Claude AI szolgáltatás túlterhelt");
+        }
+        else {
           setError(processingError instanceof Error ? processingError.message : "Ismeretlen hiba történt a feldolgozás során");
           toast.error("Hiba történt a dokumentum feldolgozása során");
         }
