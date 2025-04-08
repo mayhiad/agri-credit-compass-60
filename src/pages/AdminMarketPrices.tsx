@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -53,25 +52,21 @@ export const AdminMarketPrices = () => {
 
   const loadRegionsAndCultures = async () => {
     try {
-      // Load unique regions
       const { data: regionData, error: regionError } = await supabase
         .from('market_prices')
         .select('region');
 
       if (regionError) throw regionError;
 
-      // Get unique regions
       const uniqueRegions = [...new Set(regionData?.map(item => item.region))];
       setRegions(uniqueRegions as string[]);
 
-      // Load cultures from the cultures table
       const { data: cultureData, error: cultureError } = await supabase
         .from('cultures')
         .select('name');
 
       if (cultureError) throw cultureError;
 
-      // Get unique culture names
       const uniqueCultures = [...new Set(cultureData?.map(item => item.name))];
       setCultures(uniqueCultures as string[]);
     } catch (error) {
@@ -84,8 +79,14 @@ export const AdminMarketPrices = () => {
     setNewPrice({ ...newPrice, [name]: value });
   };
 
-  const handleSelectChange = (name: string, value: string) => {
-    setNewPrice({ ...newPrice, [name]: value });
+  const handleSelectChange = (name: string, value: string | boolean) => {
+    const processedValue = typeof value === 'boolean' 
+      ? (value ? 'true' : 'false') 
+      : value;
+    
+    setNewPrice({ ...newPrice, [name]: 
+      name === 'is_forecast' ? (processedValue === 'true') : processedValue 
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -110,7 +111,6 @@ export const AdminMarketPrices = () => {
       toast.success("Új piaci ár sikeresen hozzáadva");
       loadMarketPrices();
       
-      // Reset form
       setNewPrice({
         culture: "",
         region: "",
@@ -264,11 +264,11 @@ export const AdminMarketPrices = () => {
                 <div className="space-y-2">
                   <Label>Típus</Label>
                   <Select 
-                    onValueChange={(value) => handleSelectChange("is_forecast", value === "true")} 
-                    defaultValue={newPrice.is_forecast ? "true" : "false"}
+                    onValueChange={(value) => handleSelectChange("is_forecast", value)} 
+                    value={newPrice.is_forecast ? "true" : "false"}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Válasszon típust" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="true">Előrejelzés</SelectItem>
