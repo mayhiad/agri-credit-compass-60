@@ -68,6 +68,7 @@ const App = () => {
               user ? <Navigate to="/dashboard" /> : <Auth />
             } />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/loan-application" element={<Index />} />
             
             {/* Admin Routes */}
             <Route path="/admin" element={<Admin />} />
