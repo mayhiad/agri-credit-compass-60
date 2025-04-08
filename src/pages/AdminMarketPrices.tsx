@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -264,7 +265,7 @@ export const AdminMarketPrices = () => {
                   <Label>Típus</Label>
                   <Select 
                     onValueChange={(value) => handleSelectChange("is_forecast", value === "true")} 
-                    value={newPrice.is_forecast.toString()}
+                    defaultValue={newPrice.is_forecast ? "true" : "false"}
                   >
                     <SelectTrigger>
                       <SelectValue />
