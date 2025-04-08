@@ -98,6 +98,7 @@ export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string)
       file_name: farmData.fileName,
       file_size: farmData.fileSize,
       document_date: farmData.documentDate || farmData.submissionDate || farmData.year,
+      document_id: farmData.documentId,
       word_document_url: farmData.wordDocumentUrl,
       claude_response_url: farmData.claudeResponseUrl,
       processing_id: farmData.processingId

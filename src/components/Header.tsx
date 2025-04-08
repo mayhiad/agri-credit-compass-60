@@ -30,8 +30,9 @@ const Header = () => {
           <div className="flex items-center space-x-1 md:space-x-4 overflow-x-auto pb-1">
             <Link to="/" className="mr-6 shrink-0">
               <span className="font-bold text-xl">
-                <span className="text-primary">agri</span>
-                <span className="text-black">FIx</span>
+                <span className="text-black">agri</span>
+                <span className="text-primary">FI</span>
+                <span className="text-black">x</span>
               </span>
             </Link>
             

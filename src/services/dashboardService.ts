@@ -51,24 +51,52 @@ export const fetchFarmData = async (userId: string): Promise<{
       console.error("Hiba a kultúrák lekérésekor:", culturesError);
     }
 
-    // Fetch extra farm metadata from document_extraction_results if available
+    // Fetch the most relevant document extraction result for this farm
     const { data: extractionResults, error: extractionError } = await supabase
       .from('document_extraction_results')
-      .select('extracted_data')
+      .select('extracted_data, created_at')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1);
-      
+      .order('created_at', { ascending: false });
+
     if (extractionError) {
       console.error("Hiba az SAPS adatok lekérésekor:", extractionError);
     }
     
-    // Get extracted farm metadata if available
+    // Find the extraction result that matches the farm_id
     let extractedMetadata = null;
-    if (extractionResults && extractionResults.length > 0 && extractionResults[0].extracted_data?.farm_id === farm.id) {
-      extractedMetadata = extractionResults[0].extracted_data;
-    }
     
+    if (extractionResults && extractionResults.length > 0) {
+      // First try to find a result that matches the farm_id
+      const matchingResult = extractionResults.find(result => 
+        result.extracted_data && 
+        typeof result.extracted_data === 'object' && 
+        result.extracted_data.farm_id === farm.id
+      );
+      
+      if (matchingResult) {
+        extractedMetadata = matchingResult.extracted_data;
+        console.log("Found matching extraction result for farm:", farm.id);
+      } else if (farm.document_id) {
+        // If no direct farm_id match, try to match by document_id
+        // Look at the most recent results to find one with matching document info
+        for (const result of extractionResults) {
+          if (result.extracted_data && 
+              typeof result.extracted_data === 'object' && 
+              result.extracted_data.document_id === farm.document_id) {
+            extractedMetadata = result.extracted_data;
+            console.log("Found extraction result matching document_id:", farm.document_id);
+            break;
+          }
+        }
+      }
+      
+      // If still no match, use the most recent extraction result
+      if (!extractedMetadata) {
+        extractedMetadata = extractionResults[0].extracted_data;
+        console.log("Using most recent extraction result as fallback");
+      }
+    }
+
     // Build market price data - no fallbacks, only real data or empty array
     const marketPriceData = farmDetails?.market_prices && 
       Array.isArray(farmDetails.market_prices) ? 
@@ -101,22 +129,31 @@ export const fetchFarmData = async (userId: string): Promise<{
       year: "N/A",
       blockIds: [],
       marketPrices: marketPriceData as MarketPrice[],
-      
-      // Extra metadata from document extraction if available
-      ...(extractedMetadata && {
-        applicantName: extractedMetadata.applicant_name || "N/A",
-        submitterId: extractedMetadata.submitter_id || "N/A",
-        applicantId: extractedMetadata.applicant_id || "N/A",
-        submissionDate: extractedMetadata.submission_date || "N/A",
-        year: extractedMetadata.year || "N/A",
-        blockIds: extractedMetadata.block_ids || [],
-        processingId: extractedMetadata.processing_id,
-        claudeResponseUrl: extractedMetadata.claude_response_url,
-        fileName: extractedMetadata.file_name,
-        fileSize: extractedMetadata.file_size,
-        documentDate: extractedMetadata.document_date
-      })
     };
+    
+    // Add extracted metadata if available
+    if (extractedMetadata) {
+      // We've extracted these fields from the document, so use them
+      farmData.applicantName = extractedMetadata.applicant_name || "N/A";
+      farmData.submitterId = extractedMetadata.submitter_id || "N/A";
+      farmData.applicantId = extractedMetadata.applicant_id || "N/A";
+      farmData.submissionDate = extractedMetadata.submission_date || "N/A";
+      farmData.year = extractedMetadata.year || "N/A";
+      farmData.blockIds = extractedMetadata.block_ids || [];
+      
+      // Add any additional metadata fields
+      farmData.processingId = extractedMetadata.processing_id;
+      farmData.claudeResponseUrl = extractedMetadata.claude_response_url;
+      farmData.fileName = extractedMetadata.file_name;
+      farmData.fileSize = extractedMetadata.file_size;
+      farmData.documentDate = extractedMetadata.document_date;
+      
+      console.log("Added extracted metadata to farm data", { 
+        farmId: farm.id,
+        documentId: farm.document_id, 
+        applicantName: farmData.applicantName
+      });
+    }
     
     return { data: farmData, error: null };
   } catch (error) {

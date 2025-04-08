@@ -18,8 +18,9 @@ const NavBar = ({ onSignOut }: NavBarProps) => {
           <div className="flex items-center">
             <Link to="/" className="flex-shrink-0">
               <h1 className="text-xl font-bold">
-                <span className="text-primary">agri</span>
-                <span className="text-black">FIx</span>
+                <span className="text-black">agri</span>
+                <span className="text-primary">FI</span>
+                <span className="text-black">x</span>
               </h1>
             </Link>
             <div className="hidden md:block">

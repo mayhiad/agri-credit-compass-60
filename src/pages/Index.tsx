@@ -41,8 +41,9 @@ const Index = () => {
         {/* Logo and tagline */}
         <div className="text-center mb-16">
           <h1 className="text-5xl md:text-6xl font-bold mb-6">
-            <span className="text-primary">agri</span>
-            <span className="text-black">FIx</span>
+            <span className="text-black">agri</span>
+            <span className="text-primary">FI</span>
+            <span className="text-black">x</span>
           </h1>
           <p className="text-xl md:text-2xl font-medium text-gray-700 mb-4">
             Mezőgazdasági szabadfelhasználású gyorshitel
