@@ -10,6 +10,7 @@ import { AlertCircle, ArrowRight, CheckCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import TwoFactorAuth from "@/components/TwoFactorAuth";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -19,6 +20,8 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showTwoFactor, setShowTwoFactor] = useState(false);
+  const [currentTab, setCurrentTab] = useState("signin");
   
   // Check if user is already logged in
   useEffect(() => {
@@ -62,11 +65,17 @@ const Auth = () => {
       
       if (signUpError) throw signUpError;
       
-      setSuccess("Regisztráció sikeres! Kérjük, ellenőrizze e-mail fiókját a megerősítő linkért.");
-      toast.success("Regisztráció sikeres!");
+      // If we require email confirmation, show the verification message
+      if (!data.session) {
+        setSuccess("Regisztráció sikeres! Kérjük, ellenőrizze e-mail fiókját a megerősítő linkért.");
+        toast.success("Regisztráció sikeres!");
+      } else {
+        // If 2FA is enabled, show the OTP verification
+        setShowTwoFactor(true);
+      }
       
-      // If email confirmation is not enabled, redirect to dashboard
-      if (data.session) {
+      // If no 2FA and email confirmation is not enabled, redirect to dashboard
+      if (data.session && !showTwoFactor) {
         // Clear any stored data before setting up the new session
         localStorage.removeItem('farmData');
         navigate("/dashboard");
@@ -101,8 +110,13 @@ const Auth = () => {
       
       if (signInError) throw signInError;
       
-      toast.success("Sikeres bejelentkezés!");
-      navigate("/dashboard");
+      // Determine if we need 2FA verification
+      if (data.session?.user?.factors && Object.keys(data.session.user.factors).length > 0) {
+        setShowTwoFactor(true);
+      } else {
+        toast.success("Sikeres bejelentkezés!");
+        navigate("/dashboard");
+      }
     } catch (error: any) {
       console.error("Login error:", error);
       
@@ -117,6 +131,23 @@ const Auth = () => {
     }
   };
   
+  const handleTwoFactorVerified = () => {
+    navigate("/dashboard");
+  };
+  
+  // If showing 2FA, only display the 2FA component
+  if (showTwoFactor) {
+    return (
+      <div className="container max-w-md mx-auto py-10">
+        <TwoFactorAuth 
+          email={email} 
+          onBack={() => setShowTwoFactor(false)} 
+          onVerified={handleTwoFactorVerified} 
+        />
+      </div>
+    );
+  }
+  
   return (
     <div className="container max-w-md mx-auto py-10">
       <Card>
@@ -127,7 +158,7 @@ const Auth = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="signin">
+          <Tabs defaultValue={currentTab} onValueChange={setCurrentTab}>
             <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="signin">Bejelentkezés</TabsTrigger>
               <TabsTrigger value="signup">Regisztráció</TabsTrigger>

@@ -15,3 +15,6 @@ verify_jwt = true
 
 [functions.process-saps-document]
 verify_jwt = true
+
+[auth.email]
+enable_mfa = true
