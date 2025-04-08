@@ -83,7 +83,8 @@ export const processAllImageBatches = async (
           combinedResult.submissionDate = batchResult.data.submissionDate;
         }
         
-        if (batchResult.data.hectares && batchResult.data.hectares > 0) {
+        // Remove fallback data for hectares
+        if (batchResult.data.hectares && batchResult.data.hectares > 0 && !(batchResult.data.hectares === 123.45)) {
           combinedResult.hectares = batchResult.data.hectares;
         }
         
@@ -96,12 +97,19 @@ export const processAllImageBatches = async (
         }
         
         if (batchResult.data.cultures && batchResult.data.cultures.length > 0) {
-          // Combine cultures from different batches
-          const existingCultureNames = new Set(combinedResult.cultures.map((c: any) => c.name));
-          for (const culture of batchResult.data.cultures) {
-            if (!existingCultureNames.has(culture.name)) {
-              combinedResult.cultures.push(culture);
-              existingCultureNames.add(culture.name);
+          // Filter out the fallback culture data
+          const validCultures = batchResult.data.cultures.filter(culture => 
+            !(culture.name === "Szántóföldi kultúra" && culture.hectares === 123.45)
+          );
+          
+          if (validCultures.length > 0) {
+            // Combine cultures from different batches
+            const existingCultureNames = new Set(combinedResult.cultures.map((c: any) => c.name));
+            for (const culture of validCultures) {
+              if (!existingCultureNames.has(culture.name)) {
+                combinedResult.cultures.push(culture);
+                existingCultureNames.add(culture.name);
+              }
             }
           }
         }
@@ -298,6 +306,13 @@ NOTE: These documents may be in Hungarian. Look for words like "kérelmező", "�
       if (jsonMatch) {
         extractedData = JSON.parse(jsonMatch[0]);
         console.log(`✅ Successfully parsed JSON from Claude response`);
+        
+        // Filter out fallback data
+        if (extractedData.cultures) {
+          extractedData.cultures = extractedData.cultures.filter(
+            (culture: any) => !(culture.name === "Szántóföldi kultúra" && culture.hectares === 123.45)
+          );
+        }
       } else {
         console.warn(`⚠️ No JSON object found in Claude response`);
         extractedData = null;
@@ -319,11 +334,3 @@ NOTE: These documents may be in Hungarian. Look for words like "kérelmező", "�
     throw error;
   }
 }
-
-export const batchArray = <T>(array: T[], batchSize: number): T[][] => {
-  const batches = [];
-  for (let i = 0; i < array.length; i += batchSize) {
-    batches.push(array.slice(i, i + batchSize));
-  }
-  return batches;
-};

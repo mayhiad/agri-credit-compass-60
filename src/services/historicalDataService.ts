@@ -94,13 +94,15 @@ export const saveHistoricalData = async (
       }
     } else {
       // Farm details doesn't exist, create it
-      const newLocationData = { historical_years: historicalData };
+      const locationData: Record<string, any> = { 
+        historical_years: historicalData 
+      };
       
       const { error: insertError } = await supabase
         .from('farm_details')
         .insert({
           farm_id: farmId,
-          location_data: newLocationData
+          location_data: locationData
         });
         
       if (insertError) {

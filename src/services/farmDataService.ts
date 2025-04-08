@@ -45,7 +45,7 @@ export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string)
     console.log(`Farm record created with ID: ${farmId}`);
     
     // 2. Save the farm details (including market prices and historical data)
-    let locationData: any = {};
+    let locationData: Record<string, any> = {};
     
     // Add historical years data if available
     if (farmData.historicalYears && farmData.historicalYears.length > 0) {
@@ -56,11 +56,21 @@ export const saveFarmDataToDatabase = async (farmData: FarmData, userId: string)
       console.log(`Saved ${farmData.historicalData.length} historical data records to location_data`);
     }
     
+    // Convert marketPrices to a format compatible with JSON
+    const marketPricesJson = farmData.marketPrices ? 
+      farmData.marketPrices.map(price => ({
+        culture: price.culture,
+        averageYield: price.averageYield,
+        price: price.price,
+        trend: price.trend,
+        lastUpdated: price.lastUpdated
+      })) : [];
+    
     const { error: detailsError } = await supabase
       .from('farm_details')
       .insert({
         farm_id: farmId,
-        market_prices: farmData.marketPrices || [],
+        market_prices: marketPricesJson,
         location_data: locationData,
         crop_type: farmData.year ? `${farmData.year} évi termés` : 'Jelenlegi termés'
       });
