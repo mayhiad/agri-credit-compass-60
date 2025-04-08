@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -87,7 +88,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
       <CardHeader>
         <CardTitle>SAPS dokumentum feltöltése</CardTitle>
         <CardDescription>
-          Kérjük, töltse fel legfrissebb SAPS dokumentumát a hitelkeret megállapításához
+          Kérjük, töltse fel legfrissebb SAPS dokumentumát
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -95,7 +96,7 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-blue-500" />
             <AlertDescription className="text-blue-700">
-              A teljes folyamat mindössze <span className="font-bold">1-2 percet</span> vesz igénybe, és a szerződéskötéstől számított <span className="font-bold">48 órán belül</span> folyósítunk!
+              A dokumentum feldolgozása <span className="font-bold">1-2 percet</span> vesz igénybe.
             </AlertDescription>
           </div>
         </Alert>
@@ -124,20 +125,33 @@ export const FileUpload = ({ onComplete }: FileUploadProps) => {
             <UploadArea file={file} onFileChange={handleFileChange} />
             <ProcessingStatus status={processingStatus} />
             
-            {processingStatus?.wordDocumentUrl && (
+            {processingStatus?.claudeResponseUrl && (
               <Alert className="mt-4 mb-2 bg-green-50 border-green-200">
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-green-600" />
                   <div className="flex-1">
                     <AlertDescription className="text-green-800">
-                      Az OCR eredmények Word dokumentumként elérhetőek:
+                      A Claude AI válasza elérhető szöveges formátumban:
                     </AlertDescription>
                   </div>
                   <Button variant="outline" className="bg-white" size="sm" asChild>
-                    <a href={processingStatus.wordDocumentUrl} target="_blank" rel="noopener noreferrer">
-                      Letöltés
+                    <a href={processingStatus.claudeResponseUrl} target="_blank" rel="noopener noreferrer">
+                      Megtekintés
                     </a>
                   </Button>
+                </div>
+              </Alert>
+            )}
+            
+            {processingStatus?.processingId && (
+              <Alert className="mt-2 mb-2 bg-blue-50 border-blue-200">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-blue-600" />
+                  <div className="flex-1">
+                    <AlertDescription className="text-blue-800">
+                      Dokumentum feldolgozási azonosító: <span className="font-mono">{processingStatus.processingId}</span>
+                    </AlertDescription>
+                  </div>
                 </div>
               </Alert>
             )}

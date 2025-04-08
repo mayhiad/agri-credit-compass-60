@@ -8,8 +8,10 @@ export type ProcessingStatus = {
   progress: number;
   details?: string;
   wordDocumentUrl?: string;
+  claudeResponseUrl?: string;
   rawClaudeResponse?: string;
   claudeResponseTimestamp?: string;
+  processingId?: string;
   batchProgress?: {
     currentBatch: number;
     totalBatches: number;

@@ -4,7 +4,7 @@ import { ProcessingStatus } from "@/types/processing";
 import { supabase } from "@/integrations/supabase/client";
 import { validateDocumentFile } from "@/services/documentValidation";
 import { saveFarmDataToDatabase } from "@/services/farmDataService";
-import { generateFallbackFarmData, validateAndFixFarmData } from "@/services/fallbackDataService";
+import { processDocumentWithAI } from "@/services/aiProcessingService";
 
 /**
  * Process a SAPS document file
@@ -34,118 +34,13 @@ export const processSapsDocument = async (
     details: "A dokumentum képekké konvertálása folyamatban...",
   });
   
-  // Prepare form data for the conversion request
-  const convertFormData = new FormData();
-  convertFormData.append('file', file);
-  convertFormData.append('userId', user.id);
-  
-  // Get the authentication token
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    throw new Error("Nincs érvényes felhasználói munkamenet");
-  }
-  
-  // Call our Supabase Edge Function to convert PDF to images
+  // Call our AI processing service
   try {
-    const convertResponse = await fetch(
-      'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/convert-pdf-to-images',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: convertFormData,
-        signal: AbortSignal.timeout(300000), // 5 minute timeout for large files
-      }
-    );
+    const processResult = await processDocumentWithAI(file, user);
     
-    if (!convertResponse.ok) {
-      const errorText = await convertResponse.text();
-      console.error("PDF konvertálási hiba:", errorText);
-      let errorData;
-      
-      try {
-        errorData = JSON.parse(errorText);
-      } catch (parseError) {
-        errorData = { error: errorText || "Ismeretlen hiba történt" };
-      }
-      
-      throw new Error(errorData.error || "Hiba a dokumentum konvertálása közben");
+    if (!processResult) {
+      throw new Error("Nem sikerült feldolgozni a dokumentumot");
     }
-    
-    const convertData = await convertResponse.json();
-    console.log("PDF konvertálás eredménye:", convertData);
-    
-    // Check if we got batch information
-    if (!convertData.batchId || !convertData.pageCount) {
-      throw new Error("A PDF konvertálás sikertelen volt, hiányzó batch információk");
-    }
-    
-    const batchId = convertData.batchId;
-    const pageCount = convertData.pageCount;
-    const totalBatches = Math.ceil(pageCount / 20);
-    
-    updateStatus({
-      step: "PDF konvertálás befejezve",
-      progress: 30,
-      details: `A dokumentum sikeresen konvertálva ${pageCount} képpé`,
-      batchProgress: {
-        currentBatch: 0,
-        totalBatches: totalBatches,
-        pagesProcessed: 0,
-        totalPages: pageCount
-      }
-    });
-    
-    // Step 2: Process the images with Claude AI
-    updateStatus({
-      step: "Claude AI feldolgozás",
-      progress: 40,
-      details: "A dokumentum elemzése Claude AI segítségével...",
-      batchProgress: {
-        currentBatch: 1,
-        totalBatches: totalBatches,
-        pagesProcessed: Math.min(20, pageCount),
-        totalPages: pageCount
-      }
-    });
-    
-    // Prepare the request payload
-    const payload = {
-      batchId: batchId,
-      userId: user.id
-    };
-    
-    // Call the process-saps-document endpoint
-    const processResponse = await fetch(
-      'https://ynfciltkzptrsmrjylkd.supabase.co/functions/v1/process-saps-document',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(300000), // 5 minute timeout
-      }
-    );
-    
-    if (!processResponse.ok) {
-      const errorText = await processResponse.text();
-      console.error("Claude feldolgozási hiba:", errorText);
-      let errorData;
-      
-      try {
-        errorData = JSON.parse(errorText);
-      } catch (parseError) {
-        errorData = { error: errorText || "Ismeretlen hiba történt" };
-      }
-      
-      throw new Error(errorData.error || "Hiba a dokumentum feldolgozása során");
-    }
-    
-    const processResult = await processResponse.json();
-    console.log("Claude feldolgozás eredménye:", processResult);
     
     // Update batch progress information from the response
     if (processResult.batchInfo) {
@@ -153,11 +48,15 @@ export const processSapsDocument = async (
         step: "Claude AI feldolgozás befejezve",
         progress: 70,
         details: `Dokumentum feldolgozva (${processResult.batchInfo.processedBatches}/${processResult.batchInfo.totalBatches} köteg)`,
+        processingId: processResult.processingId,
+        claudeResponseUrl: processResult.claudeResponseUrl,
+        rawClaudeResponse: processResult.rawClaudeResponse,
+        claudeResponseTimestamp: new Date().toISOString(),
         batchProgress: {
           currentBatch: processResult.batchInfo.processedBatches,
           totalBatches: processResult.batchInfo.totalBatches,
           pagesProcessed: processResult.batchInfo.processedPages,
-          totalPages: processResult.batchInfo.totalPages || pageCount
+          totalPages: processResult.batchInfo.totalPages || 0
         }
       });
     }
@@ -169,59 +68,38 @@ export const processSapsDocument = async (
     
     let farmData: FarmData = processResult.data;
     
-    // Add file metadata and batch information
+    // Add file metadata
     farmData.fileName = file.name;
     farmData.fileSize = file.size;
-    farmData.batchId = batchId;
-    farmData.pageCount = pageCount;
     farmData.processingStatus = 'completed';
+    farmData.processingId = processResult.processingId;
+    farmData.claudeResponseUrl = processResult.claudeResponseUrl;
     
-    // Check if the farm data is incomplete
-    if (!farmData.applicantName || !farmData.submitterId || !farmData.applicantId) {
-      console.warn("A Claude által feldolgozott adatok hiányosak:", farmData);
+    // Validate farm data
+    const isDataValid = 
+      farmData.applicantName && farmData.applicantName !== "N/A" &&
+      farmData.submitterId && farmData.submitterId !== "N/A" &&
+      farmData.applicantId && farmData.applicantId !== "N/A";
       
-      updateStatus({
-        step: "Alapértelmezett adatok generálása",
-        progress: 85,
-        details: "Az AI nem tudott elegendő adatot kinyerni, példa adatok generálása...",
-        batchProgress: {
-          currentBatch: totalBatches,
-          totalBatches: totalBatches,
-          pagesProcessed: pageCount,
-          totalPages: pageCount
-        }
-      });
-      
-      // Fallback adatok generálása, de megtartjuk amit tudunk
-      const fallbackData = generateFallbackFarmData(user.id, file.name, file.size);
-      
-      // Megtartjuk a Claude által kinyert adatokat, ha vannak
-      farmData = {
-        ...fallbackData,
-        applicantName: farmData.applicantName || fallbackData.applicantName,
-        documentId: farmData.documentId || fallbackData.documentId,
-        submitterId: farmData.submitterId || fallbackData.submitterId,
-        applicantId: farmData.applicantId || fallbackData.applicantId,
-        errorMessage: "Nem sikerült az összes adatot kinyerni a dokumentumból. Demonstrációs adatok kerültek megjelenítésre.",
-        batchId: batchId,
-        pageCount: pageCount,
-        processingStatus: 'completed'
-      };
+    if (!isDataValid) {
+      // All fields are N/A values - no useful data extracted
+      farmData.errorMessage = "Nem sikerült kinyerni a kulcsadatokat a dokumentumból. A Claude AI nem talált érvényes adatokat.";
     }
-    
-    // Additional validation and fix missing fields
-    farmData = validateAndFixFarmData(farmData);
     
     // Save the farm data to the database
     updateStatus({
       step: "Adatok mentése az adatbázisba",
       progress: 95,
       details: "Ügyfél adatok rögzítése...",
+      processingId: processResult.processingId,
+      claudeResponseUrl: processResult.claudeResponseUrl,
+      rawClaudeResponse: processResult.rawClaudeResponse,
+      claudeResponseTimestamp: new Date().toISOString(),
       batchProgress: {
-        currentBatch: totalBatches,
-        totalBatches: totalBatches,
-        pagesProcessed: pageCount,
-        totalPages: pageCount
+        currentBatch: processResult.batchInfo?.totalBatches || 0,
+        totalBatches: processResult.batchInfo?.totalBatches || 0,
+        pagesProcessed: processResult.batchInfo?.totalPages || 0,
+        totalPages: processResult.batchInfo?.totalPages || 0
       }
     });
     
@@ -236,12 +114,16 @@ export const processSapsDocument = async (
       updateStatus({
         step: "Feldolgozás befejezve",
         progress: 100,
-        details: `Ügyfél-azonosító: ${farmData.submitterId || "Ismeretlen"}, Név: ${farmData.applicantName || "Ismeretlen"} sikeresen feldolgozva és mentve.`,
+        details: `Dokumentumazonosító: ${processResult.processingId}, SAPS feldolgozás kész.`,
+        processingId: processResult.processingId,
+        claudeResponseUrl: processResult.claudeResponseUrl,
+        rawClaudeResponse: processResult.rawClaudeResponse,
+        claudeResponseTimestamp: new Date().toISOString(),
         batchProgress: {
-          currentBatch: totalBatches,
-          totalBatches: totalBatches,
-          pagesProcessed: pageCount,
-          totalPages: pageCount
+          currentBatch: processResult.batchInfo?.totalBatches || 0,
+          totalBatches: processResult.batchInfo?.totalBatches || 0,
+          pagesProcessed: processResult.batchInfo?.totalPages || 0,
+          totalPages: processResult.batchInfo?.totalPages || 0
         }
       });
       
@@ -253,11 +135,15 @@ export const processSapsDocument = async (
         step: "Feldolgozás befejezve figyelmeztetéssel",
         progress: 100,
         details: "Adatok feldolgozva, de nem sikerült menteni az adatbázisba.",
+        processingId: processResult.processingId,
+        claudeResponseUrl: processResult.claudeResponseUrl,
+        rawClaudeResponse: processResult.rawClaudeResponse,
+        claudeResponseTimestamp: new Date().toISOString(),
         batchProgress: {
-          currentBatch: totalBatches,
-          totalBatches: totalBatches,
-          pagesProcessed: pageCount,
-          totalPages: pageCount
+          currentBatch: processResult.batchInfo?.totalBatches || 0,
+          totalBatches: processResult.batchInfo?.totalBatches || 0,
+          pagesProcessed: processResult.batchInfo?.totalPages || 0,
+          totalPages: processResult.batchInfo?.totalPages || 0
         }
       });
       
@@ -265,7 +151,7 @@ export const processSapsDocument = async (
     }
     
   } catch (error) {
-    console.error("SAPS feltöltési hiba:", error);
+    console.error("SAPS feldolgozási hiba:", error);
     throw error;
   }
 };

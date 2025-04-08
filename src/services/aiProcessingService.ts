@@ -1,17 +1,15 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { FarmData } from "@/types/farm";
-import { saveOcrTextToWordDocument } from "@/utils/storageUtils";
 
 export const processDocumentWithAI = async (file: File, user: any): Promise<{
-  threadId?: string;
-  runId?: string;
-  assistantId?: string;
+  processingId?: string;
   ocrLogId?: string;
   data?: FarmData;
   status?: string;
   batchInfo?: any;
   rawClaudeResponse?: string;
+  claudeResponseUrl?: string;
 } | null> => {
   try {
     if (!user) {
@@ -85,7 +83,7 @@ export const processDocumentWithAI = async (file: File, user: any): Promise<{
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(processRequest),
-        signal: AbortSignal.timeout(180000), // 3 perc időtúllépés
+        signal: AbortSignal.timeout(300000), // 5 perc időtúllépés
       }
     );
     
@@ -112,11 +110,6 @@ export const processDocumentWithAI = async (file: File, user: any): Promise<{
       throw new Error(processResult.error);
     }
     
-    // If we got data back but there was an error mentioned, log it but continue
-    if (processResult.data?.errorMessage) {
-      console.warn("Claude feldolgozási figyelmeztetés:", processResult.data.errorMessage);
-    }
-    
     // Save the raw Claude response for debugging and improvement
     let rawClaudeResponse = null;
     if (processResult.rawResponse) {
@@ -124,13 +117,15 @@ export const processDocumentWithAI = async (file: File, user: any): Promise<{
       console.log("Claude nyers válasz mentve");
     }
     
-    // Claude feldolgozás már a visszatérő adatban van
+    // Return Claude processing result
     return { 
+      processingId: processResult.processingId,
       ocrLogId: processResult.ocrLogId,
       data: processResult.data,
       status: processResult.status || 'completed',
       batchInfo: processResult.batchInfo,
-      rawClaudeResponse: rawClaudeResponse
+      rawClaudeResponse: rawClaudeResponse,
+      claudeResponseUrl: processResult.claudeResponseUrl
     };
   } catch (error) {
     console.error("Dokumentum feldolgozási hiba:", error);

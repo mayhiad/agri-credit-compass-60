@@ -2,8 +2,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { corsHeaders } from "./cors.ts";
-import { supabase } from "./openaiClient.ts";
+import { supabase } from "./supabaseClient.ts";
 import { processAllImageBatches } from "./claudeProcessor.ts";
+import { v4 as uuidv4 } from "https://esm.sh/uuid@9.0.0";
 
 serve(async (req) => {
   // Add initial log message
@@ -24,9 +25,35 @@ serve(async (req) => {
 
     console.log(`🔍 Processing SAPS document: Batch ID: ${batchId}, User: ${userId}`);
     
-    // Check if the batch exists
+    // Retrieve user info to get user sequence number
+    let userSequenceNumber = 1;
     try {
-      const { data: batchData, error: batchError } = await supabase
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, customer_id')
+        .eq('id', userId)
+        .single();
+        
+      if (!profileError && profileData && profileData.customer_id) {
+        // Extract sequence number from customer ID format "CUST-YYYY-XXXXX"
+        const match = profileData.customer_id.match(/CUST-\d{4}-(\d+)/);
+        if (match && match[1]) {
+          userSequenceNumber = parseInt(match[1]);
+        }
+      }
+    } catch (error) {
+      console.warn("Unable to get user sequence number, using default 1");
+    }
+    
+    // Generate a processing ID with timestamp and user sequence number
+    const timestamp = new Date().toISOString().replace(/[^0-9]/g, "").substring(0, 14); // YYYYMMDDHHmmss
+    const processingId = `SAPS-${timestamp}-${userSequenceNumber.toString().padStart(5, '0')}`;
+    console.log(`🔑 Generated processing ID: ${processingId}`);
+    
+    // Check if the batch exists
+    let batchData;
+    try {
+      const { data, error: batchError } = await supabase
         .from('document_batches')
         .select('*')
         .eq('batch_id', batchId)
@@ -39,43 +66,24 @@ serve(async (req) => {
         throw new Error(`Batch not found: ${batchError.message || 'Unknown error'}`);
       }
       
-      if (!batchData) {
+      if (!data) {
         throw new Error(`Batch not found with ID ${batchId}`);
       }
       
+      batchData = data;
       console.log(`📊 Batch information: ${batchData.page_count} pages, status: ${batchData.status}`);
       
-      // If the batch has already been processed, return the existing result
-      if (batchData.status === 'completed' && batchData.metadata?.extractedData) {
-        console.log(`🔄 Batch already processed, returning existing result`);
-        
-        return new Response(JSON.stringify({
-          data: {
-            applicantName: batchData.metadata.extractedData.submitterName || null,
-            documentId: batchData.metadata.extractedData.submitterId || null,
-            submitterId: batchData.metadata.extractedData.submitterId || null,
-            applicantId: batchData.metadata.extractedData.applicantId || null,
-            region: null,
-            year: new Date().getFullYear().toString(),
-            hectares: 0,
-            cultures: [],
-            blockIds: [],
-            totalRevenue: 0
-          },
-          status: 'completed',
-          batchInfo: {
-            totalBatches: Math.ceil(batchData.page_count / 20),
-            processedBatches: Math.ceil(batchData.page_count / 20),
-            totalPages: batchData.page_count,
-            processedPages: batchData.page_count
-          }
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
+      // Update the processing ID for this batch
+      await supabase
+        .from('document_batches')
+        .update({ 
+          processing_id: processingId,
+          status: 'processing'
+        })
+        .eq('batch_id', batchId);
     } catch (error) {
-      console.error(`Error checking batch:`, error);
-      // Continue processing without throwing an error - we'll create it if missing
+      console.error(`Error checking/updating batch:`, error);
+      throw new Error(`Failed to process batch: ${error.message}`);
     }
     
     // Retrieve images for the batch from storage
@@ -118,10 +126,69 @@ serve(async (req) => {
       return aNum - bNum;
     });
     
-    console.log(`📋 Sorted JPG files: First few examples:`);
-    sortedFiles.slice(0, 3).forEach((file, idx) => {
-      console.log(`   ${idx + 1}: ${file.name}`);
-    });
+    // Copy JPG files to the jpg bucket for admin inspection
+    console.log(`📋 Copying JPG files to jpg bucket for admin inspection`);
+    
+    // Ensure jpg bucket exists
+    try {
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const jpgBucketExists = buckets.some(bucket => bucket.name === 'jpg');
+      
+      if (!jpgBucketExists) {
+        await supabase.storage.createBucket('jpg', {
+          public: false
+        });
+        console.log(`✅ Created jpg bucket`);
+      }
+      
+      const claudeResponseBucketExists = buckets.some(bucket => bucket.name === 'clauderesponse');
+      if (!claudeResponseBucketExists) {
+        await supabase.storage.createBucket('clauderesponse', {
+          public: false
+        });
+        console.log(`✅ Created clauderesponse bucket`);
+      }
+    } catch (error) {
+      console.warn(`⚠️ Error checking/creating buckets: ${error.message}`);
+      // Continue with processing even if bucket creation fails
+    }
+    
+    // Copy each file to the jpg bucket with the processingId folder
+    for (const file of sortedFiles) {
+      try {
+        const sourceUrl = `saps/${userId}/${batchId}/images/${file.name}`;
+        const destinationUrl = `${processingId}/${file.name}`;
+        
+        // Download file from dokumentumok bucket
+        const { data, error } = await supabase.storage
+          .from('dokumentumok')
+          .download(sourceUrl);
+          
+        if (error) {
+          console.warn(`⚠️ Error downloading JPG for copy: ${file.name}`, error);
+          continue;
+        }
+        
+        // Upload to jpg bucket
+        if (data) {
+          const { error: uploadError } = await supabase.storage
+            .from('jpg')
+            .upload(destinationUrl, data, {
+              contentType: 'image/jpeg',
+              upsert: true
+            });
+            
+          if (uploadError) {
+            console.warn(`⚠️ Error copying JPG to jpg bucket: ${file.name}`, uploadError);
+          } else {
+            console.log(`✅ Copied ${file.name} to jpg bucket under ${processingId}`);
+          }
+        }
+      } catch (copyError) {
+        console.warn(`⚠️ Error in file copy process: ${copyError.message}`);
+        // Continue with next file
+      }
+    }
     
     // Generate public URLs for the images
     const imageUrls = sortedFiles.map(file => {
@@ -143,7 +210,7 @@ serve(async (req) => {
     // Process all images with Claude AI
     let result;
     try {
-      result = await processAllImageBatches(imageUrls, userId, batchId);
+      result = await processAllImageBatches(imageUrls, userId, batchId, processingId);
     } catch (aiError) {
       console.error("❌ Claude AI processing error:", aiError);
       
@@ -151,11 +218,12 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         error: `AI processing failed: ${aiError.message}`,
         status: 'failed',
+        processingId: processingId,
         data: {
-          applicantName: null,
-          submitterId: null,
-          applicantId: null,
-          region: null,
+          applicantName: "N/A",
+          submitterId: "N/A",
+          applicantId: "N/A",
+          region: "N/A",
           year: new Date().getFullYear().toString(),
           hectares: 0,
           cultures: [],
@@ -176,16 +244,18 @@ serve(async (req) => {
     }
     
     // Save OCR result to the database
+    let ocrLogId = null;
     try {
       const { data: ocrLog, error: ocrError } = await supabase
         .from('document_ocr_logs')
         .insert({
           user_id: userId,
-          file_name: files[0].name.split('_')[0] + '.pdf', // Approximation for original filename
-          file_size: 0, // We don't have the original file size here
+          file_name: batchData.document_name || `${processingId}.pdf`,
+          file_size: batchData.metadata?.fileSize || 0,
           file_type: 'application/pdf',
           storage_path: `saps/${userId}/${batchId}/images`,
-          ocr_content: result.rawText || "No OCR text available"
+          ocr_content: result.rawText || "No OCR text available",
+          processing_id: processingId
         })
         .select('id')
         .single();
@@ -195,25 +265,61 @@ serve(async (req) => {
         console.warn(`Error details:`, JSON.stringify(ocrError, null, 2));
       } else {
         console.log(`✅ OCR log successfully created: ${ocrLog.id}`);
+        ocrLogId = ocrLog.id;
       
-        // Save AI processing result
-        if (ocrLog?.id) {
-          const { error: extractionError } = await supabase
-            .from('document_extraction_results')
-            .insert({
-              ocr_log_id: ocrLog.id,
-              user_id: userId,
-              extracted_data: result.data || { status: 'processing' },
-              processing_status: result.data ? 'completed' : 'in_progress',
-              processing_time: 0
-            });
+        // Save Claude raw response to clauderesponse bucket as Word document
+        if (result.rawText) {
+          try {
+            // Since we can't use docx directly in Deno, we'll save as plain text file
+            const textContent = `CLAUDE RESPONSE FOR ${processingId}\n\n${result.rawText}`;
+            const textEncoder = new TextEncoder();
+            const fileContent = textEncoder.encode(textContent);
             
-          if (extractionError) {
-            console.warn(`⚠️ Extraction result save error: ${extractionError.message}`);
-            console.warn(`Error details:`, JSON.stringify(extractionError, null, 2));
-          } else {
-            console.log(`✅ Extraction result saved successfully`);
+            const { data: wordUpload, error: wordError } = await supabase.storage
+              .from('clauderesponse')
+              .upload(`${processingId}.txt`, fileContent, {
+                contentType: 'text/plain',
+                upsert: true
+              });
+              
+            if (wordError) {
+              console.warn(`⚠️ Error saving Claude response to storage: ${wordError.message}`);
+            } else {
+              const wordUrl = supabase.storage
+                .from('clauderesponse')
+                .getPublicUrl(`${processingId}.txt`).data.publicUrl;
+                
+              console.log(`✅ Claude response saved to storage: ${wordUrl}`);
+              
+              // Update OCR log with Claude response URL
+              await supabase
+                .from('document_ocr_logs')
+                .update({ claude_response_url: wordUrl })
+                .eq('id', ocrLogId);
+            }
+          } catch (wordError) {
+            console.warn(`⚠️ Error creating Claude response document: ${wordError.message}`);
           }
+        }
+        
+        // Save AI processing result
+        const { error: extractionError } = await supabase
+          .from('document_extraction_results')
+          .insert({
+            ocr_log_id: ocrLog.id,
+            user_id: userId,
+            extracted_data: result.data || { status: 'processing' },
+            processing_status: result.data ? 'completed' : 'in_progress',
+            processing_time: 0,
+            raw_claude_response: result.rawText || null,
+            processing_id: processingId
+          });
+            
+        if (extractionError) {
+          console.warn(`⚠️ Extraction result save error: ${extractionError.message}`);
+          console.warn(`Error details:`, JSON.stringify(extractionError, null, 2));
+        } else {
+          console.log(`✅ Extraction result saved successfully`);
         }
       }
     } catch (dbError) {
@@ -223,10 +329,12 @@ serve(async (req) => {
     
     // Return result
     return new Response(JSON.stringify({
-      ocrLogId: null, // We don't always have this value
+      ocrLogId: ocrLogId, 
+      processingId: processingId,
       data: result.data,
       status: 'completed',
-      batchInfo: result.batchInfo
+      batchInfo: result.batchInfo,
+      claudeResponseUrl: result.claudeResponseUrl
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
